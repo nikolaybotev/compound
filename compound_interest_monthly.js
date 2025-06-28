@@ -14,20 +14,20 @@ function amt(num) {
 let monthly_interest = (interest / 12) / 100
 let no_of_payments = term * 12
 // See https://www.bankrate.com/mortgages/amortization-calculator/#how-to-calculate
-let monthly_payment = (loan_amount * (
-    (monthly_interest * (1 + monthly_interest) ** no_of_payments) /
+let monthly_payment = loan_amount * (
+    (monthly_interest * ((1 + monthly_interest) ** no_of_payments)) /
     ((1 + monthly_interest) ** no_of_payments - 1)
-))
+)
 console.log("Computed monthly payment ", amt(monthly_payment))
 
 // Calculate  Payments
 let interest_paid = 0;
 let principal_paid = 0;
 let principal_left = loan_amount;
-for (let year = 0; year < term; year += 1) {
+for (let year = 1; year <= term; year += 1) {
     console.log("YEAR ", year, " START");
 
-    for (let month = 0; month < 12; month += 1) {
+    for (let month = 1; month <= 12; month += 1) {
         // payment
         let payment_interest = monthly_interest * principal_left;
         let payment_principal = monthly_payment - payment_interest;
