@@ -40,7 +40,7 @@ for (let year = 1; year <= term; year += 1) {
         principal_left -= payment_principal;
 
         // Extra payment on the first month
-        // if (year == 0 && month == 1) {
+        // if (year == 1 && month == 1) {
         //     principal_paid += 45;
         //     principal_left -= 45;
         // }
@@ -52,3 +52,5 @@ for (let year = 1; year <= term; year += 1) {
     console.log("Principal Left ", amt(principal_left));
     console.log("");
 }
+
+console.log("Cost of loan ", amt(interest_paid + principal_paid + principal_left));
