@@ -33,6 +33,7 @@ A zero-dependency Node.js calculator for a fixed monthly mortgage payment and it
 - `intent/mortgage-skill/` is the spec and plan for that skill.
 - `apps/web` is the amortization page. It imports `buildReport` and `formatGroupedCents` from `amortize.js`. A term in years is `monthCount = years * 12`, passed with the year count as `yearsForJson`. The extra column is the requested dollars; Apply replaces that map. The loan, the map, the prefill, and which years are open are stored under `compound-amortization-v1`. Vite's `base` defaults to `./`. Atkinson Hyperlegible and IBM Plex Mono live in `apps/web/fonts` with their SIL Open Font License files; the build fails, and names the file, if a shipped font's license is not that license.
 - `intent/amortization-app/` is the spec and plan for that page.
+- `intent/extra-savings-column/` is the spec and plan for a Saved by extra column on that schedule. It is not built yet.
 - `intent/loan-recast/` is the spec and plan for a term in months and a fixed-rate servicer recast via the skill. For a recast question or a term in months, that spec wins over `intent/mortgage-skill/`, which still records the first release's year-only term and recast refusal in its own files.
 - `README.md` describes the script and points at the skill.
 
@@ -40,7 +41,7 @@ A zero-dependency Node.js calculator for a fixed monthly mortgage payment and it
 
 - Do not put the $855,000 / 6.99% / 30-year gist loan back as constants that run when arguments are missing. That scenario is only `--amount 855000 --rate 6.99 --years 30`.
 - Charging stops when the principal reaches zero. Do not keep accruing interest after payoff. The schedule still lists the later months through the no-extra payoff, with zeros, so the last `interest_saved` matches the summary.
-- An extra payment does not reduce that month's interest. On $570,000 at 7%, month 1 interest is 332500 cents even when month 1 includes extra principal. Interest saved is cumulative against the no-extra schedule, so that same example saves 0 cents in month 1 and 813770 cents by month 360.
+- An extra payment does not reduce that month's interest. On $570,000 at 7%, month 1 interest is 332500 cents even when month 1 includes extra principal. Interest saved is cumulative against the no-extra schedule, so that same example saves 0 cents in month 1 and 813770 cents by month 360. Saved by extra, when the column exists, is a different number: the lifetime interest that one month's extra saves given the rest of the map. Do not fill it with `interest_saved_cents`.
 - The skill asks when the principal, note rate, term, extra plan, or recast month is missing. It does not invent taxes, insurance, or an $855,000 loan. Summary questions use `--json` alone. A month or savings-so-far question is the only reason to add `--schedule` on a non-recast run. A recast uses `--json --schedule` on the first run only.
 - The skill runs `scripts/compound_interest_monthly.js`. That file is a symlink to the calculator at the repo root. The spec's `../../compound_interest_monthly.js` is one directory short. `plan.md` records that.
 - Do not round currency with `Math.round(dollars * 100) / 100`. `Math.round(1.005 * 100)` is 100. Round reported amounts once, at output, half up to the cent.
