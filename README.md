@@ -6,7 +6,7 @@ This code was [first published as a GitHub Gist](https://gist.github.com/nikolay
 
 There are no npm dependencies; only the Node.js runtime is required.
 
-A skill at [`.agents/skills/mortgage-loan-calculator/SKILL.md`](.agents/skills/mortgage-loan-calculator/SKILL.md) asks for a missing principal, note rate, term, or extra plan, writes a `month,extra` CSV, and answers from this script. The design is [intent/mortgage-skill/](intent/mortgage-skill/intent.md).
+A skill at [`.agents/skills/mortgage-loan-calculator/SKILL.md`](.agents/skills/mortgage-loan-calculator/SKILL.md) asks for a missing principal, note rate, term, or extra plan, writes a `month,extra` CSV, and answers from this script. Term in months and fixed-rate recast are specified in [intent/loan-recast/](intent/loan-recast/intent.md). The first release design is [intent/mortgage-skill/](intent/mortgage-skill/intent.md).
 
 A local amortization page on the same calculator is specified in [intent/amortization-app/](intent/amortization-app/intent.md). It is not built yet.
 
@@ -22,7 +22,7 @@ From this directory:
 node compound_interest_monthly.js --amount 855000 --rate 6.99 --years 30
 ```
 
-`--amount` is principal in dollars and must be greater than zero. `--rate` is the annual note rate in percent, greater than zero, with at most three decimal places (`7`, `6.99`, `6.125`). `--years` is the term as a positive integer. All three are required. Invoking the script with no arguments exits non-zero and does not run a built-in loan.
+`--amount` is principal in dollars and must be greater than zero. `--rate` is the annual note rate in percent, greater than zero, with at most three decimal places (`7`, `6.99`, `6.125`). Exactly one of `--years` or `--months` is required. Each accepts a positive integer (`^[1-9]\d*$`): `--years` is the term in years and the payment count is that integer times 12; `--months` is the payment count directly. Passing both term flags, or neither, exits non-zero. Invoking the script with no arguments exits non-zero, names `--amount`, `--rate`, `--years`, and `--months`, and does not run a built-in loan.
 
 The monthly rate is that note rate divided by 12, the same 30/360 month the script has always used. Each month's interest is the unpaid principal times that rate. The scheduled payment stays constant. The walk uses the exact payment and the exact monthly interest, and it stops charging when the principal reaches zero.
 
@@ -33,7 +33,7 @@ node compound_interest_monthly.js --amount 570000 --rate 7 --years 30 --json --s
 ```
 
 - With no output flags, stdout is a short summary: monthly payment, payoff month, total interest, extra applied, extra unapplied, interest saved, and months saved. Money uses US grouping and two decimal places.
-- `--json` writes one JSON object and nothing else. Money fields are integer cents. The object has no `schedule` key.
+- `--json` writes one JSON object and nothing else. Money fields are integer cents. The object always includes `months`, the payment count. It includes `years` only when the term was passed with `--years`. The object has no `schedule` key unless `--schedule` is also set.
 - `--json --schedule` adds `schedule`: one object per month from 1 through the no-extra payoff. With no extra principal, `extra_cents` and `interest_saved_cents` are 0.
 - `--schedule` alone prints a CSV of those same months and nothing else. The header is `month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved`.
 
@@ -41,7 +41,7 @@ Reported amounts are rounded half up to the cent once, at output.
 
 ## Extra principal
 
-`--extra` is an optional UTF-8 CSV. The header row is `month,extra`. Each data row is one extra principal payment. `month` is the payment number, from 1 through `years * 12`. `extra` is a positive dollar amount. Rows for the same month are summed. A file with only the header is no extras. A month outside the term, a non-numeric or negative amount, or a missing column exits non-zero.
+`--extra` is an optional UTF-8 CSV. The header row is `month,extra`. Each data row is one extra principal payment. `month` is the payment number, from 1 through the payment count `n` (the `--months` value, or `--years` times 12). `extra` is a positive dollar amount. Rows for the same month are summed. A file with only the header is no extras. A month outside the term, a non-numeric or negative amount, or a missing column exits non-zero.
 
 The extra is applied after that month's interest, so it does not reduce the interest charged that month. The scheduled payment stays the same. Extra principal shortens the loan. Interest stops when the principal reaches zero. The schedule still lists the later months through the no-extra payoff, with interest, principal, extra, remaining principal, and remaining interest at zero. `interest_saved` on each row is cumulative: interest the no-extra loan has charged through that month, minus interest this loan has charged through that month. The last row matches the summary's interest saved.
 
