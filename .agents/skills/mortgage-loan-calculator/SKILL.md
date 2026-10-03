@@ -38,10 +38,10 @@ If the user describes an adjustable, interest-only, or recast loan, say this cal
 
 ## Run the script
 
-The script path is `../../../compound_interest_monthly.js` relative to this skill's directory (the folder that contains this file). Resolve the real directory of this `SKILL.md` first (follow symlinks), then apply that relative path, and run that file. `../../compound_interest_monthly.js` is one directory short and does not reach the script. Do not read or write any other path except the temporary `month,extra` CSV.
+The script is `scripts/compound_interest_monthly.js` in this skill's directory (the folder that contains this file). Resolve the real directory of this `SKILL.md` first (follow symlinks), then run that file. Do not read or write any other path except the temporary `month,extra` CSV.
 
 ```bash
-node ../../../compound_interest_monthly.js \
+node scripts/compound_interest_monthly.js \
   --amount PRINCIPAL --rate NOTE_RATE --years TERM \
   [--extra extras.csv] --json [--schedule]
 ```

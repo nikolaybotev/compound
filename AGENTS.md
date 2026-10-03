@@ -8,7 +8,7 @@ A zero-dependency Node.js calculator for a fixed monthly mortgage payment and it
 - Run: `node compound_interest_monthly.js --amount 855000 --rate 6.99 --years 30` (healthy: a summary whose monthly payment is 5,682.60). `--amount`, `--rate`, and `--years` are required.
 - JSON: add `--json`. Month rows: add `--schedule` (CSV alone, or inside the JSON object when combined with `--json`).
 - Extra principal: `--extra fixtures/first-year-100.csv`. The header is `month,extra`. On $570,000 at 7% for 30 years, $100 in months 1–12 saves 813770 cents and pays off in month 358.
-- Skill: `.agents/skills/mortgage-loan-calculator/SKILL.md`. It runs `../../../compound_interest_monthly.js` relative to that directory. Workspace link, not committed: `/Users/nikolay/git/.agents/skills/mortgage-loan-calculator` → `../../github.com/nikolaybotev/compound/.agents/skills/mortgage-loan-calculator`.
+- Skill: `.agents/skills/mortgage-loan-calculator/SKILL.md`. It runs `scripts/compound_interest_monthly.js`, a symlink to the calculator at the repo root. Workspace link, not committed: `/Users/nikolay/git/.agents/skills/mortgage-loan-calculator` → `../../github.com/nikolaybotev/compound/.agents/skills/mortgage-loan-calculator`.
 - Test: `node --test`
 - Lint: none.
 - Build: none.
@@ -37,7 +37,7 @@ A zero-dependency Node.js calculator for a fixed monthly mortgage payment and it
 - Charging stops when the principal reaches zero. Do not keep accruing interest after payoff. The schedule still lists the later months through the no-extra payoff, with zeros, so the last `interest_saved` matches the summary.
 - An extra payment does not reduce that month's interest. On $570,000 at 7%, month 1 interest is 332500 cents even when month 1 includes extra principal. Interest saved is cumulative against the no-extra schedule, so that same example saves 0 cents in month 1 and 813770 cents by month 360.
 - The skill asks when the principal, note rate, term, or extra plan is missing. It does not invent taxes, insurance, or an $855,000 loan. Summary questions use `--json` alone. A month or savings-so-far question is the only reason to add `--schedule`.
-- From `.agents/skills/mortgage-loan-calculator/`, the script is `../../../compound_interest_monthly.js`. The spec's `../../compound_interest_monthly.js` is one directory short. `plan.md` records that.
+- The skill runs `scripts/compound_interest_monthly.js`. That file is a symlink to the calculator at the repo root. The spec's `../../compound_interest_monthly.js` is one directory short. `plan.md` records that.
 - Do not round currency with `Math.round(dollars * 100) / 100`. `Math.round(1.005 * 100)` is 100. Round reported amounts once, at output, half up to the cent.
 - The schedule matches Bankrate's table, not a servicer ledger. Do not round the payment or each month's interest to the cent inside the walk. On $570,000 at 7% for 30 years the exact walk totals $795,200.72; a cent-rounded servicing walk is about $795,203.90. The README footnote states that on purpose.
 - Commit `e67ec85` removed `Math.ceil` on the payment. Putting that ceiling back, or rounding the walk to cents, reopens a discrepancy the script was changed to close.

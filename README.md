@@ -52,7 +52,7 @@ node compound_interest_monthly.js --amount 570000 --rate 7 --years 30 \
 
 ## Skill
 
-[`.agents/skills/mortgage-loan-calculator/SKILL.md`](.agents/skills/mortgage-loan-calculator/SKILL.md) is the front end. It resolves `compound_interest_monthly.js` as `../../../compound_interest_monthly.js` relative to the skill directory. A summary question (interest saved, both interest totals, the scheduled payment, months saved) runs `--json` alone. A month or savings-so-far question runs `--json --schedule` and reads `schedule`. The skill does not amortize the loan itself.
+[`.agents/skills/mortgage-loan-calculator/SKILL.md`](.agents/skills/mortgage-loan-calculator/SKILL.md) is the front end. It runs `scripts/compound_interest_monthly.js`, a symlink to the calculator at the repo root. A summary question (interest saved, both interest totals, the scheduled payment, months saved) runs `--json` alone. A month or savings-so-far question runs `--json --schedule` and reads `schedule`. The skill does not amortize the loan itself.
 
 The workspace link is local setup and is not a file in this repo: `/Users/nikolay/git/.agents/skills/mortgage-loan-calculator` points at `../../github.com/nikolaybotev/compound/.agents/skills/mortgage-loan-calculator`.
 
