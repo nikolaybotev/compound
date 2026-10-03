@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Derived from | [intent.md](intent.md) (2026-10-02) |
-| Status | Draft 2 |
+| Status | Draft 3 |
 | Stage | 2 · Design |
 
 ## 1. Summary
@@ -136,7 +136,9 @@
 
 **D2 — Interest saved is a second schedule that stops at payoff.** The current loop always runs `term * 12` months. Replaying the example on that loop, $100 extra in months 1–12, leaves a balance near −$9,380 and an interest difference near $8,180, because months after payoff keep accruing. The stopped schedule saves $8,137.70. A savings answer uses the stopped schedule.
 
-**D3 — The payment is the inverse of monthly 30/360 interest.** Fannie Mae servicing guide F-1-09 defines a full month of interest on a fixed-rate first mortgage as 30 days' interest on the unpaid balance using a 360-day year. That is unpaid principal times the note rate times `30/360`, once per month. It is not actual days in the calendar month. The fixed payment which reduces the balance to zero after `n` such months is the formula in the script. Checked 2026-10-02: for $570,000 at 7% and 360 months, that payment is $3,792.224222…, the balance after 360 payments is about a hundred-millionth of a dollar, and total interest is $795,200.72. Bankrate's schedule shows that interest total; its summary card rounds it to $795,201. Rounding the payment to $3,792.22 before the walk leaves about $5.15 of principal and about $795,204.35 of interest, so the schedule keeps the exact payment and rounds only the reported figures. The $1,199.10 payment on $200,000 at 6% for 30 years is that same formula rounded for display (unrounded 1199.10105…). Month 1 interest on the $570,000 / 7% loan is $3,325.00.
+**D3 — Match Bankrate, and say so.** The schedule keeps the exact payment and the exact monthly interest, and rounds only when it reports. Results are for comparison with Bankrate's amortization schedule, not with a servicer's ledger. Checked 2026-10-02: for $570,000 at 7% and 360 months, the payment is $3,792.224222…, the balance after 360 payments is about a hundred-millionth of a dollar, and total interest is $795,200.72. Bankrate's schedule shows that interest total; its summary card rounds it to $795,201. A walk that rounds the payment to $3,792.22 and each month's interest to the cent, which is closer to how a lender posts a bill, totals about $795,203.90. The README carries that difference as a footnote. The $1,199.10 payment on $200,000 at 6% for 30 years is the same formula rounded for display (unrounded 1199.10105…). Month 1 interest on the $570,000 / 7% loan is $3,325.00.
+
+The 2022 gist and the first commit in this repo wrapped the payment in `Math.ceil`, which rounds up to the next whole dollar, and they accrued a month of interest before applying it. Commit `e67ec85` (`Fix one-off error and simplify`, 2025-06-28) removed `Math.ceil` and charges interest in the same month. That is the behavior to keep. The gist has no other revision, and this repo has no commit that rounds each month to the cent.
 
 **D4 — Extra principal does not reduce the current month's interest.** That is the commented block in the script: accrue interest, apply the scheduled principal, then apply the extra. It is also the usual US mortgage posting order.
 

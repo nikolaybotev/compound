@@ -51,6 +51,8 @@ Optional **extra payment** logic is left in comments near the bottom of the inne
 
 Numbers are formatted with US locale and two decimal places.
 
+**Footnote — this matches Bankrate, not a servicer's ledger.** The schedule uses the exact payment from the formula and does not round each month's interest to the cent. A lender that bills $3,792.22 and rounds every month's interest to the cent will show a few dollars more interest over 30 years: about $795,203.90 on a $570,000 loan at 7%, against $795,200.72 here. [Bankrate's schedule](https://www.bankrate.com/mortgages/amortization-calculator/) shows $795,200.72; the summary card on that page rounds the same total to $795,201. Compare results with that schedule.
+
 ## License
 
 [MIT](LICENSE)

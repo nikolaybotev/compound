@@ -26,6 +26,6 @@ A zero-dependency Node.js calculator for a fixed monthly mortgage payment and it
 ## Things agents get wrong
 
 - Uncommenting the extra-payment block does not answer an interest-saved question. The loop always runs `term * 12` months, so an early payoff drives the balance negative and keeps accruing interest.
-- Do not round currency with `Math.round(dollars * 100) / 100`. `Math.round(1.005 * 100)` is 100. The spec uses integer cents.
-- Interest accrues once a month at note rate × 30/360, which is the same as dividing the annual rate by 12. A calendar month's actual day count is a different accrual. The payment formula in the script is the fixed payment that zeroes that monthly recurrence after the term.
-- Rounding that payment to the cent before walking the schedule leaves a few dollars of principal and raises total interest. On $570,000 at 7% for 30 years the exact walk totals $795,200.72. Report cents at the end; do not round inside the month loop.
+- Do not round currency with `Math.round(dollars * 100) / 100`. `Math.round(1.005 * 100)` is 100. Round reported amounts once, at output.
+- The schedule matches Bankrate's table, not a servicer ledger. Do not round the payment or each month's interest to the cent inside the walk. On $570,000 at 7% for 30 years the exact walk totals $795,200.72; a cent-rounded servicing walk is about $795,203.90. The README footnote states that on purpose.
+- Commit `e67ec85` removed `Math.ceil` on the payment. Putting that ceiling back, or rounding the walk to cents, reopens a discrepancy the script was changed to close.
