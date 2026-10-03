@@ -24,7 +24,8 @@ A zero-dependency Node.js calculator for a fixed monthly mortgage payment and it
 
 ## Architecture
 
-- `compound_interest_monthly.js` is the calculator. It takes the loan as arguments and optional extra principal as `--extra` (CSV header `month,extra`). It walks a 30/360 schedule, applies extra principal after that month's interest, and stops charging at payoff. The reported schedule still runs through the no-extra payoff; later rows are zeros.
+- `amortize.js` is the pure walk. It exports `buildReport(principal, ratePercent, monthCount, extrasByMonth, yearsForJson)`, `dollarsToCents`, `formatGroupedCents`, and `formatPlainCents`. It has no Node APIs. `buildReport` always includes `schedule`. `years` is set on the report only when `yearsForJson` is passed. The page will call this module; it does not keep a second formula.
+- `compound_interest_monthly.js` is the calculator CLI. It requires `amortize.js`, parses arguments, reads `--extra`, and prints. It walks a 30/360 schedule, applies extra principal after that month's interest, and stops charging at payoff. The reported schedule still runs through the no-extra payoff; later rows are zeros. `--json` omits `schedule` unless `--schedule` is set.
 - `fixtures/first-year-100.csv` is the $100-for-the-first-year example.
 - `compound_interest_monthly.test.js` is the `node --test` suite.
 - `.agents/skills/mortgage-loan-calculator/SKILL.md` is the front end. It asks for a missing principal, note rate, term, or extra plan, writes a `month,extra` CSV, and answers from `--json`. A month or savings-so-far question adds `--schedule` and reads `schedule`. It does not amortize the loan itself.
@@ -43,4 +44,4 @@ A zero-dependency Node.js calculator for a fixed monthly mortgage payment and it
 - Do not round currency with `Math.round(dollars * 100) / 100`. `Math.round(1.005 * 100)` is 100. Round reported amounts once, at output, half up to the cent.
 - The schedule matches Bankrate's table, not a servicer ledger. Do not round the payment or each month's interest to the cent inside the walk. On $570,000 at 7% for 30 years the exact walk totals $795,200.72; a cent-rounded servicing walk is about $795,203.90. The README footnote states that on purpose.
 - Commit `e67ec85` removed `Math.ceil` on the payment. Putting that ceiling back, or rounding the walk to cents, reopens a discrepancy the script was changed to close.
-- The amortization page does not grow its own loan walk. It calls `buildReport`. The loan start month is not payment 1; payment 1 is the next calendar month. Apply replaces the extra column; it does not add to it.
+- The amortization page does not grow its own loan walk. It calls `buildReport`. That function takes a month count, not a year count: `buildReport(principal, ratePercent, monthCount, extrasByMonth, yearsForJson)`. A page term in years is `monthCount = years * 12`, and the year count is `yearsForJson`. The loan start month is not payment 1; payment 1 is the next calendar month. Apply replaces the extra column; it does not add to it.

@@ -42,7 +42,11 @@ Files: `amortize.js`, `compound_interest_monthly.js`, `compound_interest_monthly
 2. Do not change CLI stdout, stderr, or exit codes. `--json` still omits `schedule` unless `--schedule` is set. `buildReport` itself always includes `schedule`.
 3. Add tests for AC2, including a read of `amortize.js` that fails if the source contains `require`, `import`, `process`, or `fs`. Keep the existing CLI assertions for AC1.
 
-DoD: `node --test` exits 0. `node -e "const {buildReport,formatGroupedCents}=require('./amortize.js'); const r=buildReport(570000,7,30,new Map()); if(r.interest_cents!==79520072||formatGroupedCents(r.monthly_payment_cents)!=='3,792.22') process.exit(1)"` exits 0. `node compound_interest_monthly.js` with no arguments still exits non-zero and does not print the gist loan.
+### Departure
+
+The spec's requirement 1 and AC2 call `buildReport(principal, ratePercent, years, extrasByMonth)`, and the original DoD one-liner called `buildReport(570000, 7, 30, new Map())` expecting the 30-year fixture. That signature predates the loan-recast merge. The landed function is `buildReport(principal, ratePercent, monthCount, extrasByMonth, yearsForJson)`. This phase keeps that signature, the `--months` CLI, and JSON that always includes `months` and includes `years` only when `--years` was passed. The page's term field stays in years: it will pass `years * 12` as `monthCount` and the year count as `yearsForJson`. AC2 is checked with `buildReport(570000, 7, 360, new Map(), 30)`.
+
+DoD: `node --test` exits 0. `node -e "const {buildReport,formatGroupedCents}=require('./amortize.js'); const r=buildReport(570000,7,360,new Map(),30); if(r.interest_cents!==79520072||formatGroupedCents(r.monthly_payment_cents)!=='3,792.22') process.exit(1)"` exits 0. `node compound_interest_monthly.js` with no arguments still exits non-zero and does not print the gist loan.
 
 ## Phase 1 — Inputs, summary, chart, schedule
 
