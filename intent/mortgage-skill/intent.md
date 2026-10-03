@@ -14,7 +14,7 @@
 
 ## Proposed outcome
 
-A person can ask, in ordinary language, how much interest a fixed mortgage saves under an extra-principal plan. Missing loan facts are asked for before any number is given. The calculator takes the loan terms as arguments and the extra principal as a CSV of month and amount, then reports the interest saved against the same loan with no extras.
+A person can ask, in ordinary language, about a fixed mortgage and an extra-principal plan. The sample question, interest saved by paying extra, is one of those questions. The same run should also answer questions about a particular month: interest charged, principal paid, balance left, interest still to come, extra principal applied, and how much interest has been saved so far. Missing loan facts are asked for before any number is given. The calculator takes the loan terms as arguments and the extra principal as a CSV of month and amount.
 
 ## Affected users and systems
 
@@ -31,7 +31,7 @@ A person can ask, in ordinary language, how much interest a fixed mortgage saves
 
 ## Open questions (carried into spec.md)
 
-None. The design choices made while drafting are D1–D12 in [spec.md](spec.md).
+None. The design choices made while drafting are D1–D14 in [spec.md](spec.md).
 
 ## Original prompt (verbatim)
 
