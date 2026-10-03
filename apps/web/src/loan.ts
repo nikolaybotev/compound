@@ -74,6 +74,7 @@ export type ScheduleMonth = {
   interestCents: number;
   extraCents: number;
   extraDollars: number;
+  savedByExtraCents: number;
   principalBalanceCents: number;
   interestBalanceCents: number;
 };
@@ -229,6 +230,20 @@ export function loanReport(loan: Loan, extras: Map<number, number> = new Map()):
   );
 }
 
+export function savedByExtraCents(
+  loan: Loan,
+  extras: Map<number, number>,
+  month: number,
+  fullInterestCents: number,
+): number {
+  const requested = extras.get(month) ?? 0;
+  if (requested <= 0) return 0;
+  const without = new Map(extras);
+  without.delete(month);
+  const counterfactual = loanReport(loan, without);
+  return counterfactual.interest_cents - fullInterestCents;
+}
+
 export function paymentDate(
   startMonth: string,
   paymentNumber: number,
@@ -325,10 +340,12 @@ export function bands(
 }
 
 export function groupByYear(
+  loan: Loan,
   report: Report,
-  startMonth: string,
   extras: Map<number, number> = new Map(),
 ): ScheduleYear[] {
+  const startMonth = loan.startMonth;
+  const fullInterestCents = report.interest_cents;
   const groups: ScheduleYear[] = [];
   const rows = report.schedule.slice(0, report.payoff_month);
   for (const row of rows) {
@@ -355,6 +372,7 @@ export function groupByYear(
       interestCents: row.interest_cents,
       extraCents,
       extraDollars,
+      savedByExtraCents: savedByExtraCents(loan, extras, row.month, fullInterestCents),
       principalBalanceCents: row.remaining_principal_cents,
       interestBalanceCents: row.remaining_interest_cents,
     });
