@@ -6,7 +6,7 @@ This code was [first published as a GitHub Gist](https://gist.github.com/nikolay
 
 There are no npm dependencies; only the Node.js runtime is required.
 
-The change in progress is [intent/mortgage-skill/](intent/mortgage-skill/intent.md): a skill that asks for missing facts before it answers.
+A skill at [`.agents/skills/mortgage-loan-calculator/SKILL.md`](.agents/skills/mortgage-loan-calculator/SKILL.md) asks for a missing principal, note rate, term, or extra plan, writes a `month,extra` CSV, and answers from this script. The design is [intent/mortgage-skill/](intent/mortgage-skill/intent.md).
 
 ## Requirements
 
@@ -49,6 +49,12 @@ The extra is applied after that month's interest, so it does not reduce the inte
 node compound_interest_monthly.js --amount 570000 --rate 7 --years 30 \
   --extra fixtures/first-year-100.csv --json
 ```
+
+## Skill
+
+[`.agents/skills/mortgage-loan-calculator/SKILL.md`](.agents/skills/mortgage-loan-calculator/SKILL.md) is the front end. It resolves `compound_interest_monthly.js` as `../../../compound_interest_monthly.js` relative to the skill directory. A summary question (interest saved, both interest totals, the scheduled payment, months saved) runs `--json` alone. A month or savings-so-far question runs `--json --schedule` and reads `schedule`. The skill does not amortize the loan itself.
+
+The workspace link is local setup and is not a file in this repo: `/Users/nikolay/git/.agents/skills/mortgage-loan-calculator` points at `../../github.com/nikolaybotev/compound/.agents/skills/mortgage-loan-calculator`.
 
 ## Test
 
