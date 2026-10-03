@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Derived from | [intent.md](intent.md) (2026-10-02) |
-| Status | Draft 1 |
+| Status | Draft 2 |
 | Stage | 2 · Design |
 
 ## 1. Summary
@@ -61,9 +61,9 @@ This folder builds on [intent/mortgage-skill/](../mortgage-skill/intent.md). Tha
      [--extra extras.csv] [--json] [--schedule]
    ```
 
-   `--amount` and `--rate` stay as in the mortgage-skill spec. Exactly one of `--years` and `--months` is required. `--years` remains a positive integer. `--months` is a positive integer. `30.0`, `0`, a negative, and a non-integer are invalid for either flag. Both flags, or neither, exits non-zero and the reason on stderr names the term flags. A missing amount or rate still exits non-zero, still says a required argument is missing, and still does not run the $855,000 loan. The payment count `n` is `years * 12` when `--years` is set, and the given integer when `--months` is set.
+   `--amount` and `--rate` stay as in the mortgage-skill spec. Exactly one of `--years` and `--months` is required. Both accept the same text: a positive integer matching `^[1-9]\d*$`. `30.0`, `13.0`, `0`, `01`, a negative, and any other non-integer are invalid. Both flags, or neither, exits non-zero. Stderr says that exactly one of `--years` or `--months` is required and names both flags. A run with no arguments does the same for the term, also names `--amount` and `--rate` as missing, and does not run the $855,000 loan. The payment count `n` is `years * 12` when `--years` is set, and the given integer when `--months` is set.
 
-2. `--json` always includes `months`, the payment count `n`. It includes `years` only when `--years` was passed, as that integer. A `--months` run has no `years` key. Every other JSON field keeps the mortgage-skill meanings, with payoff and extra bounds measured in `n` rather than `years * 12`. The human summary text is unchanged.
+2. `--json` always includes `months`, the payment count `n`. It includes `years` only when `--years` was passed, as that integer. A `--months` run has no `years` key. Every other JSON field keeps the mortgage-skill meanings, with payoff and extra bounds measured in `n` rather than `years * 12`. The human summary text is unchanged. `README.md` still documents `--months`, the either-or rule, and the JSON `months` field.
 
 3. `--extra` months run from 1 through `n`. A month outside that range exits non-zero. Duplicate months still sum.
 
@@ -78,10 +78,12 @@ This folder builds on [intent/mortgage-skill/](../mortgage-skill/intent.md). Tha
 
 6. The skill performs a recast as two runs, and it always passes the remainder with `--months`, including when the remainder is a multiple of 12.
    - Ask, and wait, when the principal, the note rate, the original term, the extra plan, or the recast month is missing. "No extras" is an answer.
-   - "After N years" is payment month `N * 12`. Month 1 is the first payment. A stated start month and a stated recast month become a payment number the same way an extra-payment month does. November 2026 as the first payment makes March 2027 month 5. If the start payment month is missing and the recast is named as a calendar month, ask.
+   - "After N years" is payment month `N * 12`. "After N months" is payment month `N`. "At month M" is payment month `M`. Month 1 is the first payment.
+   - A calendar recast needs a first payment month. Payment number is `(year2 - year1) * 12 + (month2 - month1) + 1`, with months numbered January = 1. November 2026 as the first payment makes March 2027 month 5 and October 2028 month 24. If the first payment month is missing and the recast is named as a calendar month, ask. If the loan start could be either the closing month or the first payment month and the user did not say which, ask.
    - A lump sum paid with the recast is an extra row on the recast month in the first run.
    - The first run is `--json --schedule` for the original loan and its extra CSV.
-   - Let `M` be the recast month and `n` the original payment count. If `M` is not an integer from 1 through `n - 1`, say there is no positive remaining term to re-amortize and do not run a second loan. If month `M` has `remaining_principal_cents` of 0, the loan is already paid off; do not run a second loan.
+   - Let `M` be the recast month. The original payment count `n` is the first run's JSON `months`. The second run's `--months` value is `n - M`. Do not multiply years again for that subtraction.
+   - If `M` is not an integer from 1 through `n - 1`, tell the user there is no positive remaining term to re-amortize and do not run a second loan. If month `M` has `remaining_principal_cents` of 0, tell the user the loan is already paid off and do not run a second loan. The wording is the agent's; the two cases stay distinct.
    - The second principal is that row's `remaining_principal_cents`, written as dollars with exactly two decimal places. The second run is `--amount` that string, the same `--rate`, `--months` set to `n - M`, no `--extra`, and `--json` with no `--schedule`.
    - The second run's `amount_cents` must equal that `remaining_principal_cents`. If it does not, the dollar string was wrong; correct it and run again. Do not invent the payment.
    - The recast payment is the second run's `monthly_payment_cents`. The interest that loan costs, if only the new payment is made, is the second run's `interest_cents`.
@@ -89,7 +91,7 @@ This folder builds on [intent/mortgage-skill/](../mortgage-skill/intent.md). Tha
    - Interest already charged through the recast month is the sum of `interest_cents` on schedule rows 1 through `M`. Lifetime interest with the recast is that sum plus the second run's `interest_cents`. Those are additions of printed cents, used only when the question asks for them.
    - If, and only if, the owner also asks about extra principal after the recast, run the recast loan again with a new CSV whose month 1 is the first payment after the recast. The new required payment itself is the second run, with no extras.
 
-7. The skill file states the definition in requirement 5, the procedure in requirement 6, and the ask-before-answering rule. Its description tells an agent to use it for a fixed-rate recast even when the user does not call it a skill. An adjustable-rate or interest-only loan is still refused, with no schedule. The script path, the summary rules, and the month-level rules from the mortgage skill stay. The reported recast payment can differ by a cent from a servicer that rounds the contractual payment before amortizing. The skill does not adjust the script's figure.
+7. The skill file states the definition in requirement 5, the procedure in requirement 6, and the ask-before-answering rule. It asks for the term in years or months. Its run example shows `--years` and `--months` as the two ways to pass the term, one of them required. "Every month," with no end named, is months 1 through the payment count `n`: the `--months` value, or `years * 12`, and on a recast the first run's JSON `months`. It does not expand an extra plan with `years * 12` when the term was given in months. Its description tells an agent to use it for a fixed-rate recast even when the user does not call it a skill. An adjustable-rate or interest-only loan is still refused, with no schedule. The summary rules and the month-level rules from the current skill file stay. The script path stays the one that file already runs: resolve the real directory of `SKILL.md`, then `scripts/compound_interest_monthly.js`. The reported recast payment can differ by a cent from a servicer that rounds the contractual payment before amortizing. The skill does not adjust the script's figure.
 
 8. The sample, checked 2026-10-02 with the current script. Original loan `$570,000`, `7.375%`, `--years 30`, `$2,400` in months 1 through 360, and `$20,000` in months 5, 17, 29, and so on through the term. Month 24 `remaining_principal_cents` is 45361449. The second run `--amount 453614.49 --rate 7.375 --months 336` reports `amount_cents` 45361449, `monthly_payment_cents` 319568, `payoff_month` 336, and `interest_cents` 62013361. The same principal and rate for 335 months reports `monthly_payment_cents` 319855, so the 28-year payment is not the payment for one month less.
 
@@ -97,16 +99,16 @@ This folder builds on [intent/mortgage-skill/](../mortgage-skill/intent.md). Tha
 
 | ID | Check |
 |---|---|
-| AC1 | `--amount 200000 --rate 6 --years 15 --json` and the same loan with `--months 180` both report `monthly_payment_cents` 168771, `payoff_month` 180, and `interest_cents` 10378846. The years run has `years` 15 and `months` 180. The months run has `months` 180 and no `years` key. |
+| AC1 | `node --test` exits 0. `--amount 200000 --rate 6 --years 15 --json` and the same loan with `--months 180` both report `monthly_payment_cents` 168771, `payoff_month` 180, and `interest_cents` 10378846. The years run has `years` 15 and `months` 180. The months run has `months` 180 and no `years` key. `README.md` documents `--months` and the JSON `months` field. |
 | AC2 | `--amount 200000 --rate 6 --months 13 --json` reports `monthly_payment_cents` 1592845, `payoff_month` 13, `interest_cents` 706982, `months` 13, and no `years` key. |
-| AC3 | No arguments still exits non-zero, stderr matches a missing required argument, and neither stream contains the $855,000 loan. `--years` together with `--months` exits non-zero and names the term flags. Amount and rate with neither term flag does the same. `--months 0`, `--months 13.0`, and `--years 30.0` each exit non-zero. |
+| AC3 | No arguments still exits non-zero, stderr names `--amount`, `--rate`, `--years`, and `--months`, and neither stream contains the $855,000 loan. `--years` together with `--months` exits non-zero and says that exactly one of those two flags is required. Amount and rate with neither term flag does the same. `--months 0`, `--months 01`, `--months 13.0`, and `--years 30.0` each exit non-zero. |
 | AC4 | On a 13-month loan, an extra CSV month of 14 exits non-zero. Month 13 is accepted. |
-| AC5 | The sample in requirement 8: month 24 remaining principal 45361449 cents, and `--amount 453614.49 --rate 7.375 --months 336 --json` reports payment 319568 cents, interest 62013361 cents, payoff month 336, and `amount_cents` 45361449. `--months 335` on that principal and rate reports payment 319855 cents. |
-| AC6 | The skill description covers a fixed-rate recast. The body defines the recast as requirement 5, gives the two-run procedure, uses `--months` for the remainder, checks `amount_cents`, refuses a zero balance and a non-positive remainder, refuses adjustable and interest-only loans, and warns that a servicer's rounded payment can differ by a cent. The workspace symlink still resolves to that file. |
+| AC5 | The sample in requirement 8, as one test: the first run's month 24 `remaining_principal_cents` is 45361449, and `--amount 453614.49 --rate 7.375 --months 336 --json` reports payment 319568 cents, interest 62013361 cents, payoff month 336, and `amount_cents` 45361449. `--months 335` on that principal and rate reports payment 319855 cents. |
+| AC6 | The skill description covers a fixed-rate recast. The body defines the recast as requirement 5, gives the two-run procedure, takes `n` from the first run's `months`, uses `--months` for the remainder, checks `amount_cents`, says when the balance is already zero and when the remaining term is not positive, refuses adjustable and interest-only loans, asks for a term in years or months, shows both term flags in its run example, and warns that a servicer's rounded payment can differ by a cent. The workspace symlink still resolves to that file. |
 
 ## 7. Design decisions
 
-**D1 — Add `--months`; do not loosen `--years`.** The prompt asked for a term in months, and `--years 30.0` is already an error. A fractional year would be a second encoding of the same count. Exactly one flag is required so a command cannot carry two terms. Checked 2026-10-02: the script rejects `--years 30.0`, and `parseYears` accepts only `^[1-9]\d*$`.
+**D1 — Add `--months`; do not loosen `--years`.** The prompt asked for a term in months, and `--years 30.0` is already an error. A fractional year would be a second encoding of the same count. Exactly one flag is required so a command cannot carry two terms. `--months` uses the same `^[1-9]\d*$` text as `--years`, so `01` is an error. Checked 2026-10-02: the script rejects `--years 30.0`, and `parseYears` accepts only `^[1-9]\d*$`.
 
 **D2 — `months` is always in the JSON; `years` only when `--years` was the input.** A 13-month loan has no year count to report. Existing `--years` answers gain `months` and keep `years`. Checked 2026-10-02: `--years 15` on $200,000 at 6% returns payment 168771 cents, interest 10378846 cents, and payoff month 180, which is the 180-month walk.
 
