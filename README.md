@@ -8,7 +8,7 @@ There are no npm dependencies; only the Node.js runtime is required.
 
 A skill at [`.agents/skills/mortgage-loan-calculator/SKILL.md`](.agents/skills/mortgage-loan-calculator/SKILL.md) asks for a missing principal, note rate, term, or extra plan, writes a `month,extra` CSV, and answers from this script. Term in months and fixed-rate recast are specified in [intent/loan-recast/](intent/loan-recast/intent.md). The first release design is [intent/mortgage-skill/](intent/mortgage-skill/intent.md).
 
-A local amortization page on the same calculator is specified in [intent/amortization-app/](intent/amortization-app/intent.md). It is not built yet.
+A local amortization page on the same calculator is [apps/web](apps/web). Its design is [intent/amortization-app/](intent/amortization-app/intent.md). From this directory, `pnpm --dir apps/web dev` serves it, `pnpm --dir apps/web build` writes a static `apps/web/dist` (Vite base `./` unless `VITE_BASE` is set), and `pnpm --dir apps/web preview` serves that build. The page calls `buildReport` in `amortize.js`.
 
 ## Requirements
 
