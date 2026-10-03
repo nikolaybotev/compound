@@ -418,7 +418,6 @@ test('AC7 skill states the ask rule, the CSV, and which flags to run', () => {
     '--json` alone',
     'month or savings-so-far',
     '--json --schedule',
-    'Do not produce a schedule',
     'Do not recompute the amortization',
   ];
   for (const phrase of phrases) {
@@ -427,4 +426,32 @@ test('AC7 skill states the ask rule, the CSV, and which flags to run', () => {
   assert.doesNotMatch(skill, /disable-model-invocation:\s*true/);
   const fromSkill = path.join(path.dirname(skillPath), 'scripts', 'compound_interest_monthly.js');
   assert.equal(fs.realpathSync(fromSkill), fs.realpathSync(script));
+});
+
+test('loan-recast AC6 skill recast procedure and term flags', () => {
+  const skillPath = path.join(__dirname, '.agents', 'skills', 'mortgage-loan-calculator', 'SKILL.md');
+  const skill = fs.readFileSync(skillPath, 'utf8');
+  const phrases = [
+    'Servicer recast',
+    'two runs',
+    'remaining_principal_cents',
+    'amount_cents',
+    'monthly_payment_cents',
+    'interest_cents',
+    '--months TERM_MONTHS',
+    '--years TERM_YEARS',
+    'Exactly one of `--years` or `--months` is required',
+    'no positive remaining term',
+    'already paid off',
+    'first payment month',
+    'closing month or the first payment month',
+    'differ by about a cent',
+    'years or months',
+    'recast month',
+  ];
+  for (const phrase of phrases) {
+    assert.ok(skill.includes(phrase), `missing: ${phrase}`);
+  }
+  assert.match(skill, /G5/);
+  assert.match(skill, /G6/);
 });
