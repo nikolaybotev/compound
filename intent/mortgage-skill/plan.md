@@ -69,10 +69,10 @@ Files: `.agents/skills/mortgage-loan-calculator/SKILL.md`, `AGENTS.md`, `README.
 3. Create the workspace symlink named in requirement 11. Do not commit that symlink into this repo.
 4. Point `README.md` and `AGENTS.md` at the skill path.
 
-DoD: `node --test` still exits 0. The skill file contains the ask rule, including a missing amount or period and "no extras"; the header `month,extra`; "the first year" and "every month"; price minus down payment; the note rate; the refusal for adjustable, interest-only, and recast loans; the relative path `../../compound_interest_monthly.js`; `interest_saved_cents`; `--json` alone for G5; and `--json --schedule` for a month or savings-so-far question. The workspace symlink's target is that file.
+DoD: `node --test` still exits 0. The skill file contains the ask rule, including a missing amount or period and "no extras"; the header `month,extra`; "the first year" and "every month"; price minus down payment; the note rate; the refusal for adjustable, interest-only, and recast loans; the relative path `scripts/compound_interest_monthly.js`; `interest_saved_cents`; `--json` alone for G5; and `--json --schedule` for a month or savings-so-far question. The workspace symlink's target is that file.
 
 ### Recorded choice
 
 The skill omits `disable-model-invocation`. Setting it would load the skill only when the user names it, and requirement 10 says to use the skill even when they do not call it a skill. The skill tells the agent to resolve the real directory of `SKILL.md` before taking a relative path, so the workspace symlink is not used as the starting directory.
 
-Spec requirement 10 and this phase's definition of done name the script as `../../compound_interest_monthly.js` relative to the skill directory. From `.agents/skills/mortgage-loan-calculator/` that path is `.agents/compound_interest_monthly.js`, which is not the calculator. The script is one level higher: `../../../compound_interest_monthly.js`. The skill runs that path. The spec's shorter path is stated only to say it does not reach the file.
+The skill runs `scripts/compound_interest_monthly.js`. That file is a symlink to `../../../../compound_interest_monthly.js`, the calculator at the repo root. Spec requirement 10 names the script as `../../compound_interest_monthly.js` relative to the skill directory. From `.agents/skills/mortgage-loan-calculator/` that path is `.agents/compound_interest_monthly.js`, which is not the calculator. The spec's shorter path is not the file the skill runs.

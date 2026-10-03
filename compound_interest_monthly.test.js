@@ -319,8 +319,7 @@ test('AC7 skill states the ask rule, the CSV, and which flags to run', () => {
     'adjustable',
     'interest-only',
     'recast',
-    '../../../compound_interest_monthly.js',
-    '../../compound_interest_monthly.js',
+    'scripts/compound_interest_monthly.js',
     'interest_saved_cents',
     '--json` alone',
     'month or savings-so-far',
@@ -332,6 +331,6 @@ test('AC7 skill states the ask rule, the CSV, and which flags to run', () => {
     assert.ok(skill.includes(phrase), `missing: ${phrase}`);
   }
   assert.doesNotMatch(skill, /disable-model-invocation:\s*true/);
-  const fromSkill = path.resolve(path.dirname(skillPath), '../../../compound_interest_monthly.js');
+  const fromSkill = path.join(path.dirname(skillPath), 'scripts', 'compound_interest_monthly.js');
   assert.equal(fs.realpathSync(fromSkill), fs.realpathSync(script));
 });
