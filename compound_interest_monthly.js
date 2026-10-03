@@ -51,6 +51,7 @@ function parseArgs(argv) {
     amount: undefined,
     rate: undefined,
     years: undefined,
+    months: undefined,
     extra: undefined,
     json: false,
     schedule: false,
@@ -64,7 +65,10 @@ function parseArgs(argv) {
       opts[token.slice(2)] = true;
       continue;
     }
-    if (token === '--amount' || token === '--rate' || token === '--years' || token === '--extra') {
+    if (
+      token === '--amount' || token === '--rate' || token === '--years'
+      || token === '--months' || token === '--extra'
+    ) {
       if (seen.has(token)) fail(`duplicate argument: ${token}`);
       const value = argv[i + 1];
       if (value === undefined || value.startsWith('-')) {
@@ -146,20 +150,18 @@ function loadExtras(filePath, monthCount) {
   return extras;
 }
 
-function parseYears(text) {
-  if (text === undefined) fail('missing required argument: --years');
+function parsePositiveTerm(text, flag) {
   if (!/^[1-9]\d*$/.test(text)) {
-    fail('invalid --years: term must be a positive integer');
+    fail(`invalid ${flag}: term must be a positive integer`);
   }
-  const years = Number(text);
-  if (!Number.isSafeInteger(years)) {
-    fail('invalid --years: term must be a positive integer');
+  const value = Number(text);
+  if (!Number.isSafeInteger(value)) {
+    fail(`invalid ${flag}: term must be a positive integer`);
   }
-  return years;
+  return value;
 }
 
-function walk(principal, annualPercent, years, extrasByMonth) {
-  const n = years * 12;
+function walk(principal, annualPercent, n, extrasByMonth) {
   const r = (annualPercent / 100) / 12;
   const payment = principal * ((r * ((1 + r) ** n)) / (((1 + r) ** n) - 1));
   let balance = principal;
@@ -247,15 +249,15 @@ function scheduleRows(actual, baseline, interestSavedCents) {
   });
 }
 
-function buildReport(principal, ratePercent, years, extrasByMonth) {
-  const actual = walk(principal, ratePercent, years, extrasByMonth);
-  const baseline = walk(principal, ratePercent, years, new Map());
+function buildReport(principal, ratePercent, monthCount, extrasByMonth, yearsForJson) {
+  const actual = walk(principal, ratePercent, monthCount, extrasByMonth);
+  const baseline = walk(principal, ratePercent, monthCount, new Map());
   const interestCents = dollarsToCents(actual.interestTotal);
   const baselineInterestCents = dollarsToCents(baseline.interestTotal);
   const report = {
     amount_cents: dollarsToCents(principal),
     rate_percent: ratePercent,
-    years,
+    months: monthCount,
     monthly_payment_cents: dollarsToCents(actual.payment),
     payoff_month: actual.payoffMonth,
     interest_cents: interestCents,
@@ -268,8 +270,28 @@ function buildReport(principal, ratePercent, years, extrasByMonth) {
     interest_saved_cents: baselineInterestCents - interestCents,
     months_saved: baseline.payoffMonth - actual.payoffMonth,
   };
+  if (yearsForJson !== undefined) {
+    report.years = yearsForJson;
+  }
   report.schedule = scheduleRows(actual, baseline, report.interest_saved_cents);
   return report;
+}
+
+function resolveTerm(opts) {
+  const hasYears = opts.years !== undefined;
+  const hasMonths = opts.months !== undefined;
+  if (hasYears && hasMonths) {
+    fail('exactly one of --years or --months is required');
+  }
+  if (!hasYears && !hasMonths) {
+    fail('exactly one of --years or --months is required');
+  }
+  if (hasYears) {
+    const years = parsePositiveTerm(opts.years, '--years');
+    return { monthCount: years * 12, yearsForJson: years };
+  }
+  const months = parsePositiveTerm(opts.months, '--months');
+  return { monthCount: months, yearsForJson: undefined };
 }
 
 function printSummary(report) {
@@ -305,22 +327,25 @@ function printScheduleCsv(schedule) {
 
 function runCli(argv) {
   const opts = parseArgs(argv);
-  const missing = ['--amount', '--rate', '--years'].filter((flag) => {
-    const key = flag.slice(2);
-    return opts[key] === undefined;
-  });
-  if (missing.length === 3) {
-    fail('missing required argument: --amount, --rate, and --years');
+  if (
+    opts.amount === undefined && opts.rate === undefined
+    && opts.years === undefined && opts.months === undefined
+  ) {
+    fail('missing required argument: --amount, --rate, --years, and --months');
   }
+
+  const missing = [];
+  if (opts.amount === undefined) missing.push('--amount');
+  if (opts.rate === undefined) missing.push('--rate');
   if (missing.length > 0) {
     fail(`missing required argument: ${missing.join(', ')}`);
   }
 
   const principal = parseAmount(opts.amount);
   const ratePercent = parseRate(opts.rate);
-  const years = parseYears(opts.years);
-  const extras = opts.extra === undefined ? new Map() : loadExtras(opts.extra, years * 12);
-  const report = buildReport(principal, ratePercent, years, extras);
+  const { monthCount, yearsForJson } = resolveTerm(opts);
+  const extras = opts.extra === undefined ? new Map() : loadExtras(opts.extra, monthCount);
+  const report = buildReport(principal, ratePercent, monthCount, extras, yearsForJson);
 
   if (opts.json) {
     const payload = { ...report };
