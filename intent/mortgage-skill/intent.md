@@ -14,7 +14,7 @@
 
 ## Proposed outcome
 
-A person can ask, in ordinary language, about a fixed mortgage and an extra-principal plan. The sample question, interest saved by paying extra, is one of those questions. The same run should also answer questions about a particular month: interest charged, principal paid, balance left, interest still to come, extra principal applied, and how much interest has been saved so far. Missing loan facts are asked for before any number is given. The calculator takes the loan terms as arguments and the extra principal as a CSV of month and amount.
+A person can ask, in ordinary language, about a fixed mortgage and an extra-principal plan. The sample question, interest saved by paying extra, is answered from the summary. A question about a particular month uses the same calculator with the schedule included: interest charged, principal paid, balance left, interest still to come, extra principal applied, and how much interest has been saved so far. Missing loan facts are asked for before any number is given. The calculator takes the loan terms as arguments and the extra principal as a CSV of month and amount.
 
 ## Affected users and systems
 

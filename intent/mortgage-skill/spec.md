@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Derived from | [intent.md](intent.md) (2026-10-02) |
-| Status | Draft 6 |
+| Status | Draft 7 |
 | Stage | 2 · Design |
 
 ## 1. Summary
@@ -39,7 +39,7 @@
 - P2. The rate is the note rate. The monthly rate is that percent divided by 12, the convention already in the script and on the Bankrate page it cites.
 - P3. An extra payment is applied after that month's interest is computed, then subtracted from principal. It does not reduce that month's interest.
 - P4. The scheduled principal-and-interest payment stays constant. Extra principal shortens the loan.
-- P5. The schedule stops when the principal reaches zero. Later contractual months are not charged.
+- P5. Interest stops when the principal reaches zero. The reported schedule still lists the later months through the no-extra payoff, with interest, principal, extra, remaining principal, and remaining interest at zero.
 - P6. The schedule uses the exact payment and the exact monthly interest. Reported amounts are rounded half up to the cent once, at output. Do not round with `Math.round(dollars * 100) / 100`; `Math.round(1.005 * 100)` is 100.
 - P7. A missing required fact is a question, not a default. The constants in the file today ($855,000, 6.99%, 30 years) are not defaults.
 
@@ -67,20 +67,21 @@
 
 3. `--extra` is a UTF-8 CSV. The header row is exactly `month,extra`. Each data row is one extra principal payment. `month` is an integer from 1 through `years * 12`. `extra` is a positive dollar amount. Rows for the same month are summed. A file with only the header is no extras. A month outside that range, a non-numeric amount, a negative amount, or a missing column exits non-zero.
 
-4. Month 1 is the first payment. "The first year" is months 1 through 12. The skill writes one CSV row per extra payment, including twelve rows of `100` for the example question.
+4. Month 1 is the first payment. "The first year" is months 1 through 12. "Every month," with no end named, is months 1 through `years * 12`. A plan with no amount, or no period, is incomplete and the skill asks. The skill writes one CSV row per extra payment, including twelve rows of `100` for the example question.
 
 5. Monthly payment is the fixed amount that pays the loan off after `n = years * 12` months of the interest rule in requirement 6, with no extra principal:
 
    `principal * (r * (1 + r) ^ n) / ((1 + r) ^ n - 1)`
 
-   where `r` is the note rate times `30/360`. That is the formula already in `compound_interest_monthly.js` and on the Bankrate page it cites. The walk uses this exact payment. The reported payment is that amount rounded half up to the cent.
+   where `r` is `(rate_percent / 100) / 12`, the same figure as the note rate times `30/360`. That is the formula already in `compound_interest_monthly.js` and on the Bankrate page it cites. The walk uses this exact payment. The reported payment is that amount rounded half up to the cent.
 
 6. Each month, while principal remains and the month is within `n`:
    - Interest is the unpaid principal times `r`. This is one month of interest under a 360-day year: 30 days out of 360, not the actual number of calendar days in the month.
    - The scheduled principal portion is the exact monthly payment minus that interest. The payment is applied to interest before principal.
    - That month's extra principal, if any, is added after the interest step.
-   - If the scheduled principal plus extra is greater than or equal to the remaining principal, or this is month `n`, the payment finishes the loan: interest plus remaining principal. Extra dollars beyond the remaining principal are unapplied. The schedule stops.
+   - If the scheduled principal plus extra is greater than or equal to the remaining principal, or this is month `n`, the payment finishes the loan: interest plus remaining principal. The principal applied from the scheduled payment is only what is still owed after that month's extra. Extra dollars beyond the remaining principal are unapplied. Charging stops.
    - Otherwise the remaining principal decreases by the scheduled principal plus the extra. Interest and balance are not rounded inside the loop.
+   - The reported `schedule` and CSV still include the months after this payoff through the no-extra payoff month. Those rows are zeros, as requirement 9 describes.
 
 7. Interest saved is the no-extra interest total minus the with-extra interest total. Months saved is the no-extra payoff month minus the with-extra payoff month. Unapplied extra is reported and is not part of interest saved.
 
@@ -112,7 +113,7 @@
    |---|---|
    | `month` | Payment number, starting at 1 |
    | `interest` | Interest charged this month on this schedule. Zero after this loan is paid off |
-   | `principal` | Scheduled principal this month, not including the extra. Zero after payoff |
+   | `principal` | Scheduled principal actually applied this month, not including the extra. On a month that does not pay the loan off, that is the exact payment minus this month's interest. On the payoff month it is only the principal still owed after this month's extra, so `principal` plus applied `extra` equals the principal at the start of the month and `remaining_principal` is 0. Zero after payoff |
    | `remaining_principal` | Balance after this month's scheduled principal and extra |
    | `remaining_interest` | Interest still to be charged on this schedule after this month |
    | `extra` | Extra principal applied this month |
@@ -145,7 +146,7 @@
 | AC5 | Invoking the script with no arguments exits non-zero and does not print the $855,000 schedule. `--amount 855000 --rate 6.99 --years 30 --json` reports monthly payment 568260 cents ($5,682.60). |
 | AC6 | A CSV month outside 1…`years * 12` exits non-zero. Two rows for the same valid month are summed. |
 | AC7 | The skill file states the ask-before-answering rule, the input CSV columns, the relative script path, that `--json` alone is the summary, and that a month-level question adds `--schedule` and reads `schedule`. The workspace symlink resolves to that file. |
-| AC8 | For the AC3 loan, `--json` alone has no `schedule` key. `--json --schedule` has 360 objects. Month 1 has `extra_cents` 10000 and `interest_saved_cents` 0. Month 12 has `interest_saved_cents` 3926. Month 360 has `interest_saved_cents` 813770, and interest, principal, extra, remaining principal, and remaining interest all 0. The same figures appear in the `--schedule` CSV as 100.00, 0.00, 39.26, and 8137.70. |
+| AC8 | For the AC3 loan, `--json` alone has no `schedule` key. `--json --schedule` has 360 objects. Month 1 has `extra_cents` 10000 and `interest_saved_cents` 0. Month 12 has `interest_saved_cents` 3926. Month 358 has `interest_cents` 1183, `principal_cents` 202715, `extra_cents` 0, and `remaining_principal_cents` 0. Month 360 has `interest_saved_cents` 813770, and interest, principal, extra, remaining principal, and remaining interest all 0. The same figures appear in the `--schedule` CSV as 100.00, 0.00, 39.26, 11.83, 2027.15, and 8137.70. |
 
 ## 7. Design decisions
 
@@ -161,7 +162,7 @@ The 2022 gist and the first commit in this repo wrapped the payment in `Math.cei
 
 **D5 — No silent defaults.** A forgotten flag must not answer the gist scenario. That scenario remains runnable as `--amount 855000 --rate 6.99 --years 30`.
 
-**D6 — Summary is the default.** `--json` alone returns the lifetime totals and omits `schedule`. `--json --schedule` adds the month rows to that same object. `--schedule` alone prints the CSV. The sample savings question does not need the rows, so the skill leaves the flag off. A question about a month adds it. A default that always included 360 rows would make the common answer carry a table it does not use.
+**D6 — Summary is the default.** `--json` alone returns the lifetime totals and omits `schedule`. `--json --schedule` adds the month rows to that same object. `--schedule` alone prints the CSV. The sample savings question does not need the rows, so the skill leaves the flag off. A question about a month adds it. A default that always included 360 rows would make the common answer carry a table it does not use. The spec review on 2026-10-02 read the earlier "same run" sentence as requiring `--schedule` on every answer. The owner had already asked for summary output when the rows are not needed, so the intent now says the sample question uses the summary and a month question includes the schedule.
 
 **D7 — The skill lives in this repo and is linked into the workspace.** Product skills live in `.agents/skills/<name>/`. The workspace already links `gold-value-normalizer` the same way, so a mortgage question asked from `/Users/nikolay/git` can find it.
 
