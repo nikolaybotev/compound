@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Implements | [spec.md](spec.md) Draft 2 |
-| Status | Draft 2 |
+| Implements | [spec.md](spec.md) Draft 3 |
+| Status | Draft 3 |
 | Stage | 3 · Build |
 
 Spec wins. Update this file in the same change whenever implementation departs from it.
