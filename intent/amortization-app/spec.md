@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Derived from | [intent.md](intent.md) (2026-10-02) |
-| Status | Draft 2 |
+| Status | Draft 3 |
 | Stage | 2 · Design |
 
 ## 1. Summary
@@ -123,7 +123,7 @@ A static page in this repo amortizes one fixed mortgage in the browser by callin
 
 17. The built page contains no request to any host except its own files. Playwright covers the fixture with every other host blocked.
 
-18. Deploy. `.github/workflows/deploy-pages.yml` runs on a push to `main` and on `workflow_dispatch`. It does not run on a schedule. It installs with pnpm, builds `apps/web` with `VITE_BASE=/compound/`, and uploads `apps/web/dist` to GitHub Pages with `actions/upload-pages-artifact` and `actions/deploy-pages`. It commits nothing. The site is `https://nikolaybotev.github.io/compound/`. Local `vite preview` uses a relative base so the same `dist` opens from a folder. The workflow's permissions are `contents: read`, `pages: write`, and `id-token: write`.
+18. Deploy. `.github/workflows/deploy-pages.yml` runs on a push to `main` and on `workflow_dispatch`. It does not run on a schedule. It installs with pnpm, builds `apps/web` with `VITE_BASE=/compound/`, and uploads that `apps/web/dist` to GitHub Pages with `actions/upload-pages-artifact` and `actions/deploy-pages`. It commits nothing. The site is `https://nikolaybotev.github.io/compound/`. The Vite `base` defaults to `./`. `vite build` with `VITE_BASE` unset, and `vite preview`, use that default, so the local `dist` opens from a folder. The Pages artifact is a separate build. The workflow's permissions are `contents: read`, `pages: write`, and `id-token: write`. Pull-request CI does not fetch the production URL. Phase 3 is not done until someone has opened the published page and seen the AC10 payment.
 
 19. Continuous integration keeps the existing Node.js 24 `node --test` job with no install step. A second job, also Node.js 24, installs the web app and runs its unit tests and Playwright. A pull request that breaks either job is not merged.
 
@@ -134,15 +134,20 @@ The example loan is purchase price $570,000, 0% down, 30 years, 7%, start month 
 | ID | Check |
 |---|---|
 | AC1 | `node --test` exits 0. The CLI fixture is unchanged: $570,000 at 7% for 30 years reports payment 379222 cents, interest 79520072 cents, payoff month 360, and month-1 interest 332500 cents. |
-| AC2 | `amortize.js` source contains no `require`, no `process`, and no `fs`. `buildReport(570000, 7, 30, new Map())` returns `monthly_payment_cents` 379222, `interest_cents` 79520072, `payoff_month` 360, month 1 `interest_cents` 332500 and `principal_cents` 46722, month 157 `remaining_principal_cents` 45048005 and `remaining_interest_cents` 31934147, month 360 `remaining_principal_cents` 0. `formatGroupedCents(379222)` is `3,792.22`. |
+| AC2 | `amortize.js` source contains no `require`, no `import`, no `process`, and no `fs`. `buildReport(570000, 7, 30, new Map())` returns `monthly_payment_cents` 379222, `interest_cents` 79520072, `payoff_month` 360, month 1 `interest_cents` 332500 and `principal_cents` 46722, month 157 `remaining_principal_cents` 45048005 and `remaining_interest_cents` 31934147, month 360 `remaining_principal_cents` 0. `formatGroupedCents(379222)` is `3,792.22`. |
 | AC3 | With the example loan and no extras, the page shows monthly payment $3,792.22, loan amount $570,000.00, total interest $795,200.72, total cost $1,365,200.72, and payoff October 2056. The 2026 group lists November and December only. The November row is month 1, principal $467.22, interest $3,325.00, no extra, principal balance $569,532.78, interest balance $791,875.72. The chart has 360 bars. The card for November 2039 shows principal paid $119,519.95, interest paid $475,859.25, loan balance $450,480.05, interest remaining $319,341.47, and this payment's principal $1,157.67, interest $2,634.55, extra principal $0.00. That card and the indicated bar both show the piggy bank and the hooded figure. Interest saved is not shown. |
 | AC4 | Price $712,500 and down payment 20% shows loan amount $570,000.00 and monthly payment $3,792.22. Price $399,999.00 and down payment 3.5% shows a loan amount of $385,999.03. |
 | AC5 | Apply with monthly $100 and yearly empty, on the example loan, shows extra $100.00 on month 1. The displayed rows stop at payoff, June 2054. The summary shows interest $718,834.63, interest saved $76,366.09, months saved 28, and monthly payment still $3,792.22. The prefill map itself has $100 on every month from 1 through 360; that is a unit test, because months after payoff are not on the page. Typing in the monthly field without Apply does not change the table. |
 | AC6 | After AC5, setting month 1's extra cell to $0.00 and committing it leaves month 2 at $100.00, and month 1's interest stays $3,325.00. Clicking Apply again sets month 1 back to $100.00. A further Apply with both amounts empty clears every extra, and interest saved is no longer shown. |
 | AC7 | Apply with monthly empty, yearly $1,000, and January, on the example loan with no other extras, puts $1,000.00 on month 3 (January 2027) and not on month 1. Interest saved is $66,633.36, payoff month 336, which is displayed as October 2054. |
-| AC8 | Reload restores the loan, the extra column, the prefill fields, and which years are open. Opening 2027, reloading, and finding 2027 still open is the check for the year state. A stored value that is not valid JSON loads the AC3 defaults instead of a blank page. |
+| AC8 | Reload restores the loan, the extra column, the prefill fields, and which years are open. Opening 2027, reloading, and finding 2027 still open is the check for the year state. A stored value that is not valid JSON is ignored, and the page loads requirement 5. The test pins the clock to 2026-10-15, so that load shows the example loan, a collapsed Make extra payments section, empty prefill amounts, and January selected. |
 | AC9 | The Playwright run blocks every host other than the app and still shows the AC3 payment. The built JavaScript does not contain `bankrate.com`. |
-| AC10 | The deploy workflow has no `schedule` trigger. A push to `main` publishes `https://nikolaybotev.github.io/compound/`, and that URL shows $3,792.22 for the default loan once the start month is October 2026. |
+| AC10 | The deploy workflow has no `schedule` trigger. A push to `main` publishes `https://nikolaybotev.github.io/compound/`, and that URL shows $3,792.22 for the default loan once the start month is October 2026. The pull-request jobs do not fetch that URL. Phase 3 is not done until this check has been made on the published page. |
+| AC11 | With the clock pinned to 2026-10-15 and nothing in storage, the page opens on the example loan without the test setting the start month. Typing a letter into the purchase price shows what is wrong and leaves the monthly payment at $3,792.22 and the chart in place. |
+| AC12 | On the example loan, ArrowRight from the November 2039 card moves it to December 2039 and leaves it open. Tapping a bar pins the card. Tapping outside the card closes it. Expand all years shows the January 2027 row. Activating it again hides that row. |
+| AC13 | After AC5, committing `abc` in month 1's extra cell leaves $100.00. Apply with the monthly amount set to `12.345` does nothing, names that field, and leaves month 1 at $100.00. |
+| AC14 | After a monthly $100 Apply, changing the term from 30 years to 15 drops month 181 from the requested-extra map. Changing the term back to 30 does not put $100 back on month 181. |
+| AC15 | On a first visit, Make extra payments is collapsed, both amounts are empty, and the yearly month is January. |
 
 October 2054 in AC7: month 1 is November 2026, so month 336 is October 2054. Checked 2026-10-02 by counting months, and by running the CLI on a CSV of $1,000 at months 3, 15, …: `interest_saved_cents` 6663336, `payoff_month` 336.
 
@@ -176,7 +181,11 @@ October 2054 in AC7: month 1 is November 2026, so month 336 is October 2054. Che
 
 **D13 — Pages is not on for this repo yet.** Checked 2026-10-02: `gh api repos/nikolaybotev/compound` reports `has_pages: false`, and the Pages endpoint returns 404. The repo is public. Turning Pages on is a step in the deploy phase, not a reason to pick a different host. The URL is `https://nikolaybotev.github.io/compound/`.
 
-**D14 — The default loan is the documented example.** $570,000, 0% down, 30 years, 7% is the loan the README compares with Bankrate. The start month follows the clock so the page is not stuck on October 2026 forever. Tests that need the screenshot dates set the start month; they do not depend on the day they run.
+**D14 — The default loan is the documented example.** $570,000, 0% down, 30 years, 7% is the loan the README compares with Bankrate. The start month follows the clock so the page is not stuck on October 2026 forever. A test that needs those dates either sets the start month or pins the clock to a day in October 2026. It does not depend on the day the suite runs.
+
+**D18 — Preview and Pages are two builds.** The default Vite base is `./`, so `vite preview` and a folder open use one `dist`. GitHub Pages needs `/compound/`, so the workflow builds again with `VITE_BASE` set and uploads that other `dist`. One artifact cannot carry both bases.
+
+**D19 — A corrupt save is a first visit.** Requirement 16 throws the blob away and loads requirement 5, including today's start month, empty extras, a collapsed prefill, and January. The acceptance test pins the clock to 2026-10-15 so that first visit is the example loan. October 2026 is not itself the corrupt-storage default.
 
 **D15 — Remember the scenario locally.** An edited extra column that disappears on reload is not a usable schedule. `localStorage` is enough. There is no account to sync.
 
