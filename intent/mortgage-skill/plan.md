@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Implements | [spec.md](spec.md) Draft 6 |
-| Status | Draft 6 |
+| Implements | [spec.md](spec.md) Draft 7 |
+| Status | Draft 7 |
 | Stage | 3 · Build |
 
 Spec wins. Update this file in the same change whenever implementation departs from it.
@@ -58,7 +58,7 @@ node compound_interest_monthly.js --amount 570000 --rate 7 --years 30 \
   --extra fixtures/first-year-100.csv --json
 ```
 
-prints `interest_saved_cents` 813770 and `months_saved` 2 and no `schedule` key. The same command with `--schedule` added prints month 12 `interest_saved_cents` 3926 and month 360 `interest_saved_cents` 813770.
+prints `interest_saved_cents` 813770 and `months_saved` 2 and no `schedule` key. The same command with `--schedule` added prints month 12 `interest_saved_cents` 3926, month 358 `principal_cents` 202715, and month 360 `interest_saved_cents` 813770.
 
 ## Phase 2 — Skill front end
 
