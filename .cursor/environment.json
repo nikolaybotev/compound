@@ -1,0 +1,5 @@
+{
+  "name": "compound",
+  "install": "#!/usr/bin/env bash\nset -euo pipefail\n\nif [ ! -x \"${HOME}/.local/bin/mise\" ]; then\n  curl -fsSL https://mise.run/bash | sh\nfi\n\nexport PATH=\"${HOME}/.local/bin:${PATH}\"\neval \"$(mise activate bash)\"\n\ncd /workspace\nmise trust --yes\nmise install\nmise reshim\n\ncorepack enable\ncorepack prepare pnpm@12.6.0 --activate\nmise reshim\n\npnpm install --frozen-lockfile\npnpm --dir apps/web exec playwright install --with-deps chromium\npnpm --dir apps/web build\n",
+  "start": "#!/usr/bin/env bash\nset -euo pipefail\nexport PATH=\"${HOME}/.local/bin:${PATH}\"\neval \"$(mise activate bash)\"\nif curl -sf -o /dev/null --max-time 2 http://127.0.0.1:5173/; then\n  exit 0\nfi\nif [ ! -f apps/web/dist/index.html ]; then\n  pnpm --dir apps/web build\nfi\nexec pnpm --dir apps/web exec vite preview --host 0.0.0.0 --port 5173 --strictPort\n"
+}
