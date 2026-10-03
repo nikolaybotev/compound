@@ -1,12 +1,13 @@
 # compound
 
-A zero-dependency Node.js calculator for a fixed monthly mortgage payment and its amortization. The change in progress is `intent/mortgage-skill/`: extra principal as a CSV, and a skill that asks for missing facts before it answers.
+A zero-dependency Node.js calculator for a fixed monthly mortgage payment and its amortization. The change in progress is `intent/mortgage-skill/`: a skill that asks for missing facts before it answers.
 
 ## Commands
 
 - Install: none. Node.js is the runtime.
 - Run: `node compound_interest_monthly.js --amount 855000 --rate 6.99 --years 30` (healthy: a summary whose monthly payment is 5,682.60). `--amount`, `--rate`, and `--years` are required.
 - JSON: add `--json`. Month rows: add `--schedule` (CSV alone, or inside the JSON object when combined with `--json`).
+- Extra principal: `--extra fixtures/first-year-100.csv`. The header is `month,extra`. On $570,000 at 7% for 30 years, $100 in months 1–12 saves 813770 cents and pays off in month 358.
 - Test: `node --test`
 - Lint: none.
 - Build: none.
@@ -22,15 +23,17 @@ A zero-dependency Node.js calculator for a fixed monthly mortgage payment and it
 
 ## Architecture
 
-- `compound_interest_monthly.js` is the calculator. It takes the loan as arguments, walks a 30/360 schedule, and stops charging at payoff. Extra principal is not an input yet.
+- `compound_interest_monthly.js` is the calculator. It takes the loan as arguments and optional extra principal as `--extra` (CSV header `month,extra`). It walks a 30/360 schedule, applies extra principal after that month's interest, and stops charging at payoff. The reported schedule still runs through the no-extra payoff; later rows are zeros.
+- `fixtures/first-year-100.csv` is the $100-for-the-first-year example.
 - `compound_interest_monthly.test.js` is the `node --test` suite.
-- `intent/mortgage-skill/` is the spec for the extra-payment CSV and `.agents/skills/mortgage-loan-calculator/`.
+- `intent/mortgage-skill/` is the spec for `.agents/skills/mortgage-loan-calculator/`.
 - `README.md` describes the current script. The spec describes the script after the whole change lands.
 
 ## Things agents get wrong
 
 - Do not put the $855,000 / 6.99% / 30-year gist loan back as constants that run when arguments are missing. That scenario is only `--amount 855000 --rate 6.99 --years 30`.
-- Charging stops when the principal reaches zero. Do not keep accruing interest after payoff.
+- Charging stops when the principal reaches zero. Do not keep accruing interest after payoff. The schedule still lists the later months through the no-extra payoff, with zeros, so the last `interest_saved` matches the summary.
+- An extra payment does not reduce that month's interest. On $570,000 at 7%, month 1 interest is 332500 cents even when month 1 includes extra principal. Interest saved is cumulative against the no-extra schedule, so that same example saves 0 cents in month 1 and 813770 cents by month 360.
 - Do not round currency with `Math.round(dollars * 100) / 100`. `Math.round(1.005 * 100)` is 100. Round reported amounts once, at output, half up to the cent.
 - The schedule matches Bankrate's table, not a servicer ledger. Do not round the payment or each month's interest to the cent inside the walk. On $570,000 at 7% for 30 years the exact walk totals $795,200.72; a cent-rounded servicing walk is about $795,203.90. The README footnote states that on purpose.
 - Commit `e67ec85` removed `Math.ceil` on the payment. Putting that ceiling back, or rounding the walk to cents, reopens a discrepancy the script was changed to close.

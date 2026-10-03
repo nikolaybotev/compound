@@ -2,8 +2,10 @@
 
 // Fixed-rate mortgage amortization.
 // The monthly rate is the note rate divided by 12 (30/360). The walk keeps the
-// exact payment and exact interest. Reported amounts are rounded half up to
-// the cent once, at output.
+// exact payment and exact interest. Extra principal is applied after that
+// month's interest. Reported amounts are rounded half up to the cent once, at output.
+
+const fs = require('node:fs');
 
 function fail(message) {
   process.stderr.write(`${message}\n`);
@@ -49,6 +51,7 @@ function parseArgs(argv) {
     amount: undefined,
     rate: undefined,
     years: undefined,
+    extra: undefined,
     json: false,
     schedule: false,
   };
@@ -61,7 +64,7 @@ function parseArgs(argv) {
       opts[token.slice(2)] = true;
       continue;
     }
-    if (token === '--amount' || token === '--rate' || token === '--years') {
+    if (token === '--amount' || token === '--rate' || token === '--years' || token === '--extra') {
       if (seen.has(token)) fail(`duplicate argument: ${token}`);
       const value = argv[i + 1];
       if (value === undefined || value.startsWith('-')) {
@@ -99,6 +102,48 @@ function parseRate(text) {
     fail('invalid --rate: note rate must be a percent greater than zero with at most three decimal places');
   }
   return rate;
+}
+
+function loadExtras(filePath, monthCount) {
+  let text;
+  try {
+    text = fs.readFileSync(filePath, 'utf8');
+  } catch (error) {
+    fail(`cannot read --extra file: ${error && error.code ? error.code : 'error'}`);
+  }
+  if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+  const lines = text.split(/\r?\n/);
+  if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+  if (lines.length === 0 || lines[0] !== 'month,extra') {
+    fail('invalid --extra: header must be month,extra');
+  }
+  const extras = new Map();
+  for (let i = 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    const rowNumber = i + 1;
+    if (line === '') fail(`invalid --extra: row ${rowNumber} is empty`);
+    const parts = line.split(',');
+    if (parts.length !== 2) {
+      fail(`invalid --extra: row ${rowNumber} must have columns month and extra`);
+    }
+    const [monthText, extraText] = parts;
+    if (!/^\d+$/.test(monthText)) {
+      fail(`invalid --extra: month on row ${rowNumber} must be an integer from 1 through ${monthCount}`);
+    }
+    const month = Number(monthText);
+    if (!Number.isSafeInteger(month) || month < 1 || month > monthCount) {
+      fail(`invalid --extra: month on row ${rowNumber} must be an integer from 1 through ${monthCount}`);
+    }
+    if (!/^\d+(?:\.\d+)?$/.test(extraText)) {
+      fail(`invalid --extra: extra on row ${rowNumber} must be a positive dollar amount`);
+    }
+    const extra = Number(extraText);
+    if (!(extra > 0)) {
+      fail(`invalid --extra: extra on row ${rowNumber} must be a positive dollar amount`);
+    }
+    extras.set(month, (extras.get(month) || 0) + extra);
+  }
+  return extras;
 }
 
 function parseYears(text) {
@@ -164,7 +209,7 @@ function walk(principal, annualPercent, years, extrasByMonth) {
       interest,
       principalApplied,
       remainingPrincipal: balance,
-      extraApplied,
+      extraApplied: appliedExtra,
       cumulativeInterest: interestTotal,
     });
   }
@@ -274,7 +319,8 @@ function runCli(argv) {
   const principal = parseAmount(opts.amount);
   const ratePercent = parseRate(opts.rate);
   const years = parseYears(opts.years);
-  const report = buildReport(principal, ratePercent, years, new Map());
+  const extras = opts.extra === undefined ? new Map() : loadExtras(opts.extra, years * 12);
+  const report = buildReport(principal, ratePercent, years, extras);
 
   if (opts.json) {
     const payload = { ...report };
