@@ -13,6 +13,7 @@ A zero-dependency Node.js calculator for a fixed monthly mortgage payment and it
 - Page: `pnpm --dir apps/web dev` serves the amortization page. `pnpm --dir apps/web build` writes `apps/web/dist` with Vite `base` `./` unless `VITE_BASE` is set. `pnpm --dir apps/web preview` serves that build. `pnpm --dir apps/web test` runs the page unit tests. `pnpm --dir apps/web test:e2e` runs Playwright against `vite preview` (first time: `pnpm --dir apps/web exec playwright install --with-deps chromium`).
 - Lint: none.
 - CI: `.github/workflows/test.yml` runs `node --test` on Node.js 24 with no install step, and a second Node.js 24 job that installs the web app with pnpm and runs its unit tests and Playwright. Pull-request CI does not fetch the production URL.
+- Pages: https://nikolaybotev.github.io/compound/ is published by `.github/workflows/deploy-pages.yml` on a push to `main` and on `gh workflow run deploy-pages.yml`. That build sets `VITE_BASE=/compound/`. There is no schedule. A local `pnpm --dir apps/web build` leaves `VITE_BASE` unset and keeps base `./`.
 
 ## Conventions
 
