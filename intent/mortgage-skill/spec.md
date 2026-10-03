@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Derived from | [intent.md](intent.md) (2026-10-02) |
-| Status | Draft 1 |
+| Status | Draft 2 |
 | Stage | 2 · Design |
 
 ## 1. Summary
@@ -39,7 +39,7 @@
 - P3. An extra payment is applied after that month's interest is computed, then subtracted from principal. It does not reduce that month's interest.
 - P4. The scheduled principal-and-interest payment stays constant. Extra principal shortens the loan.
 - P5. The schedule stops when the principal reaches zero. Later contractual months are not charged.
-- P6. Money is integer cents, rounded half up on positive amounts. Do not round with `Math.round(dollars * 100) / 100`; `Math.round(1.005 * 100)` is 100.
+- P6. The schedule uses the exact payment and the exact monthly interest. Reported amounts are rounded half up to the cent once, at output. Do not round with `Math.round(dollars * 100) / 100`; `Math.round(1.005 * 100)` is 100.
 - P7. A missing required fact is a question, not a default. The constants in the file today ($855,000, 6.99%, 30 years) are not defaults.
 
 ## 4. Users and scenarios
@@ -68,18 +68,18 @@
 
 4. Month 1 is the first payment. "The first year" is months 1 through 12. The skill writes one CSV row per extra payment, including twelve rows of `100` for the example question.
 
-5. Monthly payment is the standard fixed payment, rounded half up to the cent:
+5. Monthly payment is the fixed amount that pays the loan off after `n = years * 12` months of the interest rule in requirement 6, with no extra principal:
 
    `principal * (r * (1 + r) ^ n) / ((1 + r) ^ n - 1)`
 
-   where `r` is the note rate divided by 12 and `n` is `years * 12`.
+   where `r` is the note rate times `30/360`. That is the formula already in `compound_interest_monthly.js` and on the Bankrate page it cites. The walk uses this exact payment. The reported payment is that amount rounded half up to the cent.
 
 6. Each month, while principal remains and the month is within `n`:
-   - Interest is the remaining principal times `r`, rounded half up to the cent.
-   - The scheduled principal portion is the monthly payment minus that interest.
+   - Interest is the unpaid principal times `r`. This is one month of interest under a 360-day year: 30 days out of 360, not the actual number of calendar days in the month.
+   - The scheduled principal portion is the exact monthly payment minus that interest. The payment is applied to interest before principal.
    - That month's extra principal, if any, is added after the interest step.
    - If the scheduled principal plus extra is greater than or equal to the remaining principal, or this is month `n`, the payment finishes the loan: interest plus remaining principal. Extra dollars beyond the remaining principal are unapplied. The schedule stops.
-   - Otherwise the remaining principal decreases by the scheduled principal plus the extra.
+   - Otherwise the remaining principal decreases by the scheduled principal plus the extra. Interest and balance are not rounded inside the loop.
 
 7. Interest saved is the no-extra interest total minus the with-extra interest total. Months saved is the no-extra payoff month minus the with-extra payoff month. Unapplied extra is reported and is not part of interest saved.
 
@@ -123,8 +123,8 @@
 | ID | Check |
 |---|---|
 | AC1 | `node --test` exits 0. A $200,000 loan at 6% for 30 years has monthly payment 119910 cents ($1,199.10). |
-| AC2 | A $570,000 loan at 7% for 30 years, no extras: payment 379222 cents ($3,792.22), interest 79520390 cents ($795,203.90), payoff month 360. Month 1 interest is 332500 cents ($3,325.00) even when month 1 also has an extra payment. |
-| AC3 | The same loan with $100 extra in months 1–12: interest 78706676 cents ($787,066.76), interest saved 813714 cents ($8,137.14), payoff month 358, months saved 2, extra applied 120000 cents, extra unapplied 0. |
+| AC2 | A $570,000 loan at 7% for 30 years, no extras: reported payment 379222 cents ($3,792.22), interest 79520072 cents ($795,200.72), payoff month 360. Month 1 interest is 332500 cents ($3,325.00) even when month 1 also has an extra payment. |
+| AC3 | The same loan with $100 extra in months 1–12: interest 78706302 cents ($787,063.02), interest saved 813770 cents ($8,137.70), payoff month 358, months saved 2, extra applied 120000 cents, extra unapplied 0. |
 | AC4 | The AC3 run finishes at a zero balance. Payoff month is at most 360. |
 | AC5 | Invoking the script with no arguments exits non-zero and does not print the $855,000 schedule. `--amount 855000 --rate 6.99 --years 30 --json` reports monthly payment 568260 cents ($5,682.60). |
 | AC6 | A CSV month outside 1…`years * 12` exits non-zero. Two rows for the same valid month are summed. |
@@ -134,9 +134,9 @@
 
 **D1 — Arguments for the loan, CSV for extra principal.** The prompt asked to stop editing the script, and named a CSV of month and extra amount as the flexible shape. A repeat flag such as "first year" stays in the skill, which writes rows. Checked 2026-10-02: the only extra-payment support in the script is a commented $45 on month 1 of year 1.
 
-**D2 — Interest saved is a second schedule that stops at payoff.** The current loop always runs `term * 12` months. Replaying the example on that loop, $100 extra in months 1–12, leaves a balance near −$9,380 and an interest difference near $8,180, because months after payoff keep accruing. The stopped cent schedule saves $8,137.14. A savings answer uses the stopped schedule.
+**D2 — Interest saved is a second schedule that stops at payoff.** The current loop always runs `term * 12` months. Replaying the example on that loop, $100 extra in months 1–12, leaves a balance near −$9,380 and an interest difference near $8,180, because months after payoff keep accruing. The stopped schedule saves $8,137.70. A savings answer uses the stopped schedule.
 
-**D3 — Integer cents, half up, final month absorbs the residual.** Checked 2026-10-02 against [propertycalcs](https://www.propertycalcs.com/mortgage/a/570000) and [loanamortizationschedule.org](https://www.loanamortizationschedule.org/schedule/570000/700/): both publish $3,792.22 as the monthly payment on $570,000 at 7% for 30 years. propertycalcs' total paid, $1,365,200.72, is the unrounded payment times 360, which is $795,200.72 of interest. A cent-rounded payment of $3,792.22 leaves $4.70 of principal after 360 equal payments. This schedule rounds every month's interest to the cent and makes the last payment interest plus whatever principal remains, so the loan ends on month 360 and total interest is $795,203.90. The $1,199.10 payment on $200,000 at 6% for 30 years was checked the same day against the same formula (unrounded 1199.10105…). Month 1 interest on the $570,000 / 7% loan is $3,325.00, which matches that site's worked step `0.07 / 12 * 570000`.
+**D3 — The payment is the inverse of monthly 30/360 interest.** Fannie Mae servicing guide F-1-09 defines a full month of interest on a fixed-rate first mortgage as 30 days' interest on the unpaid balance using a 360-day year. That is unpaid principal times the note rate times `30/360`, once per month. It is not actual days in the calendar month. The fixed payment which reduces the balance to zero after `n` such months is the formula in the script. Checked 2026-10-02: for $570,000 at 7% and 360 months, that payment is $3,792.224222…, the balance after 360 payments is about a hundred-millionth of a dollar, and total interest is $795,200.72. Bankrate's schedule shows that interest total; its summary card rounds it to $795,201. Rounding the payment to $3,792.22 before the walk leaves about $5.15 of principal and about $795,204.35 of interest, so the schedule keeps the exact payment and rounds only the reported figures. The $1,199.10 payment on $200,000 at 6% for 30 years is that same formula rounded for display (unrounded 1199.10105…). Month 1 interest on the $570,000 / 7% loan is $3,325.00.
 
 **D4 — Extra principal does not reduce the current month's interest.** That is the commented block in the script: accrue interest, apply the scheduled principal, then apply the extra. It is also the usual US mortgage posting order.
 
