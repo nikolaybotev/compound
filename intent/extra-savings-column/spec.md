@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Derived from | [intent.md](intent.md) (2026-10-03) |
-| Status | Draft 2 |
+| Status | Draft 3 |
 | Stage | 2 · Design |
 
 ## 1. Summary
@@ -58,7 +58,7 @@ The amortization schedule gains a column immediately after Extra payment. The ce
 
 7. The summary's Interest saved is unchanged. It remains the full map's `interest_saved_cents`.
 
-8. `--json` and the `--schedule` CSV gain no field. `interest_saved_cents` on a schedule row stays the cumulative figure. `node --test` stays green, including the recast and `--months` tests. The existing web CI job runs the page unit tests and Playwright, and that job must pass AC1–AC4. A green `node --test` does not cover the column.
+8. `--json` and the `--schedule` CSV gain no field. The CSV header stays `month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved`. `interest_saved_cents` on a schedule row stays the cumulative figure. `node --test` stays green, including the recast and `--months` tests. The existing web CI job runs the page unit tests and Playwright, and that job must pass AC1–AC4 and AC7. A green `node --test` does not cover the column. The published-page check (AC6) happens after the merge. Pull-request CI does not fetch that URL.
 
 9. Checked 2026-10-03 with `buildReport(570000, 7, 360, map, 30)` on the current `amortize.js`:
    - $100 only in month 1: the cell and the summary are both 70694 cents ($706.94).
@@ -74,10 +74,11 @@ The example loan is purchase price $570,000, 0% down, 30 years, 7%, start month 
 | ID | Check |
 |---|---|
 | AC1 | A unit test, calling `buildReport` for both sides, reports 70694 cents for $100 only in month 1, 65693 cents for month 12 alone, and 18489 cents for month 180 alone. For $100 in months 1–12 it reports 69761, 64818, and 0 for months 1, 12, and 13. The sum of those twelve cells is not 813770. |
-| AC2 | On the page, with only month 1 set to $100, Saved by extra on month 1 is $706.94 and the summary Interest saved is $706.94. Month 2 is $0.00. The 2026 year row's Saved by extra cell is empty. |
+| AC2 | The header reads Saved by extra and sits immediately after Extra payment and immediately before Principal balance. The cell is text, not an input. On the page, with only month 1 set to $100, that cell is $706.94 and the summary Interest saved is $706.94. Month 2 is $0.00. The 2026 year row's Saved by extra cell is empty. |
+| AC7 | Typing `100` into month 1's extra cell without committing leaves Saved by extra at $0.00. Committing it then shows $706.94. |
 | AC3 | With $100 in months 1–12 and nowhere else, the page shows $697.61 on month 1, $648.18 on month 12, $0.00 on month 13, and summary Interest saved $8,137.70. |
 | AC4 | Apply of $100 monthly on the example loan shows $585.67 on month 1 and summary Interest saved $76,366.09. The payoff row's Saved by extra is $0.00. |
-| AC5 | `node --test` exits 0. A `--json --schedule` run of the example loan has the same keys as before this change. The web CI job exits 0 and runs AC1–AC4. |
+| AC5 | `node --test` exits 0. A `--json --schedule` run of the example loan has the same keys as before this change. The `--schedule` CSV header is unchanged. The web CI job exits 0 and runs AC1–AC4 and AC7. |
 | AC6 | After the merge, https://nikolaybotev.github.io/compound/ with start month October 2026 and only month 1's extra set to $100 shows $706.94 in Saved by extra. |
 
 ## 7. Design decisions
