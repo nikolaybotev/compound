@@ -4,12 +4,12 @@ A zero-dependency Node.js calculator for a fixed monthly mortgage payment and it
 
 ## Commands
 
-- Install: none. Node.js is the runtime.
+- Install: `mise install` in the repo root installs Node.js 24 from `mise.toml`. Otherwise use Node.js 24.
 - Run: `node compound_interest_monthly.js --amount 855000 --rate 6.99 --years 30` (healthy: a summary whose monthly payment is 5,682.60). `--amount` and `--rate` are required. Exactly one of `--years` or `--months` is required.
 - JSON: add `--json`. Month rows: add `--schedule` (CSV alone, or inside the JSON object when combined with `--json`).
 - Extra principal: `--extra fixtures/first-year-100.csv`. The header is `month,extra`. On $570,000 at 7% for 30 years, $100 in months 1–12 saves 813770 cents and pays off in month 358.
 - Skill: `.agents/skills/mortgage-loan-calculator/SKILL.md`. It runs `scripts/compound_interest_monthly.js`, a symlink to the calculator at the repo root. Workspace link, not committed: `/Users/nikolay/git/.agents/skills/mortgage-loan-calculator` → `../../github.com/nikolaybotev/compound/.agents/skills/mortgage-loan-calculator`.
-- Test: `node --test`
+- Test: `node --test` or `mise run test` (same `node --test` task in `mise.toml`).
 - Page: `pnpm --dir apps/web dev` serves the amortization page. `pnpm --dir apps/web build` writes `apps/web/dist` with Vite `base` `./` unless `VITE_BASE` is set. `pnpm --dir apps/web preview` serves that build. `pnpm --dir apps/web test` runs the page unit tests. `pnpm --dir apps/web test:e2e` runs Playwright against `vite preview` (first time: `pnpm --dir apps/web exec playwright install --with-deps chromium`).
 - Lint: none.
 - CI: `.github/workflows/test.yml` runs `node --test` on Node.js 24 with no install step, and a second Node.js 24 job that installs the web app with pnpm and runs its unit tests and Playwright. Pull-request CI does not fetch the production URL.
