@@ -302,3 +302,36 @@ test('extra after payoff is unapplied and does not reduce that month\'s interest
     assert.equal(report.schedule.length, 360);
   });
 });
+
+test('AC7 skill states the ask rule, the CSV, and which flags to run', () => {
+  const skillPath = path.join(__dirname, '.agents', 'skills', 'mortgage-loan-calculator', 'SKILL.md');
+  const skill = fs.readFileSync(skillPath, 'utf8');
+  const phrases = [
+    'does not call it a skill',
+    'no extras',
+    'no amount',
+    'no period',
+    'month,extra',
+    'the first year',
+    'every month',
+    'price minus down payment',
+    'note rate',
+    'adjustable',
+    'interest-only',
+    'recast',
+    '../../../compound_interest_monthly.js',
+    '../../compound_interest_monthly.js',
+    'interest_saved_cents',
+    '--json` alone',
+    'month or savings-so-far',
+    '--json --schedule',
+    'Do not produce a schedule',
+    'Do not recompute the amortization',
+  ];
+  for (const phrase of phrases) {
+    assert.ok(skill.includes(phrase), `missing: ${phrase}`);
+  }
+  assert.doesNotMatch(skill, /disable-model-invocation:\s*true/);
+  const fromSkill = path.resolve(path.dirname(skillPath), '../../../compound_interest_monthly.js');
+  assert.equal(fs.realpathSync(fromSkill), fs.realpathSync(script));
+});
