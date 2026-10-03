@@ -48,3 +48,9 @@ A zero-dependency Node.js calculator for a fixed monthly mortgage payment and it
 - Commit `e67ec85` removed `Math.ceil` on the payment. Putting that ceiling back, or rounding the walk to cents, reopens a discrepancy the script was changed to close.
 - The amortization page does not grow its own loan walk. It calls `buildReport`. That function takes a month count, not a year count: `buildReport(principal, ratePercent, monthCount, extrasByMonth, yearsForJson)`. A page term in years is `monthCount = years * 12`, and the year count is `yearsForJson`. The loan start month is not payment 1; payment 1 is the next calendar month. Apply replaces the extra column; it does not add to it.
 - Do not add `apps/web/test/` or a `*.test.ts` file that `node --test` will discover. The page's unit tests live in `apps/web/unit/` and run with `pnpm --dir apps/web test`.
+
+## Cursor Cloud specific instructions
+
+- The environment install installs mise, activates it for login shells, and runs `mise install` so Node.js comes from `mise.toml`. The VM image also has an older Node earlier on `PATH`. After activation, `node -v` is 24. Use that Node for `node --test` and `mise run test`.
+- The same install enables pnpm 12.6.0 with Corepack, runs `pnpm install --frozen-lockfile`, and installs Playwright Chromium. Page unit tests are `pnpm --dir apps/web test`. End-to-end tests are `pnpm --dir apps/web test:e2e`; Playwright starts its own preview on port 4173.
+- The environment start command serves `vite preview` of `apps/web/dist` at `http://127.0.0.1:5173` and returns immediately when that URL is already up. A fresh page load is the $570,000 / 7% / 30-year loan with a 0% down payment. Its monthly payment is $3,792.22. `pnpm --dir apps/web dev` stays blank: Vite's dev server does not turn the CommonJS exports in `amortize.js` into the named `buildReport` import. The production build, preview, and `pnpm --dir apps/web test:e2e` do.
