@@ -6,7 +6,7 @@ This code was [first published as a GitHub Gist](https://gist.github.com/nikolay
 
 There are no npm dependencies; only the Node.js runtime is required.
 
-The change in progress is [intent/mortgage-skill/](intent/mortgage-skill/intent.md): extra principal from a CSV, and a skill that asks for missing facts before it answers.
+The change in progress is [intent/mortgage-skill/](intent/mortgage-skill/intent.md): a skill that asks for missing facts before it answers.
 
 ## Requirements
 
@@ -32,10 +32,23 @@ node compound_interest_monthly.js --amount 570000 --rate 7 --years 30 --json --s
 
 - With no output flags, stdout is a short summary: monthly payment, payoff month, total interest, extra applied, extra unapplied, interest saved, and months saved. Money uses US grouping and two decimal places.
 - `--json` writes one JSON object and nothing else. Money fields are integer cents. The object has no `schedule` key.
-- `--json --schedule` adds `schedule`: one object per month from 1 through payoff. With no extra principal, `extra_cents` and `interest_saved_cents` are 0.
+- `--json --schedule` adds `schedule`: one object per month from 1 through the no-extra payoff. With no extra principal, `extra_cents` and `interest_saved_cents` are 0.
 - `--schedule` alone prints a CSV of those same months and nothing else. The header is `month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved`.
 
 Reported amounts are rounded half up to the cent once, at output.
+
+## Extra principal
+
+`--extra` is an optional UTF-8 CSV. The header row is `month,extra`. Each data row is one extra principal payment. `month` is the payment number, from 1 through `years * 12`. `extra` is a positive dollar amount. Rows for the same month are summed. A file with only the header is no extras. A month outside the term, a non-numeric or negative amount, or a missing column exits non-zero.
+
+The extra is applied after that month's interest, so it does not reduce the interest charged that month. The scheduled payment stays the same. Extra principal shortens the loan. Interest stops when the principal reaches zero. The schedule still lists the later months through the no-extra payoff, with interest, principal, extra, remaining principal, and remaining interest at zero. `interest_saved` on each row is cumulative: interest the no-extra loan has charged through that month, minus interest this loan has charged through that month. The last row matches the summary's interest saved.
+
+`fixtures/first-year-100.csv` is $100 of extra principal in each of months 1–12. On a $570,000 loan at 7% for 30 years, that saves $8,137.70 of interest and pays the loan off in month 358, two months early:
+
+```bash
+node compound_interest_monthly.js --amount 570000 --rate 7 --years 30 \
+  --extra fixtures/first-year-100.csv --json
+```
 
 ## Test
 
