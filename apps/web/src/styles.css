@@ -1,0 +1,384 @@
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  src: url("../fonts/atkinson/AtkinsonHyperlegible-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  src: url("../fonts/atkinson/AtkinsonHyperlegible-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("../fonts/plex/IBMPlexMono-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  src: url("../fonts/plex/IBMPlexMono-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --paper: #f2f4f3;
+  --card: #ffffff;
+  --ink: #17211f;
+  --muted: #5c6b66;
+  --line: #d7ded9;
+  --principal: #1b7a4d;
+  --interest: #c5362b;
+  --balance: #2a4365;
+  --remaining: #d9a441;
+  --sans: "Atkinson Hyperlegible", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 1.0625rem;
+  line-height: 1.45;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: var(--card);
+  border: 1px solid var(--line);
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible,
+.chart:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.column {
+  width: min(72rem, calc(100% - 2rem));
+  margin: 0 auto;
+  padding: 2.75rem 0 4.5rem;
+}
+
+h1 {
+  margin: 0 0 1.75rem;
+  font-size: 3.25rem;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 0.95;
+}
+
+h1::after {
+  content: "";
+  display: block;
+  width: 3.25rem;
+  height: 0.35rem;
+  margin-top: 0.85rem;
+  background: var(--principal);
+}
+
+h2 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.inputs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem 1.1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1 1 9.5rem;
+  min-width: 9.5rem;
+}
+
+.field label {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.control span {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  padding: 0.35rem 0;
+  font-family: var(--mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  font-size: 1.05rem;
+}
+
+input[aria-invalid="true"] {
+  border-bottom-color: var(--interest);
+}
+
+.error {
+  margin: 0.9rem 0 0;
+  color: var(--interest);
+}
+
+.summary {
+  margin: 2rem 0 1.75rem;
+}
+
+.payment-block {
+  margin-bottom: 1.35rem;
+}
+
+.payment {
+  margin: 0.15rem 0 0.2rem;
+  font-size: 2.75rem;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.note {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+}
+
+dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem 1.5rem;
+  margin: 0;
+}
+
+dt {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+dd {
+  margin: 0.15rem 0 0;
+  font-size: 1.15rem;
+}
+
+.money {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart {
+  position: relative;
+  height: 22rem;
+  margin: 0.5rem 0 2.5rem;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.bands {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.legend {
+  position: absolute;
+  top: 0.75rem;
+  z-index: 2;
+  background: var(--card);
+  border: 1px solid var(--line);
+  padding: 0.85rem 0.95rem 0.7rem;
+  pointer-events: auto;
+}
+
+.legend h2 {
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 1rem;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.legend-list {
+  list-style: none;
+  margin: 0.7rem 0 0;
+  padding: 0;
+}
+
+.legend-list li {
+  display: grid;
+  grid-template-columns: 1.35rem 0.7rem minmax(0, 1fr) auto;
+  gap: 0.4rem;
+  align-items: center;
+  margin-top: 0.35rem;
+}
+
+.legend-list li > span {
+  white-space: nowrap;
+}
+
+.payment-split li {
+  grid-template-columns: 1fr auto;
+}
+
+.swatch {
+  width: 0.7rem;
+  height: 0.7rem;
+  justify-self: center;
+}
+
+.this-payment {
+  margin: 0.8rem 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.icon {
+  display: block;
+  width: 1.35rem;
+  height: auto;
+}
+
+.bar-icon {
+  position: absolute;
+  z-index: 1;
+  width: 2.4rem;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.schedule-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.schedule-head h2 {
+  font-size: 1.35rem;
+  color: var(--ink);
+}
+
+.schedule-scroll {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.92rem;
+  font-weight: 400;
+}
+
+th {
+  font-family: var(--sans);
+  font-weight: 400;
+  color: var(--muted);
+  text-align: right;
+  padding: 0.35rem 0.5rem 0.55rem;
+  border-bottom: 1px solid var(--line);
+}
+
+th:first-child,
+th:nth-child(2),
+td:first-child,
+td:nth-child(2) {
+  text-align: left;
+}
+
+td {
+  text-align: right;
+  padding: 0.38rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+
+.year-row {
+  background: var(--card);
+  cursor: pointer;
+}
+
+.year-row td {
+  border-bottom-color: var(--ink);
+  padding-top: 0.7rem;
+  padding-bottom: 0.7rem;
+}
+
+.year-row button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+@media (max-width: 52rem) {
+  h1 {
+    font-size: 2.4rem;
+  }
+
+  .payment {
+    font-size: 2.2rem;
+  }
+
+  dl {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .chart {
+    height: 16rem;
+  }
+
+  .legend-list li > span {
+    white-space: normal;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto;
+  }
+}
