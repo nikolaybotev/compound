@@ -6,6 +6,8 @@ This code was [first published as a GitHub Gist](https://gist.github.com/nikolay
 
 There are no npm dependencies; only the Node.js runtime is required.
 
+The change in progress is [intent/mortgage-skill/](intent/mortgage-skill/intent.md): pass the loan in arguments, pass extra principal in a CSV, and answer interest-saved questions from a skill. Until that lands, edit the constants at the top of the script to change the loan.
+
 ## What it does
 
 1. **Monthly payment** — Uses the standard amortization formula (fixed rate, equal payments over the full term). The implementation follows the same idea as common mortgage calculators; a derivation is outlined on [Bankrate’s amortization calculator](https://www.bankrate.com/mortgages/amortization-calculator/#how-to-calculate).

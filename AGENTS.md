@@ -1,0 +1,30 @@
+# compound
+
+A zero-dependency Node.js calculator for a fixed monthly mortgage payment and its amortization. The change in progress is `intent/mortgage-skill/`: loan terms as arguments, extra principal as a CSV, and a skill that asks for missing facts before it answers.
+
+## Commands
+
+- Install: none. Node.js is the runtime.
+- Run: `node compound_interest_monthly.js` (healthy: it prints a monthly payment and a year-by-year schedule for the constants at the top of the file, currently $855,000 at 6.99% for 30 years).
+- Test: none yet.
+- Lint: none.
+- Build: none.
+
+## Conventions
+
+- Docs follow the solo AI-native SDLC chain: `intent/<change>/intent.md` → `spec.md` → `plan.md`. Update `plan.md` in the same commit when implementation departs from it.
+- No npm dependencies.
+- Money printed by the script uses US locale and two decimal places.
+- The note rate is percent per year (`6.99` means 6.99%), and the monthly rate is that percent divided by 12.
+
+## Architecture
+
+- `compound_interest_monthly.js` is the calculator. Extra principal is a commented block in the month loop, not an input.
+- `intent/mortgage-skill/` is the draft for arguments, the extra-payment CSV, and `.agents/skills/mortgage-loan-calculator/`.
+- `README.md` describes the current script. The spec describes the script after the change lands.
+
+## Things agents get wrong
+
+- Uncommenting the extra-payment block does not answer an interest-saved question. The loop always runs `term * 12` months, so an early payoff drives the balance negative and keeps accruing interest.
+- Do not round currency with `Math.round(dollars * 100) / 100`. `Math.round(1.005 * 100)` is 100. The spec uses integer cents.
+- A published total of $795,200.72 interest on $570,000 at 7% for 30 years is the unrounded payment times 360. The cent schedule in the spec totals $795,203.90 because the last month pays a small residual.
