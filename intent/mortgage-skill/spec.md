@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Derived from | [intent.md](intent.md) (2026-10-02) |
-| Status | Draft 4 |
+| Status | Draft 5 |
 | Stage | 2 · Design |
 
 ## 1. Summary
@@ -35,7 +35,7 @@
 
 ## 3. Principles
 
-- P1. The skill runs the script and reads its output. Lifetime totals come from the JSON. A question about a month, or about savings so far, comes from the schedule CSV. The skill does not amortize the loan itself.
+- P1. The skill runs the script once with `--json` and reads that object. The object holds the lifetime totals and the month rows. The skill does not amortize the loan itself.
 - P2. The rate is the note rate. The monthly rate is that percent divided by 12, the convention already in the script and on the Bankrate page it cites.
 - P3. An extra payment is applied after that month's interest is computed, then subtracted from principal. It does not reduce that month's interest.
 - P4. The scheduled principal-and-interest payment stays constant. Extra principal shortens the loan.
@@ -100,10 +100,11 @@
    | `baseline.interest_cents` | Interest with no extras |
    | `interest_saved_cents` | Baseline interest minus this run's interest |
    | `months_saved` | Baseline payoff month minus this payoff month |
+   | `schedule` | One object per month, from 1 through the baseline payoff month |
 
-   With no extras, the baseline matches the run and both saved fields are 0.
+   Each `schedule` object uses the same meanings as the CSV in requirement 9, with money in integer cents: `month`, `interest_cents`, `principal_cents`, `remaining_principal_cents`, `remaining_interest_cents`, `extra_cents`, `interest_saved_cents`. The last object's `interest_saved_cents` equals the top-level `interest_saved_cents`. With no extras, the baseline matches the run, both saved fields are 0, and every schedule row has `extra_cents` and `interest_saved_cents` at 0.
 
-9. Without `--json` or `--schedule`, stdout is a short summary: monthly payment, payoff month, total interest, extra applied, extra unapplied, interest saved, and months saved. `--json` does not print the schedule. `--schedule` prints a CSV to stdout and nothing else, one row per month from 1 through the baseline payoff month (the original term when there is no extra). The header is:
+9. Without `--json` or `--schedule`, stdout is a short summary: monthly payment, payoff month, total interest, extra applied, extra unapplied, interest saved, and months saved. `--schedule` prints a CSV to stdout and nothing else, for a person who wants a sheet. The skill does not need that flag. The rows are the same months as `schedule` in the JSON. The header is:
 
    `month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved`
 
@@ -124,8 +125,7 @@
     - It resolves `compound_interest_monthly.js` relative to the skill directory (`../../compound_interest_monthly.js`) and runs that file.
     - It asks, and waits, when the principal, the note rate, the term, or the extra plan is missing. It may derive principal as purchase price minus down payment when both are given.
     - It treats a stated percent as the note rate. It does not invent taxes, insurance, or an $855,000 loan.
-    - It answers G5 from the JSON fields.
-    - It answers G6 from the schedule CSV. It does not invent a month's interest, balance, or savings, and it does not answer a month question from the summary alone.
+    - It runs the script once, with `--json`, and answers G5 from the top-level fields and G6 from `schedule`. It does not invent a month's interest, balance, or savings.
     - If the user describes an adjustable, interest-only, or recast loan, it says this calculator only covers a fixed payment that shortens the term, and it does not produce a schedule.
 
 11. After the skill file is in the repo, the workspace link is:
@@ -144,8 +144,8 @@
 | AC4 | The AC3 run finishes at a zero balance. Payoff month is at most 360. |
 | AC5 | Invoking the script with no arguments exits non-zero and does not print the $855,000 schedule. `--amount 855000 --rate 6.99 --years 30 --json` reports monthly payment 568260 cents ($5,682.60). |
 | AC6 | A CSV month outside 1…`years * 12` exits non-zero. Two rows for the same valid month are summed. |
-| AC7 | The skill file states the ask-before-answering rule, the input CSV columns, the relative script path, that lifetime totals are read from the JSON, and that a month-level question is read from the schedule CSV. The workspace symlink resolves to that file. |
-| AC8 | `--schedule` for the AC3 loan prints a header `month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved`. Month 1 has extra 100.00 and interest saved 0.00. Month 12 has interest saved 39.26. Month 360 has interest saved 8137.70, and interest, principal, extra, remaining principal, and remaining interest all 0.00. |
+| AC7 | The skill file states the ask-before-answering rule, the input CSV columns, the relative script path, and that one `--json` run supplies both the lifetime totals and `schedule`. The workspace symlink resolves to that file. |
+| AC8 | For the AC3 loan, `--json` `schedule` has 360 objects. Month 1 has `extra_cents` 10000 and `interest_saved_cents` 0. Month 12 has `interest_saved_cents` 3926. Month 360 has `interest_saved_cents` 813770, and interest, principal, extra, remaining principal, and remaining interest all 0. The same figures appear in the `--schedule` CSV as 100.00, 0.00, 39.26, and 8137.70. |
 
 ## 7. Design decisions
 
@@ -161,7 +161,7 @@ The 2022 gist and the first commit in this repo wrapped the payment in `Math.cei
 
 **D5 — No silent defaults.** A forgotten flag must not answer the gist scenario. That scenario remains runnable as `--amount 855000 --rate 6.99 --years 30`.
 
-**D6 — Two outputs, two kinds of question.** JSON is the contract for lifetime totals. The schedule CSV is the contract for a question about a month or about savings so far. The sample interest-saved question can be answered from the JSON. "What is the balance in month 12?" cannot. The skill picks the output the question needs and does not recompute either one.
+**D6 — The skill reads one JSON object.** That object carries the lifetime totals and a `schedule` array of the month rows. One `--json` run answers both the sample question and a question about a month. `--schedule` prints the same rows as a CSV for a person. The skill does not run it, and it does not recompute either form.
 
 **D7 — The skill lives in this repo and is linked into the workspace.** Product skills live in `.agents/skills/<name>/`. The workspace already links `gold-value-normalizer` the same way, so a mortgage question asked from `/Users/nikolay/git` can find it.
 
@@ -173,7 +173,7 @@ The 2022 gist and the first commit in this repo wrapped the payment in `Math.cei
 
 **D11 — Rate precision stops at three decimal places.** Eighths of a percent (6.125) fit. The text of `--rate` is parsed as a decimal so 6.99 stays exact. More than three decimal places is an error.
 
-**D14 — The schedule exists so the skill can answer more than the sample question.** The original prompt asks for a skill that answers questions like the $100-for-the-first-year example. The schedule columns are what make a different question answerable from the same run: interest in a month, principal in a month, remaining balance, interest still ahead, extra applied, and interest saved through that month.
+**D14 — The schedule exists so the skill can answer more than the sample question.** The original prompt asks for a skill that answers questions like the $100-for-the-first-year example. Those columns are the `schedule` array inside the JSON the skill reads, so one run answers both kinds of question: interest in a month, principal in a month, remaining balance, interest still ahead, extra applied, and interest saved through that month.
 
 **D13 — The schedule's interest-saved column is cumulative, and the table runs through the no-extra payoff.** Lifetime interest saved is the difference between two finished schedules, so a single month cannot be assigned its own savings without a convention. The column is interest the no-extra loan has charged through that month, minus interest this loan has charged through that month. Checked 2026-10-02 on the $570,000 / 7% / 30-year loan with $100 extra in months 1–12: month 1 saves $0.00, because the extra is applied after that month's interest; month 12 has saved $39.26 of the eventual $8,137.70; month 358, when this loan ends, has saved $8,071.85; months 359 and 360, with this loan already at zero, bring the column to $8,137.70. The CSV keeps those last rows so the final figure is on the sheet.
 
