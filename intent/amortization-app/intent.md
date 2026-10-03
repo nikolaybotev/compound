@@ -35,7 +35,7 @@ A single page, opened in a browser, with no account and no server. The loan is a
 
 ## Open questions (carried into spec.md)
 
-None. The design choices made while drafting are D1–D16 in [spec.md](spec.md).
+None. The design choices made while drafting are D1–D17 in [spec.md](spec.md).
 
 ## Original prompt (verbatim)
 

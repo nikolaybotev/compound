@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Implements | [spec.md](spec.md) Draft 1 |
-| Status | Draft 1 |
+| Implements | [spec.md](spec.md) Draft 2 |
+| Status | Draft 2 |
 | Stage | 3 · Build |
 
 Spec wins. Update this file in the same change whenever implementation departs from it.
@@ -21,9 +21,9 @@ None before Phase 3. Phase 3 needs GitHub Pages with the source set to GitHub Ac
 | AC3 | Playwright: example loan, October 2026, summary, November row, 360 bars, November 2039 card | 1 |
 | AC4 | Playwright: $712,500 at 20% down, and $399,999.00 at 3.5% | 1 |
 | AC5 | Playwright: Apply $100 monthly; interest saved $76,366.09; payoff June 2054; typing without Apply does nothing. Unit test: the map has $100 on months 1 through 360 | 2 |
-| AC6 | Playwright: clear month 1, interest stays $3,325.00, Apply puts $100 back | 2 |
+| AC6 | Playwright: clear month 1, interest stays $3,325.00, Apply puts $100 back. A further Apply with both amounts empty clears the column and hides interest saved | 2 |
 | AC7 | Playwright: $1,000 every January lands on month 3, interest saved $66,633.36, payoff October 2054 | 2 |
-| AC8 | Playwright: reload restores the column; corrupt storage loads the defaults | 2 |
+| AC8 | Playwright: reload restores the column, the prefill, and an opened 2027 group; corrupt storage loads the defaults | 2 |
 | AC9 | Playwright blocks foreign hosts; built JS has no `bankrate.com` | 1 |
 | AC10 | Deploy workflow has no cron; production URL shows $3,792.22 after the start month is set to October 2026 | 3 |
 
@@ -46,7 +46,7 @@ Files: `apps/web/**`, `pnpm-lock.yaml`, `pnpm-workspace.yaml` if a workspace fil
 1. Add the Vite + Preact app at `apps/web`. Pin pnpm with a `packageManager` field. Commit the lockfile. The app imports `buildReport` and `formatGroupedCents` from `../../amortize.js` and does not copy the formula.
 2. Build the page to requirements 3–13 and 11, with no extra-payment editor and no prefill section yet. The extra column shows blank. Store and restore the loan inputs only.
 3. Self-host Atkinson Hyperlegible and IBM Plex Mono. Read the license file that ships with each font. If it is not the SIL Open Font License, stop that font and record the substitute here before committing the files.
-4. Draw the piggy bank and the hooded figure as SVG in the repo. Show them on the hover card and on a band that is at least 24px tall.
+4. Draw the piggy bank and the hooded figure as SVG in the repo. Show both on the hover card and on the indicated bar, including when the band is shorter than the icon.
 5. Unit-test the date map, the down-payment cents, and the four band amounts against AC2's month 157 without a second walk: bands come from a `buildReport` result.
 6. Playwright, against `vite preview`, for AC3, AC4, and AC9. Set the start month in the test. Block every host other than the preview origin. Fail if `apps/web/dist` assets contain `bankrate.com`.
 7. Add a Node.js 24 CI job that installs with pnpm and runs the unit tests and Playwright. Leave the existing `node --test` job with no install step.
@@ -63,7 +63,7 @@ Files: `apps/web/**`, `AGENTS.md`
 3. Persist the map, the form, and which years are open. Ignore a corrupt blob and fall back to the default loan.
 4. Playwright for AC5, AC6, AC7, and AC8.
 
-DoD: `node --test` and the web tests exit 0. Apply of $100 monthly shows interest saved $76,366.09, payoff June 2054, and monthly payment $3,792.22, and typing $100 without Apply leaves the extra column blank. Clearing month 1 leaves its interest at $3,325.00, and Apply restores $100.00. January $1,000 lands on month 3 and shows interest saved $66,633.36 and payoff October 2054. A reload keeps the edited cell.
+DoD: `node --test` and the web tests exit 0. Apply of $100 monthly shows interest saved $76,366.09, payoff June 2054, and monthly payment $3,792.22, and typing $100 without Apply leaves the extra column blank. Clearing month 1 leaves its interest at $3,325.00, and Apply restores $100.00. A further Apply with both amounts empty clears the column and hides interest saved. January $1,000 lands on month 3 and shows interest saved $66,633.36 and payoff October 2054. A reload keeps the edited cell and leaves 2027 open if it was open.
 
 ## Phase 3 — GitHub Pages
 

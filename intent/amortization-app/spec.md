@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Derived from | [intent.md](intent.md) (2026-10-02) |
-| Status | Draft 1 |
+| Status | Draft 2 |
 | Stage | 2 · Design |
 
 ## 1. Summary
@@ -54,13 +54,13 @@ A static page in this repo amortizes one fixed mortgage in the browser by callin
 - The owner sets the start month to October 2026. The first schedule row is November 2026. The payoff month is October 2056. Hovering November 2039 shows the month-157 balances in AC3.
 - The owner sets the purchase price to $712,500 and the down payment to 20%. The loan amount is $570,000 and the payment matches the example above.
 - The owner opens Make extra payments, enters $100 a month, and clicks Apply. The extra column becomes $100 on every payment month. Interest, payoff date, and interest saved update. The monthly payment does not.
-- The owner then types $0 into month 13's extra cell and leaves the field. Only that month changes. The form still shows $100. Clicking Apply again puts $100 back on every month, including month 13.
+- The owner then types $0 into month 1's extra cell and leaves the field. Month 2 stays $100. Month 1's interest stays $3,325.00. The form still shows $100. Clicking Apply again puts $100 back on month 1.
 - The owner enters $1,000 in the yearly amount, chooses January, and clicks Apply. Each January payment carries $1,000 plus any monthly amount. Other months do not.
-- The owner reloads the page. The loan, the extra column, and the prefill fields are as they were.
+- The owner reloads the page. The loan, the extra column, the prefill fields, and which years are open are as they were.
 
 ## 5. Functional requirements
 
-1. The pure walk lives in `amortize.js` at the repo root. That file has no `require`, no `import` of a Node module, and no reference to `process` or `fs`. It exports `buildReport(principal, ratePercent, years, extrasByMonth)` and `formatGroupedCents(cents)`. `buildReport` is the function the CLI already uses to fill `--json --schedule`: same arguments, same cent fields, schedule always present. `extrasByMonth` is a `Map` from payment number to a positive dollar amount. `compound_interest_monthly.js` remains the CLI. It requires `amortize.js` and its stdout, stderr, and exit codes stay as specified in `intent/mortgage-skill/spec.md`.
+1. The pure walk lives in `amortize.js` at the repo root. That file has no `require`, no `import` of a Node module, and no reference to `process` or `fs`. It exports `buildReport(principal, ratePercent, years, extrasByMonth)` and `formatGroupedCents(cents)`. `buildReport` always returns `schedule`. It is the object the CLI writes for `--json --schedule`, with the same arguments and the same cent fields. For `--json` without `--schedule`, the CLI deletes the `schedule` key and writes the rest. `extrasByMonth` is a `Map` from payment number to a positive dollar amount. `compound_interest_monthly.js` remains the CLI. It requires `amortize.js` and its stdout, stderr, and exit codes stay as specified in `intent/mortgage-skill/spec.md`.
 
 2. The page is a Vite + Preact app at `apps/web`. Production output is static files in `apps/web/dist`. The dev server and `vite preview` serve the same app. There is no runtime server. The calculator's `node --test` job does not install npm packages. The web app's dependencies live in its own package and lockfile, installed with pnpm only by the web job and the deploy job.
 
@@ -98,7 +98,7 @@ A static page in this repo amortizes one fixed mortgage in the browser by callin
     - Interest remaining
     - This payment: Principal (`principal_cents`), Interest (`interest_cents`), Extra principal (the requested extra for that month)
 
-    The same two icons are drawn on the hovered bar, centered on their band, when that band is at least 24px tall. They are original SVG drawings in the repo: a piggy bank in side view with a coin slot, and a hooded figure walking with a sack. They are not an emoji, an icon font, or a character from a film.
+    The same two icons are drawn on the indicated bar, centered on their band, on every indicated month. A band shorter than the icon does not hide it; the icon may extend past that band. They are original SVG drawings in the repo: a piggy bank in side view with a coin slot, and a hooded figure walking with a sack. They are not an emoji, an icon font, or a character from a film.
 
 11. Colors and type are part of the page, not a default theme:
     - Paper `#F2F4F3`, card `#FFFFFF`, ink `#17211F`, muted `#5C6B66`, line `#D7DED9`.
@@ -117,7 +117,7 @@ A static page in this repo amortizes one fixed mortgage in the browser by callin
     - Additional yearly payment, and a month-of-year select (January through December)
     - Apply
 
-    Both amounts are non-negative dollar amounts with at most two decimal places, or empty. Apply with either field invalid does nothing and says which field is wrong. A valid Apply builds a new map for months 1 through `years * 12`: every month gets the monthly amount, and every payment whose calendar month is the selected month also gets the yearly amount. Amounts of zero are omitted. That map replaces the requested-extra map. The form fields stay as entered. The button does not ask for confirmation. The section's text says that Apply replaces the extra-payment column.
+    Both amounts are non-negative dollar amounts with at most two decimal places, or empty. Empty is zero. Apply with either field invalid does nothing and says which field is wrong. Both fields empty, or both zero, is valid: Apply replaces the map with an empty map. A valid Apply with a positive amount builds a new map for months 1 through `years * 12`: every month gets the monthly amount, and every payment whose calendar month is the selected month also gets the yearly amount. Amounts of zero are omitted. That map replaces the requested-extra map. The form fields stay as entered. The button does not ask for confirmation. The section's text says that Apply replaces the extra-payment column.
 
 16. The loan inputs, the requested-extra map, the prefill fields, and which years are expanded are stored in `localStorage` under one versioned key and restored on load. A value that does not parse is ignored, and the page uses requirement 5. The page writes no other storage and no cookie.
 
@@ -135,12 +135,12 @@ The example loan is purchase price $570,000, 0% down, 30 years, 7%, start month 
 |---|---|
 | AC1 | `node --test` exits 0. The CLI fixture is unchanged: $570,000 at 7% for 30 years reports payment 379222 cents, interest 79520072 cents, payoff month 360, and month-1 interest 332500 cents. |
 | AC2 | `amortize.js` source contains no `require`, no `process`, and no `fs`. `buildReport(570000, 7, 30, new Map())` returns `monthly_payment_cents` 379222, `interest_cents` 79520072, `payoff_month` 360, month 1 `interest_cents` 332500 and `principal_cents` 46722, month 157 `remaining_principal_cents` 45048005 and `remaining_interest_cents` 31934147, month 360 `remaining_principal_cents` 0. `formatGroupedCents(379222)` is `3,792.22`. |
-| AC3 | With the example loan and no extras, the page shows monthly payment $3,792.22, loan amount $570,000.00, total interest $795,200.72, total cost $1,365,200.72, and payoff October 2056. The 2026 group lists November and December only. The November row is month 1, principal $467.22, interest $3,325.00, no extra, principal balance $569,532.78, interest balance $791,875.72. The chart has 360 bars. The card for November 2039 shows principal paid $119,519.95, interest paid $475,859.25, loan balance $450,480.05, interest remaining $319,341.47, and this payment's principal $1,157.67, interest $2,634.55, extra principal $0.00. Interest saved is not shown. |
+| AC3 | With the example loan and no extras, the page shows monthly payment $3,792.22, loan amount $570,000.00, total interest $795,200.72, total cost $1,365,200.72, and payoff October 2056. The 2026 group lists November and December only. The November row is month 1, principal $467.22, interest $3,325.00, no extra, principal balance $569,532.78, interest balance $791,875.72. The chart has 360 bars. The card for November 2039 shows principal paid $119,519.95, interest paid $475,859.25, loan balance $450,480.05, interest remaining $319,341.47, and this payment's principal $1,157.67, interest $2,634.55, extra principal $0.00. That card and the indicated bar both show the piggy bank and the hooded figure. Interest saved is not shown. |
 | AC4 | Price $712,500 and down payment 20% shows loan amount $570,000.00 and monthly payment $3,792.22. Price $399,999.00 and down payment 3.5% shows a loan amount of $385,999.03. |
 | AC5 | Apply with monthly $100 and yearly empty, on the example loan, shows extra $100.00 on month 1. The displayed rows stop at payoff, June 2054. The summary shows interest $718,834.63, interest saved $76,366.09, months saved 28, and monthly payment still $3,792.22. The prefill map itself has $100 on every month from 1 through 360; that is a unit test, because months after payoff are not on the page. Typing in the monthly field without Apply does not change the table. |
-| AC6 | After AC5, setting month 1's extra cell to $0.00 and committing it leaves month 2 at $100.00, and month 1's interest stays $3,325.00. Clicking Apply again sets month 1 back to $100.00. |
+| AC6 | After AC5, setting month 1's extra cell to $0.00 and committing it leaves month 2 at $100.00, and month 1's interest stays $3,325.00. Clicking Apply again sets month 1 back to $100.00. A further Apply with both amounts empty clears every extra, and interest saved is no longer shown. |
 | AC7 | Apply with monthly empty, yearly $1,000, and January, on the example loan with no other extras, puts $1,000.00 on month 3 (January 2027) and not on month 1. Interest saved is $66,633.36, payoff month 336, which is displayed as October 2054. |
-| AC8 | Reload restores the loan, the extra column, and the prefill fields. A stored value that is not valid JSON loads the AC3 defaults instead of a blank page. |
+| AC8 | Reload restores the loan, the extra column, the prefill fields, and which years are open. Opening 2027, reloading, and finding 2027 still open is the check for the year state. A stored value that is not valid JSON loads the AC3 defaults instead of a blank page. |
 | AC9 | The Playwright run blocks every host other than the app and still shows the AC3 payment. The built JavaScript does not contain `bankrate.com`. |
 | AC10 | The deploy workflow has no `schedule` trigger. A push to `main` publishes `https://nikolaybotev.github.io/compound/`, and that URL shows $3,792.22 for the default loan once the start month is October 2026. |
 
@@ -162,7 +162,9 @@ October 2054 in AC7: month 1 is November 2026, so month 336 is October 2054. Che
 
 **D7 — Requested extra is the cell; applied extra stays inside the calculator.** `--json` `extra_cents` is what was applied. On the payoff month that can be less than what was asked. If the cell displayed the applied amount, a typed value would change by itself. The page keeps the requested map and sends it to `buildReport`. The summary can still show the report's applied and unapplied totals; the cell shows the request.
 
-**D8 — Apply replaces the column.** The prompt asked for a manual apply because the cells are the custom schedule. A second Apply that added to the cells would double a month the owner had already edited. Replace matches "prefill": the form writes a pattern, and the cells are the source of truth until the next Apply. No confirm dialog. The section says that Apply replaces the column.
+**D8 — Apply replaces the column.** The prompt asked for a manual apply because the cells are the custom schedule. A second Apply that added to the cells would double a month the owner had already edited. Replace matches "prefill": the form writes a pattern, and the cells are the source of truth until the next Apply. Both amounts empty, or both zero, is a valid pattern and leaves the column empty. No confirm dialog. The section says that Apply replaces the column.
+
+**D17 — The series icons sit on the indicated bar.** The prompt asks for them in the chart. A rule that drew them only when a band was at least 24px tall would hide both of them in the early months, because principal paid and interest paid are the thin bands then. The indicated bar always carries both icons. The hover card carries them too.
 
 **D9 — The form has no end date and no one-time date.** The prompt names two fields, the monthly amount and the yearly amount, and names the cell as the custom case. Bankrate's one-time date is the cell. "The first year only" is Apply, then clear the later cells. A duration field would be a third pattern the prompt did not ask for.
 
