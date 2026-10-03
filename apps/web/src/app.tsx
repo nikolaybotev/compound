@@ -69,8 +69,8 @@ export function App() {
 
   const report = useMemo(() => loanReport(loan, extras), [loan, extras]);
   const years = useMemo(
-    () => groupByYear(report, loan.startMonth, extras),
-    [report, loan.startMonth, extras],
+    () => groupByYear(loan, report, extras),
+    [loan, report, extras],
   );
   const payoff = paymentDate(loan.startMonth, report.payoff_month);
   const bars: ChartBar[] = report.schedule.slice(0, report.payoff_month).map((row) => {
