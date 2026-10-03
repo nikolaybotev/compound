@@ -2,15 +2,17 @@ import { describe, expect, test } from "vitest";
 import { buildReport } from "../../../amortize.js";
 import {
   bands,
+  buildPrefillMap,
   centsToDollars,
-  defaultDraft,
+  defaultScenario,
   downPaymentCents,
+  dropExtrasBeyond,
   formatMoney,
-  loadDraft,
+  loadScenario,
   parseLoan,
   paymentDate,
   percentThousandths,
-  saveDraft,
+  saveScenario,
   shortDate,
   STORAGE_KEY,
 } from "../src/loan";
@@ -79,25 +81,60 @@ describe("chart bands", () => {
   });
 });
 
+describe("extra prefill", () => {
+  test("$100 a month fills months 1 through 360 and omits zeros", () => {
+    const extras = buildPrefillMap(360, "2026-10", 100, 0, 1);
+    expect(extras.size).toBe(360);
+    expect(extras.get(1)).toBe(100);
+    expect(extras.get(360)).toBe(100);
+  });
+
+  test("$1,000 every January lands on month 3 and not month 1", () => {
+    const extras = buildPrefillMap(360, "2026-10", 0, 1000, 1);
+    expect(extras.get(1)).toBeUndefined();
+    expect(extras.get(3)).toBe(1000);
+    expect(extras.get(2)).toBeUndefined();
+  });
+
+  test("January also adds the yearly amount on top of the monthly amount", () => {
+    const extras = buildPrefillMap(360, "2026-10", 100, 1000, 1);
+    expect(extras.get(1)).toBe(100);
+    expect(extras.get(3)).toBe(1100);
+  });
+
+  test("a shorter term drops month 181 and does not keep it for later", () => {
+    const full = buildPrefillMap(360, "2026-10", 100, 0, 1);
+    const shortened = dropExtrasBeyond(full, 15 * 12);
+    expect(shortened.has(181)).toBe(false);
+    expect(shortened.get(180)).toBe(100);
+    expect(dropExtrasBeyond(shortened, 360).has(181)).toBe(false);
+  });
+});
+
 describe("saved loan inputs", () => {
   test("a value that does not parse is ignored", () => {
     const storage = memoryStorage();
     storage.setItem(STORAGE_KEY, "{");
     const now = new Date("2026-10-15T12:00:00Z");
-    expect(loadDraft(storage, now)).toEqual(defaultDraft(now));
+    expect(loadScenario(storage, now)).toEqual(defaultScenario(now));
   });
 
   test("a valid loan is restored", () => {
     const storage = memoryStorage();
-    const draft = {
+    const now = new Date("2026-10-15T12:00:00Z");
+    const scenario = defaultScenario(now);
+    scenario.draft = {
       price: "712500",
       down: "20",
       years: "15",
       rate: "6.5",
       start: "2024-03",
     };
-    saveDraft(storage, draft);
-    expect(loadDraft(storage, new Date("2026-10-15T12:00:00Z"))).toEqual(draft);
+    scenario.extras = new Map([[1, 100]]);
+    scenario.prefill = { monthly: "100", yearly: "", month: 1, open: true };
+    scenario.openYears = [2024, 2025];
+    saveScenario(storage, scenario);
+    expect(loadScenario(storage, now)).toEqual(scenario);
   });
 });
 

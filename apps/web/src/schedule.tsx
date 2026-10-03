@@ -1,13 +1,26 @@
-import { formatMoney, type ScheduleYear } from "./loan";
+import { extraInputValue, formatMoney, type ScheduleYear } from "./loan";
 
 type Props = {
   years: ScheduleYear[];
   openYears: Set<number>;
+  editingMonth: number | null;
+  editingValue: string;
   onToggleYear: (year: number) => void;
   onToggleAll: () => void;
+  onEdit: (month: number, value: string) => void;
+  onCommit: (month: number) => void;
 };
 
-export function Schedule({ years, openYears, onToggleYear, onToggleAll }: Props) {
+export function Schedule({
+  years,
+  openYears,
+  editingMonth,
+  editingValue,
+  onToggleYear,
+  onToggleAll,
+  onEdit,
+  onCommit,
+}: Props) {
   const allOpen = years.length > 0 && years.every((year) => openYears.has(year.year));
   return (
     <section class="schedule" aria-labelledby="schedule-heading">
@@ -61,7 +74,23 @@ export function Schedule({ years, openYears, onToggleYear, onToggleAll }: Props)
                         <td>{row.dateLabel}</td>
                         <td class="money">{formatMoney(row.principalCents)}</td>
                         <td class="money">{formatMoney(row.interestCents)}</td>
-                        <td class="money">{row.extraCents > 0 ? formatMoney(row.extraCents) : ""}</td>
+                        <td>
+                          <input
+                            class="extra"
+                            aria-label={`Extra payment for month ${row.month}`}
+                            inputMode="decimal"
+                            autoComplete="off"
+                            value={editingMonth === row.month ? editingValue : extraInputValue(row.extraDollars)}
+                            onFocus={() => onEdit(row.month, extraInputValue(row.extraDollars))}
+                            onInput={(event) => onEdit(row.month, event.currentTarget.value)}
+                            onBlur={() => onCommit(row.month)}
+                            onKeyDown={(event) => {
+                              if (event.key !== "Enter") return;
+                              event.preventDefault();
+                              event.currentTarget.blur();
+                            }}
+                          />
+                        </td>
                         <td class="money">{formatMoney(row.principalBalanceCents)}</td>
                         <td class="money">{formatMoney(row.interestBalanceCents)}</td>
                       </tr>
