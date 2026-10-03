@@ -50,6 +50,8 @@ test('AC1 $200,000 at 6% for 30 years pays 119910 cents', () => {
   const report = jsonRun(['--amount', '200000', '--rate', '6', '--years', '30', '--json']);
   assert.equal(report.monthly_payment_cents, 119910);
   assert.equal(report.payoff_month, 360);
+  assert.equal(report.months, 360);
+  assert.equal(report.years, 30);
   assert.equal(report.interest_saved_cents, 0);
   assert.equal(report.months_saved, 0);
   assert.equal(report.baseline.payoff_month, report.payoff_month);
@@ -119,6 +121,98 @@ test('AC5 no arguments exit non-zero and do not run the gist loan', () => {
   assert.equal(gist.amount_cents, 85500000);
   assert.equal(gist.rate_percent, 6.99);
   assert.equal(gist.years, 30);
+  assert.equal(gist.months, 360);
+});
+
+test('loan-recast AC1 $200,000 at 6% for 15 years and 180 months', () => {
+  const yearsRun = jsonRun(['--amount', '200000', '--rate', '6', '--years', '15', '--json']);
+  assert.equal(yearsRun.monthly_payment_cents, 168771);
+  assert.equal(yearsRun.payoff_month, 180);
+  assert.equal(yearsRun.interest_cents, 10378846);
+  assert.equal(yearsRun.years, 15);
+  assert.equal(yearsRun.months, 180);
+
+  const monthsRun = jsonRun(['--amount', '200000', '--rate', '6', '--months', '180', '--json']);
+  assert.equal(monthsRun.monthly_payment_cents, 168771);
+  assert.equal(monthsRun.payoff_month, 180);
+  assert.equal(monthsRun.interest_cents, 10378846);
+  assert.equal(monthsRun.months, 180);
+  assert.equal('years' in monthsRun, false);
+});
+
+test('loan-recast AC2 $200,000 at 6% for 13 months', () => {
+  const report = jsonRun(['--amount', '200000', '--rate', '6', '--months', '13', '--json']);
+  assert.equal(report.monthly_payment_cents, 1592845);
+  assert.equal(report.payoff_month, 13);
+  assert.equal(report.interest_cents, 706982);
+  assert.equal(report.months, 13);
+  assert.equal('years' in report, false);
+});
+
+test('loan-recast AC3 term flag validation', () => {
+  const both = run(['--amount', '200000', '--rate', '6', '--years', '15', '--months', '180']);
+  assert.notEqual(both.status, 0);
+  assert.match(both.stderr, /exactly one of --years or --months is required/);
+
+  const neither = run(['--amount', '200000', '--rate', '6']);
+  assert.notEqual(neither.status, 0);
+  assert.match(neither.stderr, /exactly one of --years or --months is required/);
+
+  for (const args of [
+    ['--months', '0'],
+    ['--months', '01'],
+    ['--months', '13.0'],
+    ['--years', '30.0'],
+  ]) {
+    const result = run(['--amount', '200000', '--rate', '6', ...args]);
+    assert.notEqual(result.status, 0, args.join(' '));
+  }
+});
+
+test('loan-recast AC4 extra month 14 on a 13-month loan fails; month 13 is accepted', () => {
+  withCsv('month,extra\n14,100\n', (file) => {
+    const result = run(['--amount', '200000', '--rate', '6', '--months', '13', '--extra', file]);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /1 through 13/);
+  });
+  withCsv('month,extra\n13,100\n', (file) => {
+    const report = jsonRun(['--amount', '200000', '--rate', '6', '--months', '13', '--extra', file, '--json']);
+    assert.equal(report.extra_applied_cents, 10000);
+  });
+});
+
+function buildRecastSampleExtraCsv() {
+  const lines = ['month,extra'];
+  for (let month = 1; month <= 360; month += 1) {
+    lines.push(`${month},2400`);
+  }
+  for (let month = 5; month <= 360; month += 12) {
+    lines.push(`${month},20000`);
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+test('loan-recast AC5 sample first run month 24 and second run payment', () => {
+  withCsv(buildRecastSampleExtraCsv(), (file) => {
+    const first = jsonRun([
+      '--amount', '570000', '--rate', '7.375', '--years', '30', '--extra', file, '--json', '--schedule',
+    ]);
+    const month24 = scheduleRow(first.schedule, 24);
+    assert.equal(month24.remaining_principal_cents, 45361449);
+
+    const second = jsonRun([
+      '--amount', '453614.49', '--rate', '7.375', '--months', '336', '--json',
+    ]);
+    assert.equal(second.amount_cents, 45361449);
+    assert.equal(second.monthly_payment_cents, 319568);
+    assert.equal(second.interest_cents, 62013361);
+    assert.equal(second.payoff_month, 336);
+
+    const oneLess = jsonRun([
+      '--amount', '453614.49', '--rate', '7.375', '--months', '335', '--json',
+    ]);
+    assert.equal(oneLess.monthly_payment_cents, 319855);
+  });
 });
 
 test('invalid loan arguments exit non-zero', () => {

@@ -5,7 +5,7 @@ A zero-dependency Node.js calculator for a fixed monthly mortgage payment and it
 ## Commands
 
 - Install: none. Node.js is the runtime.
-- Run: `node compound_interest_monthly.js --amount 855000 --rate 6.99 --years 30` (healthy: a summary whose monthly payment is 5,682.60). `--amount`, `--rate`, and `--years` are required.
+- Run: `node compound_interest_monthly.js --amount 855000 --rate 6.99 --years 30` (healthy: a summary whose monthly payment is 5,682.60). `--amount` and `--rate` are required. Exactly one of `--years` or `--months` is required.
 - JSON: add `--json`. Month rows: add `--schedule` (CSV alone, or inside the JSON object when combined with `--json`).
 - Extra principal: `--extra fixtures/first-year-100.csv`. The header is `month,extra`. On $570,000 at 7% for 30 years, $100 in months 1–12 saves 813770 cents and pays off in month 358.
 - Skill: `.agents/skills/mortgage-loan-calculator/SKILL.md`. It runs `scripts/compound_interest_monthly.js`, a symlink to the calculator at the repo root. Workspace link, not committed: `/Users/nikolay/git/.agents/skills/mortgage-loan-calculator` → `../../github.com/nikolaybotev/compound/.agents/skills/mortgage-loan-calculator`.
@@ -20,7 +20,7 @@ A zero-dependency Node.js calculator for a fixed monthly mortgage payment and it
 - No npm dependencies.
 - The human summary formats money in US locale with two decimal places, from integer cents. `--json` reports money as integer cents. The `--schedule` CSV uses two decimal places and no grouping separators.
 - The note rate is percent per year (`6.99` means 6.99%), and the monthly rate is that percent divided by 12.
-- There is no default loan. A missing or invalid `--amount`, `--rate`, or `--years` exits non-zero and explains the reason on stderr.
+- There is no default loan. A missing or invalid `--amount`, `--rate`, or term flag exits non-zero and explains the reason on stderr. Exactly one of `--years` or `--months` is required; both or neither fails. No arguments names `--amount`, `--rate`, `--years`, and `--months`. `--json` always includes `months`; `years` appears only when `--years` was passed.
 
 ## Architecture
 
@@ -30,6 +30,7 @@ A zero-dependency Node.js calculator for a fixed monthly mortgage payment and it
 - `.agents/skills/mortgage-loan-calculator/SKILL.md` is the front end. It asks for a missing principal, note rate, term, or extra plan, writes a `month,extra` CSV, and answers from `--json`. A month or savings-so-far question adds `--schedule` and reads `schedule`. It does not amortize the loan itself.
 - `intent/mortgage-skill/` is the spec and plan for that skill.
 - `intent/amortization-app/` is the spec and plan for a local amortization page on the same walk. It is not built yet.
+- `intent/loan-recast/` is the spec and plan for a term in months and a fixed-rate servicer recast via the skill. The script change is Phase 0; the skill update is Phase 1.
 - `README.md` describes the script and points at the skill.
 
 ## Things agents get wrong
