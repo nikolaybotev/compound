@@ -39,6 +39,7 @@ export function Schedule({
               <th scope="col">Principal</th>
               <th scope="col">Interest</th>
               <th scope="col">Extra payment</th>
+              <th scope="col">Saved by extra</th>
               <th scope="col">Principal balance</th>
               <th scope="col">Interest balance</th>
             </tr>
@@ -64,6 +65,7 @@ export function Schedule({
                   <td class="money">{formatMoney(year.principalCents)}</td>
                   <td class="money">{formatMoney(year.interestCents)}</td>
                   <td class="money">{formatMoney(year.extraCents)}</td>
+                  <td />
                   <td class="money">{formatMoney(year.principalBalanceCents)}</td>
                   <td class="money">{formatMoney(year.interestBalanceCents)}</td>
                 </tr>
@@ -91,6 +93,7 @@ export function Schedule({
                             }}
                           />
                         </td>
+                        <td class="money">{formatMoney(row.savedByExtraCents)}</td>
                         <td class="money">{formatMoney(row.principalBalanceCents)}</td>
                         <td class="money">{formatMoney(row.interestBalanceCents)}</td>
                       </tr>

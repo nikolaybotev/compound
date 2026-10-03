@@ -1,3 +1,6 @@
+import { execSync } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import { buildReport } from "../../../amortize.js";
 import {
@@ -9,13 +12,17 @@ import {
   dropExtrasBeyond,
   formatMoney,
   loadScenario,
+  loanReport,
   parseLoan,
   paymentDate,
   percentThousandths,
+  savedByExtraCents,
   saveScenario,
   shortDate,
   STORAGE_KEY,
 } from "../src/loan";
+
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
 describe("down payment cents", () => {
   test("$712,500 at 20% is a $570,000 loan", () => {
@@ -108,6 +115,78 @@ describe("extra prefill", () => {
     expect(shortened.has(181)).toBe(false);
     expect(shortened.get(180)).toBe(100);
     expect(dropExtrasBeyond(shortened, 360).has(181)).toBe(false);
+  });
+});
+
+describe("saved by extra", () => {
+  const parsed = parseLoan({
+    price: "570000",
+    down: "0",
+    years: "30",
+    rate: "7",
+    start: "2026-10",
+  });
+  if (!parsed.ok) throw new Error("example loan must parse");
+  const loan = parsed.loan;
+
+  function extrasFor(months: number[]): Map<number, number> {
+    const map = new Map<number, number>();
+    for (const month of months) map.set(month, 100);
+    return map;
+  }
+
+  function marginal(month: number, months: number[]): number {
+    const map = extrasFor(months);
+    const full = buildReport(570000, 7, 360, map, 30);
+    const without = new Map(map);
+    without.delete(month);
+    const counterfactual = buildReport(570000, 7, 360, without, 30);
+    return counterfactual.interest_cents - full.interest_cents;
+  }
+
+  test("AC1 marginal savings match buildReport counterfactuals", () => {
+    expect(marginal(1, [1])).toBe(70_694);
+    expect(marginal(12, [12])).toBe(65_693);
+    expect(marginal(180, [180])).toBe(18_489);
+
+    const firstYear = extrasFor([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+    const full = loanReport(loan, firstYear);
+    expect(savedByExtraCents(loan, firstYear, 1, full.interest_cents)).toBe(69_761);
+    expect(savedByExtraCents(loan, firstYear, 12, full.interest_cents)).toBe(64_818);
+    expect(savedByExtraCents(loan, firstYear, 13, full.interest_cents)).toBe(0);
+
+    let sum = 0;
+    for (let month = 1; month <= 12; month += 1) {
+      sum += savedByExtraCents(loan, firstYear, month, full.interest_cents);
+    }
+    expect(sum).not.toBe(813_770);
+  });
+});
+
+describe("CLI contract", () => {
+  test("AC5 json schedule keys and CSV header are unchanged", () => {
+    const json = JSON.parse(
+      execSync(
+        "node compound_interest_monthly.js --amount 570000 --rate 7 --years 30 --json --schedule",
+        { cwd: repoRoot, encoding: "utf8" },
+      ),
+    ) as { schedule: Record<string, unknown>[] };
+    expect(Object.keys(json.schedule[0]).sort()).toEqual([
+      "extra_cents",
+      "interest_cents",
+      "interest_saved_cents",
+      "month",
+      "principal_cents",
+      "remaining_interest_cents",
+      "remaining_principal_cents",
+    ]);
+    const csv = execSync(
+      "node compound_interest_monthly.js --amount 570000 --rate 7 --years 30 --schedule",
+      { cwd: repoRoot, encoding: "utf8" },
+    );
+    expect(csv.trim().split("\n")[0]).toBe(
+      "month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved",
+    );
   });
 });
 
