@@ -13,6 +13,7 @@ A local amortization page on the same calculator is [apps/web](apps/web). Its de
 ## Requirements
 
 - [Node.js](https://nodejs.org/) 24 or later. Continuous integration runs the tests on Node.js 24.
+- Optional: [mise](https://mise.jdx.dev/). From this directory, `mise install` installs the Node version pinned in `mise.toml`.
 
 ## Run
 
@@ -63,6 +64,8 @@ The workspace link is local setup and is not a file in this repo: `/Users/nikola
 ```bash
 node --test
 ```
+
+With mise installed, `mise run test` runs the same command via `mise.toml`.
 
 **Footnote — this matches Bankrate, not a servicer's ledger.** The schedule uses the exact payment from the formula and does not round each month's interest to the cent. A lender that bills $3,792.22 and rounds every month's interest to the cent will show a few dollars more interest over 30 years: about $795,203.90 on a $570,000 loan at 7%, against $795,200.72 here. [Bankrate's schedule](https://www.bankrate.com/mortgages/amortization-calculator/) shows $795,200.72; the summary card on that page rounds the same total to $795,201. Compare results with that schedule.
 
