@@ -8,12 +8,15 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [["github"], ["list"]] : "list",
+  workers: process.env.CI ? 1 : undefined,
+  timeout: 30_000,
+  globalTimeout: process.env.CI ? 180_000 : 0,
+  reporter: process.env.CI ? [["github"], ["line"]] : "line",
   use: {
     baseURL: `${origin}/`,
     timezoneId: "UTC",
     locale: "en-US",
-    trace: "retain-on-failure",
+    trace: "off",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], hasTouch: true } }],
   webServer: {
@@ -21,5 +24,6 @@ export default defineConfig({
     url: origin,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    gracefulShutdown: { signal: "SIGTERM", timeout: 5_000 },
   },
 });
