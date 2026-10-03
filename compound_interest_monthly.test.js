@@ -428,6 +428,27 @@ test('AC7 skill states the ask rule, the CSV, and which flags to run', () => {
   assert.equal(fs.realpathSync(fromSkill), fs.realpathSync(script));
 });
 
+test('amortization AC2 pure walk matches the 30-year fixture and stays free of Node APIs', () => {
+  const source = fs.readFileSync(path.join(__dirname, 'amortize.js'), 'utf8');
+  for (const token of ['require', 'import', 'process', 'fs']) {
+    assert.equal(source.includes(token), false, `amortize.js contains ${token}`);
+  }
+  const { buildReport, formatGroupedCents } = require('./amortize.js');
+  const report = buildReport(570000, 7, 360, new Map(), 30);
+  assert.equal(report.monthly_payment_cents, 379222);
+  assert.equal(report.interest_cents, 79520072);
+  assert.equal(report.payoff_month, 360);
+  assert.equal(report.months, 360);
+  assert.equal(report.years, 30);
+  assert.equal(report.schedule[0].interest_cents, 332500);
+  assert.equal(report.schedule[0].principal_cents, 46722);
+  assert.equal(report.schedule[156].remaining_principal_cents, 45048005);
+  assert.equal(report.schedule[156].remaining_interest_cents, 31934147);
+  assert.equal(report.schedule[359].remaining_principal_cents, 0);
+  assert.equal(formatGroupedCents(379222), '3,792.22');
+  assert.equal(formatGroupedCents(report.monthly_payment_cents), '3,792.22');
+});
+
 test('loan-recast AC6 skill recast procedure and term flags', () => {
   const skillPath = path.join(__dirname, '.agents', 'skills', 'mortgage-loan-calculator', 'SKILL.md');
   const skill = fs.readFileSync(skillPath, 'utf8');
