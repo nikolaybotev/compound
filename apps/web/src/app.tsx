@@ -1,53 +1,88 @@
-import { useMemo, useState } from "preact/hooks";
+import { useMemo, useRef, useState } from "preact/hooks";
 import { Chart, type ChartBar } from "./chart";
 import {
+  MONTH_NAMES,
   bands,
+  buildPrefillMap,
+  dropExtrasBeyond,
+  extraInputValue,
   firstPaymentYear,
   formatMoney,
   groupByYear,
-  loadDraft,
+  loadScenario,
   loanReport,
   longDate,
+  parseDollarField,
   parseLoan,
   paymentDate,
-  saveDraft,
+  saveScenario,
   shortDate,
   type Loan,
   type LoanDraft,
+  type Prefill,
+  type Scenario,
 } from "./loan";
 import { Schedule } from "./schedule";
+import { dollarsToCents } from "../../../amortize.js";
 
-function readInitial(): { draft: LoanDraft; loan: Loan } {
-  const draft = loadDraft(typeof localStorage === "undefined" ? undefined : localStorage);
-  const parsed = parseLoan(draft);
-  if (!parsed.ok) {
-    throw new Error(parsed.message);
-  }
-  return { draft, loan: parsed.loan };
+const MONTHLY_AMOUNT = "Additional amount to monthly payment";
+const YEARLY_AMOUNT = "Additional yearly payment";
+
+function readInitial(): Scenario & { loan: Loan } {
+  const scenario = loadScenario(typeof localStorage === "undefined" ? undefined : localStorage);
+  const parsed = parseLoan(scenario.draft);
+  if (!parsed.ok) throw new Error(parsed.message);
+  return { ...scenario, loan: parsed.loan };
 }
 
 export function App() {
   const initial = useState(readInitial)[0];
   const [draft, setDraft] = useState(initial.draft);
   const [loan, setLoan] = useState(initial.loan);
+  const [extras, setExtras] = useState(initial.extras);
+  const [prefill, setPrefill] = useState(initial.prefill);
   const [error, setError] = useState<string | null>(null);
   const [invalidField, setInvalidField] = useState<string | null>(null);
-  const [openYears, setOpenYears] = useState<Set<number>>(
-    () => new Set([firstPaymentYear(initial.loan)]),
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const [openYears, setOpenYears] = useState<Set<number>>(() =>
+    initial.openYears ? new Set(initial.openYears) : new Set([firstPaymentYear(initial.loan)]),
   );
+  const [editingMonth, setEditingMonth] = useState<number | null>(null);
+  const [editingValue, setEditingValue] = useState("");
+  const snapshot = useRef<Scenario>({
+    draft: initial.draft,
+    extras: initial.extras,
+    prefill: initial.prefill,
+    openYears: initial.openYears ?? [firstPaymentYear(initial.loan)],
+  });
 
-  const report = useMemo(() => loanReport(loan), [loan]);
-  const years = useMemo(() => groupByYear(report, loan.startMonth), [report, loan.startMonth]);
+  function persist(patch: Partial<Scenario>) {
+    const next: Scenario = {
+      draft: patch.draft ?? snapshot.current.draft,
+      extras: patch.extras ?? snapshot.current.extras,
+      prefill: patch.prefill ?? snapshot.current.prefill,
+      openYears: patch.openYears === undefined ? snapshot.current.openYears : patch.openYears,
+    };
+    snapshot.current = next;
+    saveScenario(localStorage, next);
+  }
+
+  const report = useMemo(() => loanReport(loan, extras), [loan, extras]);
+  const years = useMemo(
+    () => groupByYear(report, loan.startMonth, extras),
+    [report, loan.startMonth, extras],
+  );
   const payoff = paymentDate(loan.startMonth, report.payoff_month);
   const bars: ChartBar[] = report.schedule.slice(0, report.payoff_month).map((row) => {
     const date = paymentDate(loan.startMonth, row.month);
     const split = bands(report, row);
+    const requested = extras.get(row.month) ?? 0;
     return {
       month: row.month,
       dateLabel: shortDate(date.year, date.month),
       paymentPrincipal: row.principal_cents,
       paymentInterest: row.interest_cents,
-      paymentExtra: 0,
+      paymentExtra: requested > 0 ? dollarsToCents(requested) : 0,
       total: report.amount_cents + report.interest_cents,
       ...split,
     };
@@ -57,15 +92,22 @@ export function App() {
     const next = { ...draft, [field]: value };
     setDraft(next);
     const parsed = parseLoan(next);
-    if (parsed.ok) {
-      setLoan(parsed.loan);
-      setError(null);
-      setInvalidField(null);
-      saveDraft(localStorage, next);
+    if (!parsed.ok) {
+      setError(parsed.message);
+      setInvalidField(parsed.field);
       return;
     }
-    setError(parsed.message);
-    setInvalidField(parsed.field);
+    const kept = dropExtrasBeyond(extras, parsed.loan.years * 12);
+    setLoan(parsed.loan);
+    setExtras(kept);
+    setError(null);
+    setInvalidField(null);
+    persist({ draft: next, extras: kept });
+  }
+
+  function rememberYears(next: Set<number>) {
+    persist({ openYears: [...next] });
+    return next;
   }
 
   function toggleYear(year: number) {
@@ -73,15 +115,62 @@ export function App() {
       const next = new Set(current);
       if (next.has(year)) next.delete(year);
       else next.add(year);
-      return next;
+      return rememberYears(next);
     });
   }
 
   function toggleAll() {
     setOpenYears((current) => {
       const every = years.every((year) => current.has(year.year));
-      return every ? new Set() : new Set(years.map((year) => year.year));
+      const next = every ? new Set<number>() : new Set(years.map((year) => year.year));
+      return rememberYears(next);
     });
+  }
+
+  function changePrefill(patch: Partial<Prefill>) {
+    const next = { ...prefill, ...patch };
+    setPrefill(next);
+    persist({ prefill: next });
+  }
+
+  function applyPrefill() {
+    const monthly = parseDollarField(prefill.monthly);
+    if (!monthly.ok) {
+      setApplyError(
+        `${MONTHLY_AMOUNT} must be a dollar amount with at most two decimal places, or empty.`,
+      );
+      return;
+    }
+    const yearly = parseDollarField(prefill.yearly);
+    if (!yearly.ok) {
+      setApplyError(
+        `${YEARLY_AMOUNT} must be a dollar amount with at most two decimal places, or empty.`,
+      );
+      return;
+    }
+    setApplyError(null);
+    const next = buildPrefillMap(
+      loan.years * 12,
+      loan.startMonth,
+      monthly.dollars,
+      yearly.dollars,
+      prefill.month,
+    );
+    setExtras(next);
+    setEditingMonth(null);
+    persist({ extras: next });
+  }
+
+  function commitExtra(month: number) {
+    if (editingMonth !== month) return;
+    const parsed = parseDollarField(editingValue);
+    setEditingMonth(null);
+    if (!parsed.ok) return;
+    const next = new Map(extras);
+    if (parsed.dollars === 0) next.delete(month);
+    else next.set(month, parsed.dollars);
+    setExtras(next);
+    persist({ extras: next });
   }
 
   return (
@@ -158,14 +247,83 @@ export function App() {
             <dt>Payoff date</dt>
             <dd class="money">{longDate(payoff.year, payoff.month)}</dd>
           </div>
+          {extras.size > 0 ? (
+            <div role="region" aria-label="Interest saved">
+              <dt>Interest saved</dt>
+              <dd class="money">{formatMoney(report.interest_saved_cents)}</dd>
+            </div>
+          ) : null}
+          {extras.size > 0 ? (
+            <div role="region" aria-label="Months saved">
+              <dt>Months saved</dt>
+              <dd class="money">{report.months_saved}</dd>
+            </div>
+          ) : null}
         </dl>
       </section>
       <Chart bars={bars} />
+      <section class="prefill">
+        <button
+          type="button"
+          aria-expanded={prefill.open}
+          onClick={() => changePrefill({ open: !prefill.open })}
+        >
+          Make extra payments
+        </button>
+        <div class="prefill-panel" hidden={!prefill.open}>
+          <p>Apply replaces the extra-payment column.</p>
+          <div class="inputs">
+            <Field
+              id="extra-monthly"
+              label={MONTHLY_AMOUNT}
+              value={prefill.monthly}
+              invalid={false}
+              onInput={(value) => changePrefill({ monthly: value })}
+            />
+            <Field
+              id="extra-yearly"
+              label={YEARLY_AMOUNT}
+              value={prefill.yearly}
+              invalid={false}
+              onInput={(value) => changePrefill({ yearly: value })}
+            />
+            <div class="field">
+              <label for="extra-yearly-month">Month of year</label>
+              <select
+                id="extra-yearly-month"
+                value={String(prefill.month)}
+                onChange={(event) => changePrefill({ month: Number(event.currentTarget.value) })}
+              >
+                {MONTH_NAMES.map((name, index) => (
+                  <option key={name} value={index + 1}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <button type="button" onClick={applyPrefill}>
+            Apply
+          </button>
+          {applyError ? (
+            <p class="error" role="alert">
+              {applyError}
+            </p>
+          ) : null}
+        </div>
+      </section>
       <Schedule
         years={years}
         openYears={openYears}
+        editingMonth={editingMonth}
+        editingValue={editingValue}
         onToggleYear={toggleYear}
         onToggleAll={toggleAll}
+        onEdit={(month, value) => {
+          setEditingMonth(month);
+          setEditingValue(value);
+        }}
+        onCommit={commitExtra}
       />
     </main>
   );

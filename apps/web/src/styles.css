@@ -286,6 +286,41 @@ dd {
   pointer-events: none;
 }
 
+.prefill {
+  margin: 0 0 1.25rem;
+}
+
+.prefill-panel {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--line);
+}
+
+.prefill-panel p {
+  margin: 0 0 0.85rem;
+  color: var(--muted);
+}
+
+.prefill-panel .inputs {
+  margin-bottom: 0.85rem;
+}
+
+select {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  padding: 0.35rem 0;
+  font-family: var(--sans);
+  font-size: 1.05rem;
+}
+
+input.extra {
+  width: 7rem;
+  text-align: right;
+  padding: 0.15rem 0;
+}
+
 .schedule-head {
   display: flex;
   align-items: baseline;

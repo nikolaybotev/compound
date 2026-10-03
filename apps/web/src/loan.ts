@@ -2,6 +2,7 @@ import {
   buildReport,
   dollarsToCents,
   formatGroupedCents,
+  formatPlainCents,
   type Report,
 } from "../../../amortize.js";
 
@@ -20,7 +21,7 @@ const SHORT_MONTHS = [
   "Dec",
 ] as const;
 
-const LONG_MONTHS = [
+export const MONTH_NAMES = [
   "January",
   "February",
   "March",
@@ -72,6 +73,7 @@ export type ScheduleMonth = {
   principalCents: number;
   interestCents: number;
   extraCents: number;
+  extraDollars: number;
   principalBalanceCents: number;
   interestBalanceCents: number;
 };
@@ -245,7 +247,69 @@ export function shortDate(year: number, month: number): string {
 }
 
 export function longDate(year: number, month: number): string {
-  return `${LONG_MONTHS[month - 1]} ${year}`;
+  return `${MONTH_NAMES[month - 1]} ${year}`;
+}
+
+export type Prefill = {
+  monthly: string;
+  yearly: string;
+  month: number;
+  open: boolean;
+};
+
+export type Scenario = {
+  draft: LoanDraft;
+  extras: Map<number, number>;
+  prefill: Prefill;
+  openYears: number[] | null;
+};
+
+export function defaultPrefill(): Prefill {
+  return { monthly: "", yearly: "", month: 1, open: false };
+}
+
+export function extraInputValue(dollars: number | undefined): string {
+  if (!dollars) return "";
+  return formatPlainCents(dollarsToCents(dollars));
+}
+
+export function parseDollarField(
+  text: string,
+): { ok: true; dollars: number } | { ok: false } {
+  const trimmed = text.trim();
+  if (trimmed === "") return { ok: true, dollars: 0 };
+  if (!/^(?:\d+)(?:\.\d{1,2})?$/.test(trimmed)) return { ok: false };
+  const dollars = Number(trimmed);
+  if (!Number.isFinite(dollars) || dollars < 0) return { ok: false };
+  return { ok: true, dollars };
+}
+
+export function buildPrefillMap(
+  monthCount: number,
+  startMonth: string,
+  monthly: number,
+  yearly: number,
+  yearlyMonth: number,
+): Map<number, number> {
+  const extras = new Map<number, number>();
+  for (let month = 1; month <= monthCount; month += 1) {
+    const date = paymentDate(startMonth, month);
+    const amount = monthly + (date.month === yearlyMonth ? yearly : 0);
+    if (amount > 0) extras.set(month, amount);
+  }
+  return extras;
+}
+
+export function dropExtrasBeyond(
+  extras: Map<number, number>,
+  monthCount: number,
+): Map<number, number> {
+  const next = new Map<number, number>();
+  for (const [month, amount] of extras) {
+    if (month >= 1 && month <= monthCount && amount > 0) next.set(month, amount);
+  }
+  if (next.size === extras.size) return extras;
+  return next;
 }
 
 export function bands(
@@ -260,11 +324,17 @@ export function bands(
   };
 }
 
-export function groupByYear(report: Report, startMonth: string): ScheduleYear[] {
+export function groupByYear(
+  report: Report,
+  startMonth: string,
+  extras: Map<number, number> = new Map(),
+): ScheduleYear[] {
   const groups: ScheduleYear[] = [];
   const rows = report.schedule.slice(0, report.payoff_month);
   for (const row of rows) {
     const date = paymentDate(startMonth, row.month);
+    const extraDollars = extras.get(row.month) ?? 0;
+    const extraCents = extraDollars > 0 ? dollarsToCents(extraDollars) : 0;
     let group = groups[groups.length - 1];
     if (!group || group.year !== date.year) {
       group = {
@@ -283,12 +353,14 @@ export function groupByYear(report: Report, startMonth: string): ScheduleYear[] 
       dateLabel: shortDate(date.year, date.month),
       principalCents: row.principal_cents,
       interestCents: row.interest_cents,
-      extraCents: 0,
+      extraCents,
+      extraDollars,
       principalBalanceCents: row.remaining_principal_cents,
       interestBalanceCents: row.remaining_interest_cents,
     });
     group.principalCents += row.principal_cents;
     group.interestCents += row.interest_cents;
+    group.extraCents += extraCents;
     group.principalBalanceCents = row.remaining_principal_cents;
     group.interestBalanceCents = row.remaining_interest_cents;
   }
@@ -301,8 +373,57 @@ export function firstPaymentYear(loan: Loan): number {
 
 type StorageLike = Pick<Storage, "getItem" | "setItem">;
 
-export function loadDraft(storage: StorageLike | undefined, now = new Date()): LoanDraft {
-  const fallback = defaultDraft(now);
+export function defaultScenario(now = new Date()): Scenario {
+  return {
+    draft: defaultDraft(now),
+    extras: new Map(),
+    prefill: defaultPrefill(),
+    openYears: null,
+  };
+}
+
+function parseExtras(value: unknown): Map<number, number> | null {
+  if (value === undefined) return new Map();
+  if (!Array.isArray(value)) return null;
+  const extras = new Map<number, number>();
+  for (const entry of value) {
+    if (!Array.isArray(entry) || entry.length !== 2) return null;
+    const [month, amount] = entry;
+    if (typeof month !== "number" || !Number.isInteger(month) || month < 1) return null;
+    if (typeof amount !== "number" || !Number.isFinite(amount) || !(amount > 0)) return null;
+    extras.set(month, amount);
+  }
+  return extras;
+}
+
+function parsePrefill(value: unknown): Prefill | null {
+  if (value === undefined) return defaultPrefill();
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (typeof record.monthly !== "string" || typeof record.yearly !== "string") return null;
+  if (typeof record.month !== "number" || !Number.isInteger(record.month)) return null;
+  if (record.month < 1 || record.month > 12 || typeof record.open !== "boolean") return null;
+  return {
+    monthly: record.monthly,
+    yearly: record.yearly,
+    month: record.month,
+    open: record.open,
+  };
+}
+
+function parseOpenYears(value: unknown): number[] | null | undefined {
+  if (value === undefined) return null;
+  if (!Array.isArray(value)) return undefined;
+  const years: number[] = [];
+  for (const year of value) {
+    if (typeof year !== "number" || !Number.isInteger(year)) return undefined;
+    years.push(year);
+  }
+  return years;
+}
+
+export function loadScenario(storage: StorageLike | undefined, now = new Date()): Scenario {
+  const fallback = defaultScenario(now);
   if (!storage) return fallback;
   try {
     const raw = storage.getItem(STORAGE_KEY);
@@ -319,24 +440,31 @@ export function loadDraft(storage: StorageLike | undefined, now = new Date()): L
       start: typeof record.start === "string" ? record.start : "",
     };
     if (!parseLoan(draft).ok) return fallback;
-    return draft;
+    const extras = parseExtras(record.extras);
+    const prefill = parsePrefill(record.prefill);
+    const openYears = parseOpenYears(record.openYears);
+    if (!extras || !prefill || openYears === undefined) return fallback;
+    return { draft, extras, prefill, openYears };
   } catch {
     return fallback;
   }
 }
 
-export function saveDraft(storage: StorageLike | undefined, draft: LoanDraft): void {
+export function saveScenario(storage: StorageLike | undefined, scenario: Scenario): void {
   if (!storage) return;
   try {
     storage.setItem(
       STORAGE_KEY,
       JSON.stringify({
         version: 1,
-        price: draft.price,
-        down: draft.down,
-        years: draft.years,
-        rate: draft.rate,
-        start: draft.start,
+        price: scenario.draft.price,
+        down: scenario.draft.down,
+        years: scenario.draft.years,
+        rate: scenario.draft.rate,
+        start: scenario.draft.start,
+        extras: [...scenario.extras.entries()],
+        prefill: scenario.prefill,
+        openYears: scenario.openYears,
       }),
     );
   } catch {
