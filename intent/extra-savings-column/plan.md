@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Implements | [spec.md](spec.md) Draft 1 |
-| Status | Draft 1 |
+| Implements | [spec.md](spec.md) Draft 2 |
+| Status | Draft 2 |
 | Stage | 3 · Build |
 
 Spec wins. Update this file in the same change whenever implementation departs from it.
@@ -20,7 +20,7 @@ None. GitHub Pages already deploys this repo on a push to `main`.
 | AC2 | Playwright: only month 1 is $100, cell and summary are $706.94, month 2 is $0.00, the 2026 year cell is empty | 0 |
 | AC3 | Playwright: $100 in months 1–12 shows $697.61, $648.18, $0.00, and summary $8,137.70 | 0 |
 | AC4 | Playwright: Apply $100 monthly shows $585.67 on month 1, summary $76,366.09, and $0.00 on the payoff row | 0 |
-| AC5 | `node --test` exits 0. `--json --schedule` keys are unchanged | 0 |
+| AC5 | `node --test` exits 0. `--json --schedule` keys are unchanged. The web CI job runs AC1–AC4 and exits 0 | 0 |
 | AC6 | After the merge, the published page shows $706.94 for month 1's $100 with start month October 2026 | 0 |
 
 One phase. One pull request.
