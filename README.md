@@ -8,6 +8,8 @@ There are no npm dependencies; only the Node.js runtime is required.
 
 A skill at [`.agents/skills/mortgage-loan-calculator/SKILL.md`](.agents/skills/mortgage-loan-calculator/SKILL.md) asks for a missing principal, note rate, term, or extra plan, writes a `month,extra` CSV, and answers from this script. The design is [intent/mortgage-skill/](intent/mortgage-skill/intent.md).
 
+A local amortization page on the same calculator is specified in [intent/amortization-app/](intent/amortization-app/intent.md). It is not built yet.
+
 ## Requirements
 
 - [Node.js](https://nodejs.org/) 24 or later. Continuous integration runs the tests on Node.js 24.
