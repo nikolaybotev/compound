@@ -4,7 +4,7 @@
 
 Run three passes and tag each finding with its pass:
 
-- **Bugs:** a payment, total interest, or interest-saved figure that disagrees with the cent fixtures in `intent/mortgage-skill/spec.md`; a schedule that keeps going after the principal is zero; an extra amount that does not reduce principal; a skill that supplies a loan amount, rate, term, or extra plan the user did not give.
+- **Bugs:** a payment, total interest, or interest-saved figure that disagrees with the fixtures in `intent/mortgage-skill/spec.md`; a schedule that keeps going after the principal is zero; an extra amount that does not reduce principal; a skill that supplies a loan amount, rate, term, or extra plan the user did not give.
 - **Security:** secrets or personal loan files committed to the repo; unexpected network or dependencies; reading or writing paths other than the script, the `--extra` file the user passed, and the skill's own temporary CSV.
 - **Compliance:** the change matches `intent/mortgage-skill/spec.md` and `plan.md`, and the conventions in `AGENTS.md`. A departure from the plan that is not written back into `plan.md` in the same change is a compliance finding.
 

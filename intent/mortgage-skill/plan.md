@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Implements | [spec.md](spec.md) Draft 1 |
-| Status | Draft 1 |
+| Implements | [spec.md](spec.md) Draft 2 |
+| Status | Draft 2 |
 | Stage | 3 · Build |
 
 Spec wins. Update this file in the same change whenever implementation departs from it.
@@ -26,12 +26,12 @@ None. Rounding, the CSV, and the end of the no-argument gist run are decided in 
 
 Suggested build chunk: Phases 0, 1, and 2, in order, each as its own pull request. Start that chunk only after this plan is approved and the fresh-context reviews in the cycle have been applied.
 
-## Phase 0 — Loan arguments and cent schedule
+## Phase 0 — Loan arguments and 30/360 schedule
 
 Files: `compound_interest_monthly.js`, `compound_interest_monthly.test.js`, `.github/workflows/test.yml`, `README.md`, `AGENTS.md`
 
 1. Replace the constants with `--amount`, `--rate`, and `--years` per spec requirement 1. Exit non-zero when one is missing or invalid. Remove the path that runs $855,000 with no arguments.
-2. Compute the schedule in integer cents, half up, and stop at payoff per requirements 5 and 6. There are no extra payments in this phase; the extra step is zero.
+2. Compute the schedule from the exact payment and exact 30/360 monthly interest, and stop at payoff, per requirements 5 and 6. Round to the cent only when reporting. There are no extra payments in this phase; the extra step is zero.
 3. Implement `--json` and the human summary. `--schedule` prints the payment lines. JSON field names match requirement 8, with saved fields at 0 and the baseline equal to the run.
 4. Add `node --test` cases for AC1, AC2 (no-extra parts), and AC5.
 5. Add a GitHub Actions workflow that runs `node --test` on Node.js 24 for pull requests and pushes.
@@ -57,7 +57,7 @@ node compound_interest_monthly.js --amount 570000 --rate 7 --years 30 \
   --extra fixtures/first-year-100.csv --json
 ```
 
-prints `interest_saved_cents` 813714 and `months_saved` 2.
+prints `interest_saved_cents` 813770 and `months_saved` 2.
 
 ## Phase 2 — Skill front end
 
