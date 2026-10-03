@@ -20,3 +20,6 @@ mise reshim
 pnpm install --frozen-lockfile
 pnpm --dir apps/web exec playwright install --with-deps chromium
 pnpm --dir apps/web build
+
+# Cloud Agents read ~/.cursor/skills. Existing skill folders are left in place.
+curl -fsSL https://raw.githubusercontent.com/nikolaybotev/local-skills/main/install.sh | sh -s -- ~/.cursor/skills
