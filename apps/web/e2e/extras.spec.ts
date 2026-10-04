@@ -13,10 +13,9 @@ test.afterEach(({ context }) => {
 
 test("AC15 a fresh visit keeps Make extra payments collapsed", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("button", { name: "Make extra payments" })).toHaveAttribute(
-    "aria-expanded",
-    "false",
-  );
+  const summary = extraSummary(page);
+  await expect(summary).toHaveAccessibleName("Make extra payments");
+  await expect(summary).toHaveAttribute("aria-expanded", "false");
   await expect(page.locator("#extra-monthly")).toHaveValue("");
   await expect(page.locator("#extra-yearly")).toHaveValue("");
   await expect(page.locator("#extra-yearly-month")).toHaveValue("1");
@@ -86,11 +85,10 @@ test("AC8 reload keeps the edited cell, the prefill, and an open 2027", async ({
   await page.evaluate(() => localStorage.setItem("compound-amortization-v1", "{"));
   await page.reload();
   await expect(page.locator("#start")).toHaveValue("2026-10");
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,792.22");
-  await expect(page.getByRole("button", { name: "Make extra payments" })).toHaveAttribute(
-    "aria-expanded",
-    "false",
-  );
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,936.85");
+  const summary = extraSummary(page);
+  await expect(summary).toHaveAccessibleName("Make extra payments");
+  await expect(summary).toHaveAttribute("aria-expanded", "false");
   await expect(page.locator("#extra-monthly")).toHaveValue("");
   await expect(page.locator("#extra-yearly")).toHaveValue("");
   await expect(page.locator("#extra-yearly-month")).toHaveValue("1");
@@ -125,16 +123,20 @@ test("AC14 a shorter term drops month 181 and restoring the term does not bring 
 async function openExample(page: Page) {
   await page.goto("/");
   await page.locator("#start").fill("2026-10");
-  await page.locator("#price").fill("570000");
+  await page.locator("#price").fill("570");
   await page.locator("#down").fill("0");
   await page.locator("#years").fill("30");
   await page.locator("#rate").fill("7");
   await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,792.22");
 }
 
+function extraSummary(page: Page) {
+  return page.locator("summary", { hasText: "Make extra payments" });
+}
+
 async function openPrefill(page: Page) {
-  const button = page.getByRole("button", { name: "Make extra payments" });
-  if ((await button.getAttribute("aria-expanded")) !== "true") await button.click();
+  const summary = extraSummary(page);
+  if ((await summary.getAttribute("aria-expanded")) !== "true") await summary.click();
 }
 
 async function applyMonthly(page: Page, amount: string) {

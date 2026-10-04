@@ -1,5 +1,29 @@
 import { buildReport, dollarsToCents } from "../../../amortize.js";
-import { centsToDollars, percentThousandths, type Loan } from "./loan";
+
+type AmortizedLoan = {
+  priceCents: number;
+  loanCents: number;
+  ratePercent: number;
+  years: number;
+};
+
+export function percentThousandths(text: string): number | null {
+  if (!/^(?:\d+)(?:\.\d{1,3})?$/.test(text)) return null;
+  const [whole, frac = ""] = text.split(".");
+  const padded = `${frac}000`.slice(0, 3);
+  const thousandths = Number(whole) * 1000 + Number(padded);
+  if (!Number.isSafeInteger(thousandths)) return null;
+  return thousandths;
+}
+
+function centsToDollars(cents: number): number {
+  const negative = cents < 0;
+  const abs = Math.abs(cents);
+  const whole = Math.trunc(abs / 100);
+  const frac = String(abs % 100).padStart(2, "0");
+  const dollars = Number(`${whole}.${frac}`);
+  return negative ? -dollars : dollars;
+}
 
 export const PICTURE_PERCENT_FIELDS = [
   "tax",
@@ -235,7 +259,7 @@ function prepaidInterestCents(baseCents: number, rateThousandths: number): numbe
 }
 
 export function buildPicture(
-  loan: Loan,
+  loan: AmortizedLoan,
   rateText: string,
   downText: string,
   values: PictureValues,

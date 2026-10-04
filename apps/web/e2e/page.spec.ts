@@ -59,12 +59,12 @@ test("AC3 example loan, chart, and November 2039 card", async ({ page }) => {
 
 test("AC4 down payment changes the loan amount", async ({ page }) => {
   await openExample(page);
-  await page.locator("#price").fill("712500");
+  await page.locator("#price").fill("712.5");
   await page.locator("#down").fill("20");
   await expect(page.getByRole("region", { name: "Loan amount" })).toContainText("$570,000.00");
   await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,792.22");
 
-  await page.locator("#price").fill("399999.00");
+  await page.locator("#price").fill("399.999");
   await page.locator("#down").fill("3.5");
   await expect(page.getByRole("region", { name: "Loan amount" })).toContainText("$385,999.03");
 });
@@ -82,7 +82,7 @@ test("AC11 pinned clock loads October 2026 and an invalid price keeps the loan",
   await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
   await page.goto("/");
   await expect(page.locator("#start")).toHaveValue("2026-10");
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,792.22");
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,936.85");
   await expect(page.locator("[data-bar]")).toHaveCount(360);
 
   const price = page.locator("#price");
@@ -90,7 +90,7 @@ test("AC11 pinned clock loads October 2026 and an invalid price keeps the loan",
   await page.keyboard.press("End");
   await page.keyboard.type("x");
   await expect(page.getByRole("alert")).toContainText("Purchase price");
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,792.22");
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,936.85");
   await expect(page.locator("[data-bar]")).toHaveCount(360);
 });
 
@@ -120,7 +120,7 @@ test("AC12 keyboard, tap, and expand all years", async ({ page }) => {
 async function openExample(page: Page) {
   await page.goto("/");
   await page.locator("#start").fill("2026-10");
-  await page.locator("#price").fill("570000");
+  await page.locator("#price").fill("570");
   await page.locator("#down").fill("0");
   await page.locator("#years").fill("30");
   await page.locator("#rate").fill("7");
@@ -129,6 +129,7 @@ async function openExample(page: Page) {
 
 async function indicateMonth(page: Page, month: number) {
   const chart = page.getByTestId("chart");
+  await chart.scrollIntoViewIfNeeded();
   const box = await chart.boundingBox();
   if (!box) throw new Error("chart has no box");
   const x = box.x + ((month - 0.5) / 360) * box.width;

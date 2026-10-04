@@ -1,14 +1,19 @@
 import { useMemo, useRef, useState } from "preact/hooks";
+import type { ComponentChildren } from "preact";
 import { Chart, type ChartBar } from "./chart";
+import { Disclosure } from "./disclosure";
 import {
   MONTH_NAMES,
+  THOUSANDS_MESSAGE,
   bands,
   buildPrefillMap,
+  dollarsToThousandsText,
   dropExtrasBeyond,
   extraInputValue,
   firstPaymentYear,
   formatMoney,
   groupByYear,
+  isTrailingDotThousands,
   loadScenario,
   loanReport,
   longDate,
@@ -17,32 +22,50 @@ import {
   paymentDate,
   saveScenario,
   shortDate,
+  thousandsToDollarString,
   type Loan,
   type LoanDraft,
   type Prefill,
   type Scenario,
 } from "./loan";
+import {
+  buildPicture,
+  formatWholeDollars,
+  parsePicture,
+  type PictureInputField,
+  type PictureValues,
+} from "./picture";
 import { Schedule } from "./schedule";
 import { dollarsToCents } from "../../../amortize.js";
 
 const MONTHLY_AMOUNT = "Additional amount to monthly payment";
 const YEARLY_AMOUNT = "Additional yearly payment";
+const PROPERTY_TAX_NOTE = "Nashua: 1.683%; Brentwood: 1.32%.";
 
-function readInitial(): Scenario & { loan: Loan } {
+function readInitial(): Scenario & { loan: Loan; pictureValues: PictureValues } {
   const scenario = loadScenario(typeof localStorage === "undefined" ? undefined : localStorage);
   const parsed = parseLoan(scenario.draft);
   if (!parsed.ok) throw new Error(parsed.message);
-  return { ...scenario, loan: parsed.loan };
+  const picture = parsePicture(scenario.picture);
+  if (!picture.ok) throw new Error(picture.message);
+  return { ...scenario, loan: parsed.loan, pictureValues: picture.values };
 }
 
 export function App() {
   const initial = useState(readInitial)[0];
   const [draft, setDraft] = useState(initial.draft);
+  const [validText, setValidText] = useState({ down: initial.draft.down, rate: initial.draft.rate });
   const [loan, setLoan] = useState(initial.loan);
+  const [priceText, setPriceText] = useState(() => dollarsToThousandsText(initial.draft.price));
   const [extras, setExtras] = useState(initial.extras);
   const [prefill, setPrefill] = useState(initial.prefill);
+  const [pictureDraft, setPictureDraft] = useState(initial.picture);
+  const [pictureSaved, setPictureSaved] = useState(initial.picture);
+  const [pictureValues, setPictureValues] = useState(initial.pictureValues);
   const [error, setError] = useState<string | null>(null);
   const [invalidField, setInvalidField] = useState<string | null>(null);
+  const [pictureError, setPictureError] = useState<string | null>(null);
+  const [pictureInvalid, setPictureInvalid] = useState<PictureInputField | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [openYears, setOpenYears] = useState<Set<number>>(() =>
     initial.openYears ? new Set(initial.openYears) : new Set([firstPaymentYear(initial.loan)]),
@@ -54,6 +77,7 @@ export function App() {
     extras: initial.extras,
     prefill: initial.prefill,
     openYears: initial.openYears ?? [firstPaymentYear(initial.loan)],
+    picture: initial.picture,
   });
 
   function persist(patch: Partial<Scenario>) {
@@ -62,15 +86,23 @@ export function App() {
       extras: patch.extras ?? snapshot.current.extras,
       prefill: patch.prefill ?? snapshot.current.prefill,
       openYears: patch.openYears === undefined ? snapshot.current.openYears : patch.openYears,
+      picture: patch.picture ?? snapshot.current.picture,
     };
     snapshot.current = next;
     saveScenario(localStorage, next);
   }
 
-  const report = useMemo(() => loanReport(loan, extras), [loan, extras]);
+  const lines = useMemo(
+    () => buildPicture(loan, validText.rate, validText.down, pictureValues),
+    [loan, validText, pictureValues],
+  );
+  const report = useMemo(
+    () => loanReport(loan, extras, lines.financedCents),
+    [loan, extras, lines.financedCents],
+  );
   const years = useMemo(
-    () => groupByYear(loan, report, extras),
-    [loan, report, extras],
+    () => groupByYear(loan, report, extras, lines.financedCents),
+    [loan, report, extras, lines.financedCents],
   );
   const payoff = paymentDate(loan.startMonth, report.payoff_month);
   const bars: ChartBar[] = report.schedule.slice(0, report.payoff_month).map((row) => {
@@ -93,16 +125,45 @@ export function App() {
     setDraft(next);
     const parsed = parseLoan(next);
     if (!parsed.ok) {
-      setError(parsed.message);
-      setInvalidField(parsed.field);
+      const priceProblem = field === "price" && (parsed.field === "price" || parsed.field === "loan");
+      setError(priceProblem ? THOUSANDS_MESSAGE : parsed.message);
+      setInvalidField(priceProblem ? "price" : parsed.field);
       return;
     }
     const kept = dropExtrasBeyond(extras, parsed.loan.years * 12);
+    setValidText({ down: next.down, rate: next.rate });
     setLoan(parsed.loan);
     setExtras(kept);
     setError(null);
     setInvalidField(null);
     persist({ draft: next, extras: kept });
+  }
+
+  function onPriceInput(value: string) {
+    setPriceText(value);
+    const trimmed = value.trim();
+    if (isTrailingDotThousands(trimmed)) {
+      if (invalidField === "price") {
+        setError(null);
+        setInvalidField(null);
+      }
+      return;
+    }
+    const dollars = thousandsToDollarString(trimmed);
+    if (dollars === null) {
+      setError(THOUSANDS_MESSAGE);
+      setInvalidField("price");
+      return;
+    }
+    update("price", dollars);
+  }
+
+  function onPriceBlur() {
+    setPriceText(dollarsToThousandsText(draft.price));
+    if (invalidField === "price") {
+      setError(null);
+      setInvalidField(null);
+    }
   }
 
   function rememberYears(next: Set<number>) {
@@ -131,6 +192,30 @@ export function App() {
     const next = { ...prefill, ...patch };
     setPrefill(next);
     persist({ prefill: next });
+  }
+
+  function updatePicture(field: PictureInputField, value: string) {
+    const next = { ...pictureDraft, [field]: value };
+    setPictureDraft(next);
+    const parsed = parsePicture(next);
+    if (!parsed.ok) {
+      setPictureError(parsed.message);
+      setPictureInvalid(parsed.field);
+      return;
+    }
+    const saved = { ...next, open: pictureDraft.open };
+    setPictureValues(parsed.values);
+    setPictureSaved(saved);
+    setPictureError(null);
+    setPictureInvalid(null);
+    persist({ picture: saved });
+  }
+
+  function setPictureOpen(open: boolean) {
+    const saved = { ...pictureSaved, open };
+    setPictureSaved(saved);
+    setPictureDraft({ ...pictureDraft, open });
+    persist({ picture: saved });
   }
 
   function applyPrefill() {
@@ -176,22 +261,47 @@ export function App() {
   return (
     <main class="column">
       <h1>Amortization</h1>
-      <div class="inputs">
-        <Field
+      <p class="heading-line">
+        <input
           id="price"
-          label="Purchase price"
-          value={draft.price}
-          invalid={invalidField === "price"}
-          onInput={(value) => update("price", value)}
+          aria-label="Purchase price (thousands)"
+          inputMode="decimal"
+          autoComplete="off"
+          value={priceText}
+          aria-invalid={invalidField === "price"}
+          style={{ width: `${Math.max(priceText.length, 1) + 1}ch` }}
+          onInput={(event) => onPriceInput(event.currentTarget.value)}
+          onBlur={onPriceBlur}
         />
-        <Field
+        <span>K | </span>
+        <input
           id="down"
-          label="Down payment"
+          aria-label="Down payment"
+          inputMode="decimal"
+          autoComplete="off"
           value={draft.down}
-          suffix="%"
-          invalid={invalidField === "down" || invalidField === "loan"}
-          onInput={(value) => update("down", value)}
+          aria-invalid={invalidField === "down" || invalidField === "loan"}
+          style={{ width: `${Math.max(draft.down.length, 1) + 1}ch` }}
+          onInput={(event) => update("down", event.currentTarget.value)}
         />
+        <span>% down | </span>
+        <input
+          id="rate"
+          aria-label="Interest"
+          inputMode="decimal"
+          autoComplete="off"
+          value={draft.rate}
+          aria-invalid={invalidField === "rate"}
+          style={{ width: `${Math.max(draft.rate.length, 1) + 1}ch` }}
+          onInput={(event) => update("rate", event.currentTarget.value)}
+        />
+        <span>% fixed = </span>
+        <span class="complete-payment" aria-label="Complete monthly payment">
+          {formatWholeDollars(lines.headingDollars)}
+        </span>
+        <span> / month</span>
+      </p>
+      <div class="inputs">
         <Field
           id="years"
           label="Term"
@@ -199,14 +309,6 @@ export function App() {
           suffix="years"
           invalid={invalidField === "years"}
           onInput={(value) => update("years", value)}
-        />
-        <Field
-          id="rate"
-          label="Interest"
-          value={draft.rate}
-          suffix="%"
-          invalid={invalidField === "rate"}
-          onInput={(value) => update("rate", value)}
         />
         <div class="field">
           <label for="start">Start month</label>
@@ -262,15 +364,13 @@ export function App() {
         </dl>
       </section>
       <Chart bars={bars} />
-      <section class="prefill">
-        <button
-          type="button"
-          aria-expanded={prefill.open}
-          onClick={() => changePrefill({ open: !prefill.open })}
-        >
-          Make extra payments
-        </button>
-        <div class="prefill-panel" hidden={!prefill.open}>
+      <Disclosure
+        className="prefill"
+        title="Make extra payments"
+        open={prefill.open}
+        onToggle={(open) => changePrefill({ open })}
+      >
+        <div class="prefill-panel">
           <p>Apply replaces the extra-payment column.</p>
           <div class="inputs">
             <Field
@@ -311,7 +411,173 @@ export function App() {
             </p>
           ) : null}
         </div>
-      </section>
+      </Disclosure>
+      <Disclosure
+        className="picture"
+        title="Monthly payment and closing costs"
+        open={pictureDraft.open}
+        onToggle={setPictureOpen}
+      >
+        <p class="loan-type">Conventional</p>
+        <table class="picture-table">
+          <tbody>
+            <MoneyRow line="purchase-price" label="Purchase price" amount={lines.priceCents} />
+            <MoneyRow line="down-payment" label="Down payment" amount={lines.downCents} />
+            <MoneyRow line="base-loan" label="Base loan amount" amount={lines.baseCents} />
+            <MoneyRow
+              line="upfront-mip"
+              label="Upfront MIP"
+              amount={lines.upfrontMipCents}
+              rate={
+                <PictureInput
+                  id="picture-upfront"
+                  label="FHA upfront MIP"
+                  value={pictureDraft.upfrontMip}
+                  invalid={pictureInvalid === "upfrontMip"}
+                  onInput={(value) => updatePicture("upfrontMip", value)}
+                />
+              }
+            />
+            <MoneyRow
+              line="financed"
+              label="Total loan amount financed"
+              amount={lines.financedCents}
+            />
+            <MoneyRow
+              line="principal-and-interest"
+              label="Principal and interest"
+              amount={lines.principalAndInterestCents}
+            />
+            <MoneyRow
+              line="property-tax"
+              label="Property tax"
+              note={PROPERTY_TAX_NOTE}
+              amount={lines.taxCents}
+              rate={
+                <PictureInput
+                  id="picture-tax"
+                  label="Property tax"
+                  value={pictureDraft.tax}
+                  invalid={pictureInvalid === "tax"}
+                  onInput={(value) => updatePicture("tax", value)}
+                />
+              }
+            />
+            <MoneyRow
+              line="insurance"
+              label="Home insurance"
+              amount={lines.insuranceCents}
+              rate={
+                <PictureInput
+                  id="picture-insurance"
+                  label="Home insurance"
+                  value={pictureDraft.insurance}
+                  invalid={pictureInvalid === "insurance"}
+                  onInput={(value) => updatePicture("insurance", value)}
+                />
+              }
+            />
+            <MoneyRow
+              line="fha-mip"
+              label="FHA MIP"
+              amount={lines.fhaMipCents}
+              rate={<span>{lines.fhaMipRateText}</span>}
+            />
+            <MoneyRow
+              line="pmi"
+              label="Conventional PMI (Private Mortgage Insurance)"
+              amount={lines.pmiCents}
+              rate={<span>{lines.pmiRateText}</span>}
+            />
+            <MoneyRow line="total-monthly" label="Total monthly payment" amount={lines.totalMonthlyCents} />
+            <MoneyRow
+              line="origination"
+              label="Lender origination fee"
+              amount={lines.originationCents}
+              rate={
+                <PictureInput
+                  id="picture-origination"
+                  label="Lender origination"
+                  value={pictureDraft.origination}
+                  invalid={pictureInvalid === "origination"}
+                  onInput={(value) => updatePicture("origination", value)}
+                />
+              }
+            />
+            <MoneyRow
+              line="processing"
+              label="Lender processing fee"
+              amount={lines.processingCents}
+              rate={
+                <PictureInput
+                  id="picture-processing"
+                  label="Lender processing fee"
+                  value={pictureDraft.processing}
+                  invalid={pictureInvalid === "processing"}
+                  onInput={(value) => updatePicture("processing", value)}
+                />
+              }
+            />
+            <MoneyRow
+              line="appraisal"
+              label="Conventional appraisal"
+              amount={lines.appraisalCents}
+              rate={
+                <PictureInput
+                  id="picture-appraisal"
+                  label="Conventional appraisal"
+                  value={pictureDraft.appraisal}
+                  invalid={pictureInvalid === "appraisal"}
+                  onInput={(value) => updatePicture("appraisal", value)}
+                />
+              }
+            />
+            <MoneyRow
+              line="title"
+              label="Title and escrow"
+              amount={lines.titleCents}
+              rate={
+                <PictureInput
+                  id="picture-title"
+                  label="Title and escrow"
+                  value={pictureDraft.title}
+                  invalid={pictureInvalid === "title"}
+                  onInput={(value) => updatePicture("title", value)}
+                />
+              }
+            />
+            <MoneyRow
+              line="recording"
+              label="Recording and taxes"
+              amount={lines.recordingCents}
+              rate={
+                <PictureInput
+                  id="picture-recording"
+                  label="Recording and taxes"
+                  value={pictureDraft.recording}
+                  invalid={pictureInvalid === "recording"}
+                  onInput={(value) => updatePicture("recording", value)}
+                />
+              }
+            />
+            <MoneyRow
+              line="prepaid-insurance"
+              label="Prepaid home insurance"
+              amount={lines.prepaidInsuranceCents}
+            />
+            <MoneyRow line="prepaid-interest" label="Prepaid interest" amount={lines.prepaidInterestCents} />
+            <MoneyRow line="prepaid-tax" label="Prepaid property taxes" amount={lines.prepaidTaxCents} />
+            <MoneyRow line="cushion" label="Escrow cushion" amount={lines.cushionCents} />
+            <MoneyRow line="closing" label="Total closing costs" amount={lines.closingCents} />
+            <MoneyRow line="cash-to-close" label="Total cash to close" amount={lines.cashToCloseCents} />
+          </tbody>
+        </table>
+        {pictureError ? (
+          <p class="error" role="alert">
+            {pictureError}
+          </p>
+        ) : null}
+      </Disclosure>
       <Schedule
         years={years}
         openYears={openYears}
@@ -326,6 +592,46 @@ export function App() {
         onCommit={commitExtra}
       />
     </main>
+  );
+}
+
+function MoneyRow(props: {
+  line: string;
+  label: string;
+  amount: number;
+  note?: string;
+  rate?: ComponentChildren;
+}) {
+  return (
+    <tr data-line={props.line}>
+      <th scope="row">
+        {props.label}
+        {props.note ? <span class="picture-note">{props.note}</span> : null}
+      </th>
+      <td>{props.rate}</td>
+      <td class="money">{formatMoney(props.amount)}</td>
+    </tr>
+  );
+}
+
+function PictureInput(props: {
+  id: string;
+  label: string;
+  value: string;
+  invalid: boolean;
+  onInput: (value: string) => void;
+}) {
+  return (
+    <input
+      id={props.id}
+      class="picture-input"
+      aria-label={props.label}
+      inputMode="decimal"
+      autoComplete="off"
+      value={props.value}
+      aria-invalid={props.invalid}
+      onInput={(event) => props.onInput(event.currentTarget.value)}
+    />
   );
 }
 

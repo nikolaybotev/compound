@@ -41,7 +41,7 @@ DoD: `pnpm --dir apps/web test` exits 0 and the AC1 cents match, including 39368
 
 ### Build notes (Phase 0)
 
-None yet.
+The half-up division lives in `picture.ts` and matches `downPaymentCents` on the same cents and thousandths. Prepaid interest uses that division on `base × rate thousandths × 15 / (100000 × 360)`.
 
 ## Phase 1 — Heading, disclosures, and the page
 
@@ -58,7 +58,12 @@ DoD: `node --test` exits 0. `pnpm --dir apps/web test` and `pnpm --dir apps/web 
 
 ### Build notes (Phase 1)
 
-None yet.
+- A trailing dot after any whole thousands figure (`600.`, and also `0.`) does not error and does not change the loan, so the decimal point can be typed. The spec names `600.`.
+- Blurring the purchase-price field restores the thousands display of the last valid dollar price. An invalid entry keeps its error while those keystrokes are in the field. The error clears on blur because the field no longer shows them.
+- A picture value that is not an object falls back to the requirement 7 defaults, closed, and the saved loan stays. A missing picture field, or one that does not parse, uses that field's default. A missing or non-boolean `open` stays closed. A saved `open: true` stays open.
+- `loanReport`, `savedByExtraCents`, and `groupByYear` take financed cents. When a caller omits them they use `loan.loanCents`, which is the upfront-MIP 0% case. The page always passes the picture's financed cents. `loan.loanCents` stays the base.
+- `percentThousandths` lives in `picture.ts` and `loan.ts` re-exports it, so the heading and the picture share one parser. `picture.ts` keeps its own cents-to-dollars conversion, the same steps as `centsToDollars`, so it does not import `loan.ts`. A cycle there left the saved-picture parser unset.
+- The summary keeps the browser's `list-item` display. `display: flex` on the summary element drops its disclosure behavior, so the chevron row is an inner span. This Playwright Chromium exposes a closed `details` as a group and does not expose the summary as a button, so the extra-payment checks read `aria-expanded` and the accessible name on the `summary`. The chart hover in `page.spec.ts` scrolls the chart into view; the heading pushes the old hover point past the 720px Playwright viewport.
 
 ## Phase 2 — Open the feature pull request
 
