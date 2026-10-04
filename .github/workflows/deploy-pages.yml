@@ -1,12 +1,24 @@
 name: deploy-pages
 
-# Publishes apps/web/dist to GitHub Pages. Push to main and manual dispatch only.
+# Publishes one GitHub Pages site. Push to main and manual dispatch only.
 # The page has no external data, so this workflow does not republish on a timer.
-# The job commits nothing. VITE_BASE is set only for this build.
+# The job commits nothing.
+#
+# While the complete-loan-picture review is up, this is the only Pages upload.
+# A push to main rebuilds production at the site root from main and prototype/
+# from the feature ref together. Uploading production alone would delete
+# https://nikolaybotev.github.io/compound/prototype/. The github-pages
+# environment stays limited to main; this workflow does not widen it.
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to publish under prototype/
+        required: false
+        default: complete-loan-picture
+        type: string
 
 permissions:
   contents: read
@@ -21,25 +33,77 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out
+      # Two directories so the second checkout cannot replace the first tree.
+      # Vite writes apps/web/dist inside each checkout.
+      - name: Check out main
         uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main
+
+      # On push, inputs.ref is empty, so the prototype ref is the feature
+      # branch. It is not github.sha. A ref that cannot be checked out fails
+      # here, before any upload, and the previous deployment stays.
+      - name: Check out prototype
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || 'complete-loan-picture' }}
+          path: prototype
+
+      # package.json is under each checkout, not the workspace root.
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
+        with:
+          version: 12.6.0
+
       - name: Set up Node.js 24
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: pnpm
-      - name: Install
+          cache-dependency-path: |
+            main/pnpm-lock.yaml
+            prototype/pnpm-lock.yaml
+
+      - name: Install production dependencies
+        working-directory: main
         run: pnpm install --frozen-lockfile
-      - name: Production build
+
+      - name: Install prototype dependencies
+        working-directory: prototype
+        run: pnpm install --frozen-lockfile
+
+      - name: Build production
+        working-directory: main
         env:
           VITE_BASE: /compound/
         run: pnpm --dir apps/web build
+
+      - name: Build prototype
+        working-directory: prototype
+        env:
+          VITE_BASE: /compound/prototype/
+        run: pnpm --dir apps/web build
+
+      - name: Assemble site
+        run: |
+          set -euo pipefail
+          mkdir -p site/prototype
+          cp -a main/apps/web/dist/. site/
+          cp -a prototype/apps/web/dist/. site/prototype/
+          test -f site/index.html
+          test -f site/prototype/index.html
+          grep -q '/compound/' site/index.html
+          grep -q '/compound/prototype/' site/prototype/index.html
+          if grep -q '/compound/prototype/' site/index.html; then
+            echo "production index references /compound/prototype/" >&2
+            exit 1
+          fi
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: apps/web/dist
+          path: site
 
   deploy:
     needs: build

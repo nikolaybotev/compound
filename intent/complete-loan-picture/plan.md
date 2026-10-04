@@ -93,4 +93,7 @@ DoD: AC8. The feature pull request is still open and unmerged. Stop. Do not merg
 
 ### Build notes (Phase 3)
 
-None yet.
+- pnpm is pinned to 12.6.0. The two checkouts live in `main/` and `prototype/`, so `pnpm/action-setup` has no root `package.json` from which to read `packageManager`.
+- The prototype checkout ref is `inputs.ref || 'complete-loan-picture'`. On a push, `inputs.ref` is empty, so the default is the feature branch and not `github.sha`.
+- The assemble step also requires production `index.html` to contain `/compound/`. The spec's checks stay: both index files exist, the prototype file references `/compound/prototype/`, and the root file does not.
+- The same workflow file is committed on `complete-loan-picture`. Phase 3 still lands on `main` only through the workflow pull request. This copy keeps a later merge of the feature from restoring the production-only upload, which would delete `prototype/`.
