@@ -4,8 +4,8 @@
 |---|---|
 | Author | Validation run (Cloud Agent) |
 | Captured | 2026-10-04 |
-| Status | Draft |
-| Stage | 1 · Plan |
+| Status | Built (validation) |
+| Stage | 4 · Done |
 | Feeds | [spec.md](spec.md) → [plan.md](plan.md) |
 | Builds on | [../mortgage-skill/intent.md](../mortgage-skill/intent.md) |
 

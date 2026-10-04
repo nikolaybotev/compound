@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | Derived from | [intent.md](intent.md) (2026-10-04) |
-| Status | Draft 1 |
-| Stage | 2 · Design |
+| Status | Built 1 |
+| Stage | 4 · Done |
 
 ## 1. Summary
 

@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | Implements | [spec.md](spec.md) Draft 1 |
-| Status | Draft 1 |
-| Stage | 3 · Build (documentation only) |
+| Status | Built (Phase 0) |
+| Stage | 4 · Done (validation only) |
 
 Spec wins. Update this file in the same change whenever implementation departs from it.
 
@@ -44,4 +44,4 @@ The last line passes when every changed file path is under `intent/sdlc-validati
 
 ### Build notes (Phase 0)
 
-<Added after the phase lands.>
+Owner approved the build gate on 2026-10-04. The three intent-chain files landed on `cursor/sdlc-validation-dummy-10be` in commit `f4dc73d`. Pull request #14 passed `node --test` and the web CI job with no code changes outside `intent/sdlc-validation-dummy/`. Phase 0 DoD (file tests, verbatim prompt grep, validation markers, diff scope) was re-run at merge time. No departures from [spec.md](spec.md) Draft 1. Product build subagent was not used, per spec non-goals and plan step 3.
