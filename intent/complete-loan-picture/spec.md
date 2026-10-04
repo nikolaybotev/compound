@@ -78,7 +78,7 @@ This spec wins over [plan.md](plan.md). Where it narrows [../amortization-app/sp
    | Conventional appraisal | `500` | same |
    | Recording and taxes | `800` | same |
 
-   Conventional PMI and FHA MIP rates are computed, not typed (requirement 11). The 15 days in prepaid interest are not an input.
+   Conventional PMI and FHA MIP rates are computed, not typed (requirement 9). The 15 days in prepaid interest are not an input.
 
 8. **Financed principal.** Base loan cents are today's price cents minus down-payment cents (`downPaymentCents`). Upfront MIP cents are that base times the upfront MIP percent, half up to the cent with the same integer division `downPaymentCents` uses. Financed cents are base plus upfront MIP. On the default base loan, upfront MIP `1.75` is 997500 cents and the financed amount is `$579,975.00`. The page passes financed dollars to `loanReport` / `buildReport` and passes the same financed principal into every `savedByExtraCents` call. At the default upfront MIP of 0%, financed cents equal the base, `$570,000.00`. The summary "Loan amount" is `amount_cents` from that report. Extra principal is still on top of principal and interest. The note under the summary payment stays.
 
