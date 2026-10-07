@@ -2,6 +2,7 @@
 
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
+const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
@@ -237,6 +238,36 @@ test('loan-size flags cannot be mixed, and a down payment cannot consume the pri
   ]);
   assert.notEqual(allDown.status, 0);
   assert.match(allDown.stderr, /less than 100/);
+});
+
+test('the skill asks for the missing facts and reports the script cents', () => {
+  const skillPath = path.join(__dirname, '.agents', 'skills', 'mortgage-origination-fees', 'SKILL.md');
+  const skill = fs.readFileSync(skillPath, 'utf8');
+  const phrases = [
+    'scripts/origination_fees.js',
+    'note rate',
+    'net rate',
+    'APR',
+    'loan amount',
+    'down payment',
+    '--years 30',
+    'no term was given',
+    'lender credit',
+    '2725720',
+    '389159',
+    '57274280',
+    '4543',
+    '$3,891.53',
+    '$27,257.34',
+    'adjustable',
+    'interest-only',
+    'Do not discount the payments yourself',
+  ];
+  for (const phrase of phrases) {
+    assert.ok(skill.includes(phrase), `missing: ${phrase}`);
+  }
+  const fromSkill = path.join(path.dirname(skillPath), 'scripts', 'origination_fees.js');
+  assert.equal(fs.realpathSync(fromSkill), fs.realpathSync(script));
 });
 
 test('rates reject zero, a fourth decimal, and an unknown flag', () => {
