@@ -44,4 +44,4 @@ DoD: the skill names the AC1 cents, the symlink resolves to `origination_fees.js
 
 ### Build notes (Phase 1)
 
-Landed in the same working tree as Phase 0. AC8 is asserted in `origination_fees.test.js` along with the cent fixtures, so `node --test` covers the skill phrases and the symlink. The workspace symlink `/Users/nikolay/git/.agents/skills/mortgage-origination-fees` is local setup, matching the amortization skill, and is not a file in this repo.
+Phase 0 merged as #18. This phase adds the skill, the AC8 test, and the docs. The amortization skill description does not mention this skill. The workspace symlink `/Users/nikolay/git/.agents/skills/mortgage-origination-fees` is local setup, matching the amortization skill, and is not a file in this repo.
