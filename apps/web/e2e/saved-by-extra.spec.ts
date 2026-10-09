@@ -64,7 +64,7 @@ test("AC4 Apply $100 monthly through payoff", async ({ page }) => {
 async function openExample(page: Page) {
   await page.goto("/");
   await page.locator("#start").fill("2026-10");
-  await page.locator("#price").fill("570000");
+  await page.locator("#price").fill("570");
   await page.locator("#down").fill("0");
   await page.locator("#years").fill("30");
   await page.locator("#rate").fill("7");
@@ -72,8 +72,8 @@ async function openExample(page: Page) {
 }
 
 async function applyMonthly(page: Page, amount: string) {
-  const button = page.getByRole("button", { name: "Make extra payments" });
-  if ((await button.getAttribute("aria-expanded")) !== "true") await button.click();
+  const summary = page.locator("summary", { hasText: "Make extra payments" });
+  if ((await summary.getAttribute("aria-expanded")) !== "true") await summary.click();
   await page.locator("#extra-monthly").fill(amount);
   await page.getByRole("button", { name: "Apply" }).click();
 }
