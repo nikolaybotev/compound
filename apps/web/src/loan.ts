@@ -5,6 +5,14 @@ import {
   formatPlainCents,
   type Report,
 } from "../../../amortize.js";
+import {
+  defaultPicture,
+  percentThousandths,
+  pictureFromStorage,
+  type PictureDraft,
+} from "./picture";
+
+export { percentThousandths };
 
 const SHORT_MONTHS = [
   "Jan",
@@ -91,6 +99,8 @@ export type ScheduleYear = {
 
 const PRICE_MESSAGE =
   "Purchase price must be a number of dollars greater than zero, with at most two decimal places.";
+export const THOUSANDS_MESSAGE =
+  "Purchase price must be thousands of dollars greater than zero, with at most five decimal places.";
 const DOWN_MESSAGE =
   "Down payment must be a percent greater than or equal to zero and less than 100, with at most three decimal places.";
 const TERM_MESSAGE = "Term must be a positive whole number of years.";
@@ -106,12 +116,42 @@ export function currentStartMonth(now = new Date()): string {
 
 export function defaultDraft(now = new Date()): LoanDraft {
   return {
-    price: "570000",
-    down: "0",
+    price: "600000",
+    down: "5",
     years: "30",
-    rate: "7",
+    rate: "7.375",
     start: currentStartMonth(now),
   };
+}
+
+export function isTrailingDotThousands(text: string): boolean {
+  return /^(?:\d+)\.$/.test(text.trim());
+}
+
+export function thousandsToDollarString(text: string): string | null {
+  const trimmed = text.trim();
+  if (!/^(?:\d+)(?:\.\d{1,5})?$/.test(trimmed)) return null;
+  const [whole, frac = ""] = trimmed.split(".");
+  const moved = `${frac}000`.slice(0, 3);
+  const rest = frac.length > 3 ? frac.slice(3) : "";
+  const combined = `${whole}${moved}`.replace(/^0+(?=\d)/, "");
+  const cents = rest.padEnd(2, "0");
+  if (combined === "0" && /^0+$/.test(cents)) return null;
+  if (rest.length > 0) return `${combined}.${rest}`;
+  return combined;
+}
+
+export function dollarsToThousandsText(dollars: string): string {
+  const trimmed = dollars.trim();
+  const [whole, frac = ""] = trimmed.split(".");
+  if (!/^\d+$/.test(whole)) return trimmed;
+  const dec = frac.replace(/\D/g, "").slice(0, 2).padEnd(2, "0");
+  const padded = whole.padStart(3, "0");
+  const shifted = padded.slice(0, -3).replace(/^0+(?=\d)/, "");
+  const nextWhole = shifted === "" ? "0" : shifted;
+  const nextFrac = `${padded.slice(-3)}${dec}`.replace(/0+$/, "");
+  if (nextFrac.length === 0) return nextWhole;
+  return `${nextWhole}.${nextFrac}`;
 }
 
 export function formatMoney(cents: number): string {
@@ -125,15 +165,6 @@ export function centsToDollars(cents: number): number {
   const frac = String(abs % 100).padStart(2, "0");
   const dollars = Number(`${whole}.${frac}`);
   return negative ? -dollars : dollars;
-}
-
-export function percentThousandths(text: string): number | null {
-  if (!/^(?:\d+)(?:\.\d{1,3})?$/.test(text)) return null;
-  const [whole, frac = ""] = text.split(".");
-  const padded = `${frac}000`.slice(0, 3);
-  const thousandths = Number(whole) * 1000 + Number(padded);
-  if (!Number.isSafeInteger(thousandths)) return null;
-  return thousandths;
 }
 
 export function downPaymentCents(priceCents: number, thousandths: number): number {
@@ -220,9 +251,13 @@ export function parseLoan(draft: LoanDraft): ParseResult {
   };
 }
 
-export function loanReport(loan: Loan, extras: Map<number, number> = new Map()): Report {
+export function loanReport(
+  loan: Loan,
+  extras: Map<number, number> = new Map(),
+  financedCents: number = loan.loanCents,
+): Report {
   return buildReport(
-    centsToDollars(loan.loanCents),
+    centsToDollars(financedCents),
     loan.ratePercent,
     loan.years * 12,
     extras,
@@ -235,12 +270,13 @@ export function savedByExtraCents(
   extras: Map<number, number>,
   month: number,
   fullInterestCents: number,
+  financedCents: number = loan.loanCents,
 ): number {
   const requested = extras.get(month) ?? 0;
   if (requested <= 0) return 0;
   const without = new Map(extras);
   without.delete(month);
-  const counterfactual = loanReport(loan, without);
+  const counterfactual = loanReport(loan, without, financedCents);
   return counterfactual.interest_cents - fullInterestCents;
 }
 
@@ -277,6 +313,7 @@ export type Scenario = {
   extras: Map<number, number>;
   prefill: Prefill;
   openYears: number[] | null;
+  picture: PictureDraft;
 };
 
 export function defaultPrefill(): Prefill {
@@ -343,6 +380,7 @@ export function groupByYear(
   loan: Loan,
   report: Report,
   extras: Map<number, number> = new Map(),
+  financedCents: number = loan.loanCents,
 ): ScheduleYear[] {
   const startMonth = loan.startMonth;
   const fullInterestCents = report.interest_cents;
@@ -372,7 +410,13 @@ export function groupByYear(
       interestCents: row.interest_cents,
       extraCents,
       extraDollars,
-      savedByExtraCents: savedByExtraCents(loan, extras, row.month, fullInterestCents),
+      savedByExtraCents: savedByExtraCents(
+        loan,
+        extras,
+        row.month,
+        fullInterestCents,
+        financedCents,
+      ),
       principalBalanceCents: row.remaining_principal_cents,
       interestBalanceCents: row.remaining_interest_cents,
     });
@@ -397,6 +441,7 @@ export function defaultScenario(now = new Date()): Scenario {
     extras: new Map(),
     prefill: defaultPrefill(),
     openYears: null,
+    picture: defaultPicture(),
   };
 }
 
@@ -462,7 +507,7 @@ export function loadScenario(storage: StorageLike | undefined, now = new Date())
     const prefill = parsePrefill(record.prefill);
     const openYears = parseOpenYears(record.openYears);
     if (!extras || !prefill || openYears === undefined) return fallback;
-    return { draft, extras, prefill, openYears };
+    return { draft, extras, prefill, openYears, picture: pictureFromStorage(record.picture) };
   } catch {
     return fallback;
   }
@@ -483,6 +528,7 @@ export function saveScenario(storage: StorageLike | undefined, scenario: Scenari
         extras: [...scenario.extras.entries()],
         prefill: scenario.prefill,
         openYears: scenario.openYears,
+        picture: scenario.picture,
       }),
     );
   } catch {
