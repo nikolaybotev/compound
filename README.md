@@ -6,7 +6,7 @@ This code was [first published as a GitHub Gist](https://gist.github.com/nikolay
 
 There are no npm dependencies; only the Node.js runtime is required.
 
-A skill at [`.agents/skills/mortgage-loan-calculator/SKILL.md`](.agents/skills/mortgage-loan-calculator/SKILL.md) asks for a missing principal, note rate, term, or extra plan, writes a `month,extra` CSV, and answers from this script. Term in months and fixed-rate recast are specified in [intent/loan-recast/](intent/loan-recast/intent.md). The first release design is [intent/mortgage-skill/](intent/mortgage-skill/intent.md).
+A skill at [`.agents/skills/mortgage-loan-calculator/SKILL.md`](.agents/skills/mortgage-loan-calculator/SKILL.md) asks for a missing principal, note rate, term, or extra plan, writes a `month,extra` CSV, and answers from this script. Term in months and fixed-rate recast are specified in [intent/loan-recast/](intent/loan-recast/intent.md). The first release design is [intent/mortgage-skill/](intent/mortgage-skill/intent.md). A second skill, [`.agents/skills/mortgage-origination-fees/SKILL.md`](.agents/skills/mortgage-origination-fees/SKILL.md), reports the prepaid finance charge implied by a note rate and an APR. Its design is [intent/origination-fees/](intent/origination-fees/intent.md).
 
 A local amortization page on the same calculator is [apps/web](apps/web). Its design is [intent/amortization-app/](intent/amortization-app/intent.md). From this directory, `pnpm --dir apps/web dev` serves it, `pnpm --dir apps/web build` writes a static `apps/web/dist` (Vite base `./` unless `VITE_BASE` is set), and `pnpm --dir apps/web preview` serves that build. The page calls `buildReport` in `amortize.js`. The published page is [https://nikolaybotev.github.io/compound/](https://nikolaybotev.github.io/compound/). A push to `main` publishes it; `gh workflow run deploy-pages.yml` publishes it again. That build sets `VITE_BASE=/compound/` and does not run on a schedule.
 
@@ -52,6 +52,24 @@ The extra is applied after that month's interest, so it does not reduce the inte
 node compound_interest_monthly.js --amount 570000 --rate 7 --years 30 \
   --extra fixtures/first-year-100.csv --json
 ```
+
+## Origination fees
+
+`origination_fees.js` reports the prepaid finance charge implied by a note rate and an APR on a fixed, fully amortizing loan. The monthly payment is the same note-rate payment as the amortization script. The amount financed is the present value of that exact payment discounted at the APR. The charge is the note amount minus the amount financed. Reported amounts are rounded half up to the cent once, at output.
+
+```bash
+node origination_fees.js --amount 600000 --rate 6.75 --apr 7.21 --years 30
+```
+
+On that loan the payment is $3,891.59, the amount financed is $572,742.80, and the prepaid finance charge is $27,257.20 (4.543% of the note amount). A hand calculation that rounds the payment to $3,891.53 before discounting prints $27,257.34. This script does not do that.
+
+`--rate` and `--apr` are percents greater than zero with at most three decimal places. Exactly one of `--years` or `--months` is required, with the same positive-integer rule as the amortization script. The loan is `--amount`, or `--price` with exactly one of `--down` (dollars, zero or greater, and less than the price) or `--down-percent` (at least 0 and less than 100, at most three decimal places). `--json` writes one object. Money fields are integer cents. `points_thousandths` of 4543 means 4.543%. A negative `finance_charge_cents` is a lender credit. `years` appears only when `--years` was passed.
+
+The figure assumes equal monthly payments and a first payment one full month out. It does not split out monthly mortgage insurance or odd-days interest, and it does not include costs that are outside the APR.
+
+[`.agents/skills/mortgage-origination-fees/SKILL.md`](.agents/skills/mortgage-origination-fees/SKILL.md) is the front end. It asks for a missing note rate, APR, or loan size. When the term is omitted it passes `--years 30` and says so. It runs `scripts/origination_fees.js`, a symlink to this script, and answers from `--json`. The design is [intent/origination-fees/](intent/origination-fees/intent.md).
+
+The workspace link is local setup and is not a file in this repo: `/Users/nikolay/git/.agents/skills/mortgage-origination-fees` points at `../../github.com/nikolaybotev/compound/.agents/skills/mortgage-origination-fees`.
 
 ## Skill
 
