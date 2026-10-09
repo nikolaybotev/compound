@@ -8,9 +8,11 @@ import {
   buildPrefillMap,
   centsToDollars,
   defaultScenario,
+  dollarsToThousandsText,
   downPaymentCents,
   dropExtrasBeyond,
   formatMoney,
+  isTrailingDotThousands,
   loadScenario,
   loanReport,
   parseLoan,
@@ -20,7 +22,9 @@ import {
   saveScenario,
   shortDate,
   STORAGE_KEY,
+  thousandsToDollarString,
 } from "../src/loan";
+import { defaultPicture as pictureDefaults } from "../src/picture";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -190,6 +194,46 @@ describe("CLI contract", () => {
   });
 });
 
+describe("thousands price", () => {
+  test("digit-shifts a purchase price into dollars and back", () => {
+    expect(thousandsToDollarString("600")).toBe("600000");
+    expect(thousandsToDollarString("570")).toBe("570000");
+    expect(thousandsToDollarString("712.5")).toBe("712500");
+    expect(thousandsToDollarString("399.999")).toBe("399999");
+    expect(thousandsToDollarString("0.00001")).toBe("0.01");
+    expect(thousandsToDollarString("1200")).toBe("1200000");
+    expect(thousandsToDollarString("0")).toBeNull();
+    expect(thousandsToDollarString("600.123456")).toBeNull();
+    expect(dollarsToThousandsText("570000")).toBe("570");
+    expect(dollarsToThousandsText("712500")).toBe("712.5");
+    expect(dollarsToThousandsText("399999.00")).toBe("399.999");
+    expect(dollarsToThousandsText("0.01")).toBe("0.00001");
+    expect(dollarsToThousandsText("1200000")).toBe("1200");
+    expect(isTrailingDotThousands("600.")).toBe(true);
+    expect(isTrailingDotThousands("600.1")).toBe(false);
+  });
+});
+
+describe("financed principal", () => {
+  test("loanReport uses financed cents and leaves the base on the loan", () => {
+    const parsed = parseLoan({
+      price: "600000",
+      down: "5",
+      years: "30",
+      rate: "7.375",
+      start: "2026-10",
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.loan.loanCents).toBe(57_000_000);
+    const report = loanReport(parsed.loan, new Map(), 57_997_500);
+    expect(report.amount_cents).toBe(57_997_500);
+    expect(report.monthly_payment_cents).toBe(
+      buildReport(579975, 7.375, 360, new Map()).monthly_payment_cents,
+    );
+  });
+});
+
 describe("saved loan inputs", () => {
   test("a value that does not parse is ignored", () => {
     const storage = memoryStorage();
@@ -214,6 +258,87 @@ describe("saved loan inputs", () => {
     scenario.openYears = [2024, 2025];
     saveScenario(storage, scenario);
     expect(loadScenario(storage, now)).toEqual(scenario);
+  });
+
+  test("a version-1 loan without a picture keeps that loan and the picture defaults", () => {
+    const storage = memoryStorage();
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        price: "570000",
+        down: "0",
+        years: "30",
+        rate: "7",
+        start: "2026-10",
+        extras: [[1, 100]],
+        prefill: { monthly: "100", yearly: "", month: 1, open: true },
+        openYears: [2026],
+      }),
+    );
+    const loaded = loadScenario(storage, new Date("2026-10-15T12:00:00Z"));
+    expect(loaded.draft).toEqual({
+      price: "570000",
+      down: "0",
+      years: "30",
+      rate: "7",
+      start: "2026-10",
+    });
+    expect(loaded.extras).toEqual(new Map([[1, 100]]));
+    expect(loaded.prefill.open).toBe(true);
+    expect(loaded.openYears).toEqual([2026]);
+    expect(loaded.picture).toEqual(pictureDefaults());
+    expect(loaded.picture.open).toBe(false);
+  });
+
+  test("a saved picture open flag and a partial picture keep the loan", () => {
+    const storage = memoryStorage();
+    const now = new Date("2026-10-15T12:00:00Z");
+    const scenario = defaultScenario(now);
+    scenario.draft = { ...scenario.draft, price: "100000", down: "0", rate: "7" };
+    scenario.openYears = [2026];
+    scenario.picture = { ...pictureDefaults(), tax: "2", open: true };
+    saveScenario(storage, scenario);
+    const loaded = loadScenario(storage, now);
+    expect(loaded.draft.price).toBe("100000");
+    expect(loaded.picture).toEqual(scenario.picture);
+
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        price: "570000",
+        down: "0",
+        years: "30",
+        rate: "7",
+        start: "2026-10",
+        picture: { tax: "2" },
+      }),
+    );
+    const partial = loadScenario(storage, now);
+    expect(partial.draft.price).toBe("570000");
+    expect(partial.picture.tax).toBe("2");
+    expect(partial.picture.insurance).toBe("0.35");
+    expect(partial.picture.open).toBe(false);
+  });
+
+  test("a malformed picture does not discard the saved loan", () => {
+    const storage = memoryStorage();
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        price: "570000",
+        down: "0",
+        years: "30",
+        rate: "7",
+        start: "2026-10",
+        picture: "nope",
+      }),
+    );
+    const loaded = loadScenario(storage, new Date("2026-10-15T12:00:00Z"));
+    expect(loaded.draft.price).toBe("570000");
+    expect(loaded.picture).toEqual(pictureDefaults());
   });
 });
 

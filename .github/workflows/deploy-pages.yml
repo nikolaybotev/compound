@@ -4,11 +4,12 @@ name: deploy-pages
 # The page has no external data, so this workflow does not republish on a timer.
 # The job commits nothing.
 #
-# While the complete-loan-picture review is up, this is the only Pages upload.
-# A push to main rebuilds production at the site root from main and prototype/
-# from the feature ref together. Uploading production alone would delete
-# https://nikolaybotev.github.io/compound/prototype/. The github-pages
-# environment stays limited to main; this workflow does not widen it.
+# This is the only Pages upload. A push to main rebuilds production at the
+# site root from main and prototype/ beside it. Uploading production alone
+# would delete https://nikolaybotev.github.io/compound/prototype/. The
+# github-pages environment stays limited to main; this workflow does not
+# widen it. If the prototype ref cannot be checked out, the prototype build
+# uses the main tree and the production upload still happens.
 on:
   push:
     branches: [main]
@@ -41,14 +42,24 @@ jobs:
           ref: main
           path: main
 
-      # On push, inputs.ref is empty, so the prototype ref is the feature
-      # branch. It is not github.sha. A ref that cannot be checked out fails
-      # here, before any upload, and the previous deployment stays.
+      # On push, inputs.ref is empty, so the prototype ref defaults to
+      # complete-loan-picture. It is not github.sha. A missing ref does not
+      # fail the job: the next step copies main into prototype/.
       - name: Check out prototype
+        id: prototype_checkout
+        continue-on-error: true
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.ref || 'complete-loan-picture' }}
           path: prototype
+
+      - name: Use main when the prototype ref is missing
+        if: steps.prototype_checkout.outcome == 'failure'
+        run: |
+          set -euo pipefail
+          rm -rf prototype
+          mkdir -p prototype
+          cp -a main/. prototype/
 
       # package.json is under each checkout, not the workspace root.
       - name: Set up pnpm
