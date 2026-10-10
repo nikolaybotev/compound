@@ -81,7 +81,7 @@ export function Schedule({
                   <td class="money">{formatMoney(year.interestCents)}</td>
                   {arm ? <td /> : null}
                   <td class="money">{formatMoney(year.extraCents)}</td>
-                  <td />
+                  <td class="money">{formatMoney(year.savedByExtraCents)}</td>
                   <td class="money">{formatMoney(year.principalBalanceCents)}</td>
                   <td class="money">{formatMoney(year.interestBalanceCents)}</td>
                 </tr>
@@ -130,6 +130,7 @@ export function Schedule({
                         <td>
                           <input
                             class="extra"
+                            data-edited={row.edited ? "true" : undefined}
                             aria-label={`Extra payment for month ${row.month}`}
                             inputMode="decimal"
                             autoComplete="off"

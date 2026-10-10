@@ -12,6 +12,8 @@ import {
   downPaymentCents,
   dropExtrasBeyond,
   formatMoney,
+  groupByYear,
+  isEditedExtra,
   isTrailingDotThousands,
   loadScenario,
   loanReport,
@@ -233,6 +235,112 @@ describe("financed principal", () => {
     expect(report.monthly_payment_cents).toBe(
       buildReport(579975, 7.375, 360, new Map()).monthly_payment_cents,
     );
+  });
+});
+
+describe("year subtotals and edited cells", () => {
+  const parsed = parseLoan({ price: "570000", down: "0", years: "30", rate: "7", start: "2026-10" });
+  if (!parsed.ok) throw new Error("example loan must parse");
+  const loan = parsed.loan;
+
+  test("AC1 the Saved by extra year subtotal is the sum of its cells", () => {
+    const extras = new Map<number, number>();
+    for (let month = 1; month <= 12; month += 1) extras.set(month, 100);
+    const report = loanReport(loan, extras);
+    const years = groupByYear(loan, report, extras);
+    expect(years[0].year).toBe(2026);
+    expect(years[0].savedByExtraCents).toBe(139_060);
+    expect(years[1].savedByExtraCents).toBe(668_128);
+    expect(years.slice(2).every((year) => year.savedByExtraCents === 0)).toBe(true);
+    const sum = years.reduce((total, year) => total + year.savedByExtraCents, 0);
+    expect(sum).toBe(807_188);
+    expect(report.interest_saved_cents).toBe(813_770);
+    for (const year of years) {
+      expect(year.savedByExtraCents).toBe(
+        year.rows.reduce((total, row) => total + row.savedByExtraCents, 0),
+      );
+    }
+  });
+
+  test("a year with no extra subtotals to zero", () => {
+    const report = loanReport(loan, new Map());
+    expect(groupByYear(loan, report, new Map())[0].savedByExtraCents).toBe(0);
+  });
+
+  test("AC1 the edited predicate compares one month against the applied map", () => {
+    const extras = new Map([
+      [1, 100],
+      [2, 50],
+    ]);
+    const applied = new Map([
+      [2, 50],
+      [3, 100],
+    ]);
+    expect(isEditedExtra(extras, applied, 1)).toBe(true);
+    expect(isEditedExtra(extras, applied, 3)).toBe(true);
+    expect(isEditedExtra(extras, applied, 2)).toBe(false);
+    expect(isEditedExtra(extras, applied, 4)).toBe(false);
+    expect(isEditedExtra(new Map([[2, 75]]), applied, 2)).toBe(true);
+  });
+
+  test("groupByYear marks only the months that differ from the applied map", () => {
+    const applied = new Map([[1, 100]]);
+    const extras = new Map([
+      [1, 100],
+      [2, 40],
+    ]);
+    const report = loanReport(loan, extras);
+    const rows = groupByYear(loan, report, extras, loan.loanCents, applied)[0].rows;
+    expect(rows[0].edited).toBe(false);
+    expect(rows[1].edited).toBe(true);
+  });
+});
+
+describe("applied map in storage", () => {
+  const now = new Date("2026-10-15T12:00:00Z");
+  const base = {
+    version: 1,
+    price: "570000",
+    down: "0",
+    years: "30",
+    rate: "7",
+    start: "2026-10",
+  };
+
+  test("AC1 a payload without applied equals the loaded extras", () => {
+    const storage = memoryStorage();
+    storage.setItem(STORAGE_KEY, JSON.stringify({ ...base, extras: [[1, 100]] }));
+    const loaded = loadScenario(storage, now);
+    expect(loaded.extras).toEqual(new Map([[1, 100]]));
+    expect(loaded.applied).toEqual(loaded.extras);
+    expect(loaded.applied).not.toBe(loaded.extras);
+  });
+
+  test("AC1 a malformed applied keeps the loan and equals the extras", () => {
+    const storage = memoryStorage();
+    storage.setItem(STORAGE_KEY, JSON.stringify({ ...base, extras: [[1, 100]], applied: "x" }));
+    const loaded = loadScenario(storage, now);
+    expect(loaded.draft.price).toBe("570000");
+    expect(loaded.extras).toEqual(new Map([[1, 100]]));
+    expect(loaded.applied).toEqual(new Map([[1, 100]]));
+  });
+
+  test("AC1 saveScenario writes applied as month and dollars pairs", () => {
+    const storage = memoryStorage();
+    const scenario = defaultScenario(now);
+    scenario.extras = new Map([[3, 250]]);
+    scenario.applied = new Map([[3, 100]]);
+    scenario.openYears = [2026];
+    saveScenario(storage, scenario);
+    const stored = JSON.parse(storage.getItem(STORAGE_KEY) ?? "{}");
+    expect(stored.version).toBe(1);
+    expect(stored.applied).toEqual([[3, 100]]);
+    expect(loadScenario(storage, now).applied).toEqual(new Map([[3, 100]]));
+  });
+
+  test("AC1 a fresh scenario has an empty applied map", () => {
+    expect(defaultScenario(now).applied.size).toBe(0);
+    expect(loadScenario(memoryStorage(), now).applied.size).toBe(0);
   });
 });
 
