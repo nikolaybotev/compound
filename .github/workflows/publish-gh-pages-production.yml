@@ -9,6 +9,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      deploy_gh_pages:
+        description: Dispatch deploy-gh-pages-branch even when gh-pages did not change
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -26,6 +31,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
+          fetch-depth: 0
           path: main
 
       - name: Set up pnpm
@@ -74,8 +80,20 @@ jobs:
           MSG="Production publish from main ${{ github.sha }}"
           bash main/.github/scripts/gh-pages-publish.sh production "${MSG}" "${GITHUB_WORKSPACE}/staging"
 
+      - name: Bootstrap deploy when deploy workflow changes on main
+        id: bootstrap_deploy
+        if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
+        working-directory: main
+        run: |
+          set -euo pipefail
+          if git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" \
+            | grep -qF '.github/workflows/deploy-gh-pages-branch.yml'; then
+            echo "force=1" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Deploy gh-pages tree to GitHub Pages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_PAGES_PUSH_MARKER: ${{ runner.temp }}/gh-pages-pushed
+          FORCE_GH_PAGES_DEPLOY: ${{ steps.bootstrap_deploy.outputs.force == '1' || (github.event_name == 'workflow_dispatch' && inputs.deploy_gh_pages) && '1' || '' }}
         run: bash main/.github/scripts/dispatch-deploy-gh-pages-branch.sh
