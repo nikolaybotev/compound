@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Implements | [spec.md](spec.md) Approved |
-| Status | Executing rollout |
+| Status | Cutover blocked on Pages source (Step 5) |
 | Stage | 3 · Build + deploy |
 
 Spec wins. Update this file when execution departs from it.
@@ -84,12 +84,12 @@ One commit on `gh-pages` deleting `prototype/`. Not a standing job.
 
 | Step | Date (UTC) | Result |
 |---|---|---|
-| 1 Backup `pages-backup-pre-gh-pages` | | |
-| 2 Merge PR #20 | | |
-| 3 Actions deploys idle | | |
-| 4 Seed `gh-pages` | | |
-| 5 Pages source → `gh-pages` | | |
-| 6 Smoke test | | |
+| 1 Backup `pages-backup-pre-gh-pages` | 2026-10-10 | `302471780b394f701b78942900caa87a94923e09` — production root `index.html` + 6 `assets/` files; `prototype/` with own `index.html` + 6 `assets/` files; `.nojekyll`. |
+| 2 Merge PR #20 | 2026-10-10 | Squash merge `d57f32d3179ffdd5941d57c7df04c5e411ba02e4` (“Feature preview deploy for pull requests (#20)”). |
+| 3 Actions deploys idle | 2026-10-10 | `deploy-pages` run `38017068606` success after merge; no further `main` pushes before seed. |
+| 4 Seed `gh-pages` | 2026-10-10 | Orphan branch `c400ba596e5f39b115563558b64ff39289ad3ae4`; production from `main` at merge; `prototype/` from backup; no `feat/`; tag `0.6` on seed commit. |
+| 5 Pages source → `gh-pages` | 2026-10-10 | **Not done** — GitHub API and browser settings return 403 (integration token cannot change Pages). Repo owner must set branch `gh-pages`, folder `/`. |
+| 6 Smoke test | 2026-10-10 | **Pre-switch (Actions still source):** production heading `600 K \| 5% down \| 7.375% fixed = $4,853 / month`, summary P&I **$3,936.85**; `prototype/` serves backup-era bundles (`index-D-QChoyJ.js`). Re-test after Step 5. |
 
 ### Build notes
 
