@@ -14,12 +14,16 @@ import {
 } from "../src/arm";
 import {
   defaultScenario,
+  groupByYear,
+  indexInputValue,
   loadScenario,
   loanReport,
+  parseIndexField,
   parseLoan,
   saveScenario,
   savedByExtraCents,
   STORAGE_KEY,
+  withIndex,
   type Loan,
 } from "../src/loan";
 import { defaultPicture } from "../src/picture";
@@ -364,5 +368,63 @@ describe("ARM storage", () => {
     expect(loaded.armStored).toBe(false);
     saveScenario(storage, loaded);
     expect("arm" in JSON.parse(storage.raw() ?? "{}")).toBe(false);
+  });
+});
+
+describe("index cell", () => {
+  test("parses the index grammar, not the dollar grammar", () => {
+    expect(parseIndexField("")).toEqual({ ok: true, percent: null });
+    expect(parseIndexField("  ")).toEqual({ ok: true, percent: null });
+    expect(parseIndexField("0")).toEqual({ ok: true, percent: 0 });
+    expect(parseIndexField("4.42")).toEqual({ ok: true, percent: 4.42 });
+    expect(parseIndexField("4.437")).toEqual({ ok: true, percent: 4.437 });
+    for (const bad of ["abc", "4.4371", "-1", "4,42", "4.", ".5", "1e2"]) {
+      expect(parseIndexField(bad), bad).toEqual({ ok: false });
+    }
+  });
+
+  test("an index edit replaces, adds, and deletes one entry", () => {
+    const start: [number, number][] = [[97, 4]];
+    expect(withIndex(start, 85, 4.42)).toEqual([
+      [85, 4.42],
+      [97, 4],
+    ]);
+    expect(withIndex(start, 97, 0)).toEqual([[97, 0]]);
+    expect(withIndex(start, 97, null)).toEqual([]);
+    expect(withIndex(start, 85, null)).toBe(start);
+    expect(indexInputValue(0)).toBe("0");
+    expect(indexInputValue(null)).toBe("");
+    expect(indexInputValue(4.42)).toBe("4.42");
+  });
+
+  test("ARM rows carry the rate, payment, index, and reset flag; fixed rows do not", () => {
+    const values = feValues();
+    const arm: Loan = { ...feLoan(), arm: { enabled: true, values, index: [[85, 4.42]] } };
+    const armYears = groupByYear(arm, loanReport(arm));
+    const rows = armYears.flatMap((year) => year.rows);
+    expect(rows).toHaveLength(360);
+    expect(rows[83]).toMatchObject({ month: 84, ratePercent: 5.875, paymentCents: 337177, indexPercent: null, isReset: false });
+    expect(rows[84]).toMatchObject({ month: 85, ratePercent: 6.92, paymentCents: 369572, indexPercent: 4.42, isReset: true });
+    expect(rows[96]).toMatchObject({ month: 97, ratePercent: 8.92, indexPercent: null, isReset: true });
+    expect(rows.filter((row) => row.isReset)).toHaveLength(23);
+    const year2033 = armYears.find((year) => year.year === 2033);
+    expect(year2033).toBeDefined();
+
+    const fixed: Loan = { ...feLoan(), arm: { enabled: false, values, index: [[85, 4.42]] } };
+    const fixedRows = groupByYear(fixed, loanReport(fixed)).flatMap((year) => year.rows);
+    expect(fixedRows.every((row) => row.ratePercent === null && row.paymentCents === null)).toBe(true);
+    expect(fixedRows.every((row) => row.indexPercent === null && !row.isReset)).toBe(true);
+  });
+
+  test("the table ends at the payoff month in ARM mode", () => {
+    const values = feValues();
+    const loan: Loan = { ...feLoan(), arm: { enabled: true, values, index: [] } };
+    const extras = new Map<number, number>();
+    for (let month = 1; month <= 360; month += 1) extras.set(month, 2400);
+    const report = loanReport(loan, extras);
+    const rows = groupByYear(loan, report, extras).flatMap((year) => year.rows);
+    expect(report.payoff_month).toBe(181);
+    expect(rows).toHaveLength(181);
+    expect(rows.at(-1)).toMatchObject({ month: 181, isReset: true, paymentCents: 2657 });
   });
 });

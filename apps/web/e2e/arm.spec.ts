@@ -216,6 +216,158 @@ test("a broken stored arm never puts the page into ARM mode", async ({ page }) =
   await expect(page.locator("thead th")).toHaveCount(8);
 });
 
+test("AC9 the ARM schedule has eleven columns with Rate, Payment, and Index", async ({ page }) => {
+  await openArm(page);
+  const headers = page.locator("thead th");
+  await expect(headers).toHaveText([
+    "#",
+    "Date",
+    "Rate",
+    "Payment",
+    "Principal",
+    "Interest",
+    "Index",
+    "Extra payment",
+    "Saved by extra",
+    "Principal balance",
+    "Interest balance",
+  ]);
+  const extraIndex = await headers.evaluateAll((cells) =>
+    cells.findIndex((cell) => cell.textContent === "Extra payment"),
+  );
+  const indexIndex = await headers.evaluateAll((cells) =>
+    cells.findIndex((cell) => cell.textContent === "Index"),
+  );
+  expect(indexIndex).toBe(extraIndex - 1);
+
+  await openYear(page, 2033);
+  const october = page.getByRole("row", { name: /Oct 2033/ });
+  await expect(october).toContainText("5.875%");
+  await expect(october).toContainText("$3,371.77");
+  await expect(october.getByLabel("Index for month 84")).toHaveCount(0);
+  const november = page.getByRole("row", { name: /Nov 2033/ });
+  await expect(november).toContainText("10.875%");
+  await expect(november).toContainText("$5,037.71");
+  await expect(november).toContainText("$4,620.03");
+  await expect(november.getByLabel("Index for month 85")).toHaveValue("");
+
+  const yearRow = page.locator("tbody[data-year='2033'] tr.year-row");
+  const cells = yearRow.locator("td");
+  await expect(cells).toHaveCount(11);
+  await expect(cells.nth(2)).toHaveText("");
+  await expect(cells.nth(3)).toHaveText("");
+  await expect(cells.nth(6)).toHaveText("");
+});
+
+test("AC10 an index at the first adjustment recomputes the path", async ({ page }) => {
+  await openArm(page);
+  await openYear(page, 2033);
+  const nov = page.getByRole("row", { name: /Nov 2033/ });
+
+  await setIndex(page, 85, "4.42");
+  await expect(nov).toContainText("6.92%");
+  await expect(nov).toContainText("$2,939.82");
+  await expect(nov).toContainText("$3,695.72");
+  await expect(index(page, 85)).toHaveValue("4.42");
+  await expect(page.getByRole("region", { name: "Highest payment" })).toContainText(
+    "$4,978.20 from November 2035",
+  );
+  await expect(page.getByRole("region", { name: "Total interest paid" })).toContainText("$1,064,081.79");
+
+  await setIndex(page, 85, "abc");
+  await expect(index(page, 85)).toHaveValue("4.42");
+  await expect(nov).toContainText("6.92%");
+
+  await setIndex(page, 85, "0");
+  await expect(index(page, 85)).toHaveValue("0");
+  await expect(nov).toContainText("2.5%");
+  await setIndex(page, 85, "4.437");
+  await expect(nov).toContainText("6.937%");
+  await setIndex(page, 85, "4.42");
+  await expect(nov).toContainText("6.92%");
+
+  await page.locator("#product").selectOption("fixed");
+  await expect(page.locator("thead th")).toHaveCount(8);
+  await expect(page.getByRole("region", { name: "Highest payment" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Total interest paid" })).toContainText("$643,835.49");
+  await expect(page.getByLabel("Index for month 85")).toHaveCount(0);
+
+  await page.locator("#product").selectOption("arm");
+  await expect(page.locator("thead th")).toHaveCount(11);
+  await expect(index(page, 85)).toHaveValue("4.42");
+  await expect(page.getByRole("region", { name: "Highest payment" })).toContainText("$4,978.20");
+
+  await page.reload();
+  await openYear(page, 2033);
+  await expect(index(page, 85)).toHaveValue("4.42");
+  await expect(page.getByRole("region", { name: "Highest payment" })).toContainText(
+    "$4,978.20 from November 2035",
+  );
+  const stored = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("compound-amortization-v1") ?? "{}"),
+  );
+  expect(stored.arm.index).toEqual([[85, 4.42]]);
+
+  await setIndex(page, 85, "");
+  await expect(index(page, 85)).toHaveValue("");
+  await expect(nov).toContainText("10.875%");
+  await expect(page.getByRole("region", { name: "Highest payment" })).toContainText(
+    "$5,037.71 from November 2033",
+  );
+  await expect(page.getByRole("region", { name: "Total interest paid" })).toContainText("$1,103,636.33");
+
+  const extra = page.getByLabel("Extra payment for month 1");
+  await openYear(page, 2026);
+  await extra.fill("100");
+  await extra.press("Enter");
+  const first = page.getByRole("row", { name: /Nov 2026/ });
+  await expect(first).toContainText("$309.06");
+  await expect(page.getByRole("region", { name: "Interest saved" })).toContainText("$309.06");
+});
+
+test("Apply replaces only the extra column and leaves the index", async ({ page }) => {
+  await openArm(page);
+  await openYear(page, 2033);
+  await setIndex(page, 85, "4.42");
+  await page.locator("summary", { hasText: "Make extra payments" }).click();
+  await page.locator("#extra-monthly").fill("100");
+  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(index(page, 85)).toHaveValue("4.42");
+  await expect(page.getByLabel("Extra payment for month 85")).toHaveValue("100.00");
+});
+
+test("a term change drops index entries that are no longer adjustment months", async ({ page }) => {
+  await openArm(page);
+  await openYear(page, 2033);
+  await setIndex(page, 85, "4.42");
+  await page.locator("#arm-fixed-years").fill("10");
+  await expect(page.getByLabel("Index for month 85")).toHaveCount(0);
+  const stored = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("compound-amortization-v1") ?? "{}"),
+  );
+  expect(stored.arm.index).toEqual([]);
+  await page.locator("#arm-fixed-years").fill("7");
+  await openYear(page, 2033);
+  await expect(index(page, 85)).toHaveValue("");
+});
+
+async function openYear(page: Page, year: number) {
+  const body = page.locator(`tbody[data-year='${year}']`);
+  const toggle = body.locator("tr.year-row button");
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+  await expect(toggle).toHaveAttribute("aria-expanded", "true");
+}
+
+function index(page: Page, month: number) {
+  return page.getByLabel(`Index for month ${month}`);
+}
+
+async function setIndex(page: Page, month: number, value: string) {
+  const cell = index(page, month);
+  await cell.fill(value);
+  await cell.press("Enter");
+}
+
 async function openFresh(page: Page) {
   await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
   await page.goto("/");
