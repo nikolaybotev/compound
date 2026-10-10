@@ -15,7 +15,7 @@ Pull requests that change the amortization page have no URL on the existing GitH
 
 ## Proposed outcome
 
-Each open same-repo pull request gets a stable preview at `https://nikolaybotev.github.io/compound/feat/<pull-request-number>/`, built from the PR head with `VITE_BASE=/compound/feat/<number>/`. Production stays `main`-only. Closing the pull request removes that `feat/<number>/` path from the live site. Preview builds use a separate `localStorage` key so they do not read or write production’s `compound-amortization-v1`.
+GitHub Pages will serve orphan branch `gh-pages` (built site only, `.nojekyll` at root). Each open same-repo pull request commits `feat/<number>/` on that branch. Production and `prototype/` on `gh-pages` update only from `main`. Preview URL `https://nikolaybotev.github.io/compound/feat/<pull-request-number>/` with per-PR storage `compound-amortization-feat-<number>-v1`. Until cutover, `deploy-pages.yml` stays the live publisher; this change does not seed `gh-pages` or flip the Pages setting.
 
 ## Affected users and systems
 

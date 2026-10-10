@@ -2,76 +2,65 @@
 
 | | |
 |---|---|
-| Implements | [spec.md](spec.md) Draft 1 |
-| Status | Draft 1 |
+| Implements | [spec.md](spec.md) Draft 2 |
+| Status | Draft 2 |
 | Stage | 3 · Build |
 
 Spec wins. Update this file in the same change whenever implementation departs from it.
 
 ## Stops
 
-None.
-
-## Phase 0 — Intent and spec
-
-Files: `intent/feature-previews/{intent,spec,plan}.md`
-
-DoD: Decisions D1–D8 recorded; builds on complete-loan-picture Pages work.
+None. This pull request does **not** run cutover steps below.
 
 ## Phase 1 — App storage key
 
-Files: `apps/web/src/loan.ts`
+Files: `apps/web/src/loan.ts` (done)
 
-1. Set `STORAGE_KEY` from `import.meta.env.VITE_STORAGE_KEY` with fallback `compound-amortization-v1`.
+`STORAGE_KEY` from `VITE_STORAGE_KEY`, default `compound-amortization-v1`.
 
-DoD: AC3; unit tests unchanged (no env in test runner).
+## Phase 2 — gh-pages publish script
 
-## Phase 2 — Production merge of `pages-feat`
+Files: `.github/scripts/gh-pages-publish.sh`
 
-Files: `.github/workflows/deploy-pages.yml`
+1. Modes: `production`, `feature-update`, `feature-remove`.
+2. Skip with exit 0 when `refs/heads/gh-pages` is absent.
+3. Ensure `.nojekyll` at repo root of `gh-pages`.
+4. Retry loop on non-fast-forward push (re-fetch, reapply only this mode’s paths, commit, tag, push). No force-push.
 
-1. After assembling `site/` from `main` and `prototype/`, check out branch `pages-feat` into `pages-feat/` (`continue-on-error: true`).
-2. If `pages-feat/feat` exists, `mkdir -p site/feat` and `cp -a pages-feat/feat/. site/feat/`.
-3. Comment that `pages-feat` is written only by `deploy-feature-preview.yml`.
+DoD: Documented in AGENTS.md; feature retry behavior in PR description.
 
-DoD: AC1; production and prototype checks unchanged.
+## Phase 3 — Workflows
 
-## Phase 3 — Feature preview workflow
+Files:
 
-Files: `.github/workflows/deploy-feature-preview.yml`
+- `.github/workflows/publish-gh-pages-production.yml` — `main` push + `workflow_dispatch`; build prod + prototype; `gh-pages-publish.sh production` with tag `pages-prod/<github.sha>`.
+- `.github/workflows/deploy-feature-preview.yml` — PR events; build feat; `feature-update` / `feature-remove` with tag `pages-feat/pr-<n>/<head-sha>`.
+- `.github/workflows/deploy-pages.yml` — unchanged live Actions publisher (remove `pages-feat` merge).
+- `.github/workflows/test.yml` — `branches-ignore: gh-pages`.
 
-1. `on: pull_request` types `opened`, `synchronize`, `reopened`, `closed`.
-2. `permissions: contents: write`, `actions: write`. Concurrency `feature-preview-pages`, `cancel-in-progress: false`.
-3. Job guard: same-repo head only.
-4. **Publish:** checkout PR head, pnpm install, build with `VITE_BASE=/compound/feat/<number>/` and `VITE_STORAGE_KEY=compound-amortization-feat-<number>-v1`.
-5. Clone or init `pages-feat`, copy dist to `feat/<number>/`, commit, push.
-6. **Close:** remove `feat/<number>/`, commit, push if changed.
-7. When `pages-feat` moved, dispatch `deploy-feat-pages.yml` on `main` via GitHub API.
+Remove: `deploy-feat-pages.yml`, `verify-pages-mirror.mjs`, `pages-feat` branch workflow.
 
-DoD: AC2; no `github-pages` environment on this workflow.
+DoD: AC1, AC2, AC6.
 
-## Phase 3b — Feat-only Pages publish
+## Phase 4 — Docs
 
-Files: `.github/workflows/deploy-feat-pages.yml`
-
-1. `on: workflow_dispatch` only. Concurrency group `pages` with `deploy-pages.yml`.
-2. Mirror with `wget -p` (page requisites). Run `.github/scripts/verify-pages-mirror.mjs` on production and prototype before overlaying `feat/`.
-3. `rm -rf site/feat`, then copy `pages-feat/feat/` when present.
-4. Run the verifier again on the full `site/` (includes each `feat/<n>/index.html`). Fail closed before upload if any linked file is missing.
-5. `upload-pages-artifact` and `deploy-pages` on the `github-pages` environment. No checkout of `main` for a build, no pnpm build.
-
-DoD: AC6. Stop and record a blocker if mirroring cannot be made safe; do not merge.
-
-## Phase 4 — Docs and verification
-
-Files: `AGENTS.md`
-
-1. Preview URL, `pages-feat` + dispatch model, storage keys, local preview build command.
+Files: `AGENTS.md`, `intent/feature-previews/spec.md`
 
 DoD: AC4, AC5.
 
+## Cutover (manual — not run from this PR)
+
+1. Build a complete current production tree (`VITE_BASE=/compound/`) and `prototype/` (`VITE_BASE=/compound/prototype/`) from `main` and the prototype ref.
+2. Create orphan branch `gh-pages` with that tree, all assets, `.nojekyll`, and any existing `feat/` folders to keep.
+3. Verify files (HTML, JS, CSS, fonts) locally or with a checklist.
+4. Stop in-flight GitHub Actions Pages deploys for this repo.
+5. In repository **Settings → Pages**, set source to **Deploy from a branch**, branch `gh-pages`, root `/`.
+6. Load https://nikolaybotev.github.io/compound/ and https://nikolaybotev.github.io/compound/prototype/ and confirm.
+7. Disable or stop relying on `deploy-pages.yml` for live traffic (workflow file may remain until Nikolay removes it).
+
+**Rollback:** Set Pages source back to **GitHub Actions**, run `gh workflow run deploy-pages.yml`, confirm production URLs. To restore `gh-pages` content, add a commit on `gh-pages` that copies a tagged tree (`git checkout tags/pages-prod/<sha> -- .`) without rewriting branch history.
+
 ### Build notes
 
-- First PR preview creates branch `pages-feat` with an empty `feat/` tree aside from the first preview folder.
-- Departure (2026-10-10): dropped dispatch of `deploy-pages.yml` from feature jobs. Feat publish mirrors the live site instead of rebuilding production (D4, D9).
-- Departure (2026-10-10): `deploy-feature-preview.yml` treats `createWorkflowDispatch` 404 as success with a log line until `deploy-feat-pages.yml` is on `main`; other dispatch errors still fail the job.
+- 2026-10-10: Replaced mirror + `pages-feat` + `deploy-feat-pages.yml` with orphan `gh-pages` path-scoped commits (D2–D5).
+- Feature folder publish retry: on rejected push, `gh-pages-publish.sh` fetches the new tip, reapplies **only** `feat/<pr>/` (or production root + `prototype/` for main), commits again, up to 10 times.

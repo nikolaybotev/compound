@@ -1,9 +1,7 @@
 name: deploy-feature-preview
 
-# Publishes PR previews under /compound/feat/<number>/ without touching the
-# github-pages environment or rebuilding production. Built files live on
-# branch pages-feat; after a push there, this job dispatches
-# deploy-feat-pages.yml on main, which mirrors the live site and overlays feat/.
+# Publishes feat/<pull-request-number>/ on orphan gh-pages after cutover seed.
+# Does not rebuild production or prototype. Until gh-pages exists, exits 0.
 
 on:
   pull_request:
@@ -11,10 +9,9 @@ on:
 
 permissions:
   contents: write
-  actions: write
 
 concurrency:
-  group: feature-preview-pages
+  group: gh-pages-publish
   cancel-in-progress: false
 
 jobs:
@@ -52,72 +49,28 @@ jobs:
           VITE_STORAGE_KEY: compound-amortization-feat-${{ github.event.pull_request.number }}-v1
         run: pnpm --dir apps/web build
 
-      - name: Update pages-feat branch
-        id: pages_feat
+      - name: Check out gh-pages publish script
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts/gh-pages-publish.sh
+          sparse-checkout-cone-mode: false
+          path: publish-tools
+
+      - name: Publish feat folder on gh-pages
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          REPO="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          STORE="${RUNNER_TEMP}/pages-feat-store"
-          rm -rf "$STORE"
-          mkdir -p "$STORE"
-          git -C "$STORE" init
-          git -C "$STORE" config user.name "github-actions[bot]"
-          git -C "$STORE" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if git -C "$STORE" ls-remote --exit-code "$REPO" refs/heads/pages-feat; then
-            git -C "$STORE" remote add origin "$REPO"
-            git -C "$STORE" fetch origin pages-feat --depth 1
-            git -C "$STORE" checkout -B pages-feat FETCH_HEAD
-          else
-            git -C "$STORE" checkout -B pages-feat
-            git -C "$STORE" remote add origin "$REPO"
-            mkdir -p "$STORE/feat"
-          fi
-
           if [ "${{ github.event.action }}" = "closed" ]; then
-            rm -rf "$STORE/feat/${PR_NUMBER}"
+            TAG="pages-feat/pr-${PR_NUMBER}/${HEAD_SHA}-removed"
+            MSG="Remove feat preview for PR #${PR_NUMBER} (${HEAD_SHA})"
+            bash publish-tools/.github/scripts/gh-pages-publish.sh feature-remove "${TAG}" "${MSG}" "${PR_NUMBER}"
           else
-            mkdir -p "$STORE/feat/${PR_NUMBER}"
-            rm -rf "$STORE/feat/${PR_NUMBER}"
-            cp -a "${GITHUB_WORKSPACE}/apps/web/dist/." "$STORE/feat/${PR_NUMBER}/"
-            test -f "$STORE/feat/${PR_NUMBER}/index.html"
-            grep -q "/compound/feat/${PR_NUMBER}/" "$STORE/feat/${PR_NUMBER}/index.html"
+            TAG="pages-feat/pr-${PR_NUMBER}/${HEAD_SHA}"
+            MSG="Feat preview PR #${PR_NUMBER} (${HEAD_SHA})"
+            bash publish-tools/.github/scripts/gh-pages-publish.sh feature-update "${TAG}" "${MSG}" "${PR_NUMBER}" "${GITHUB_WORKSPACE}/apps/web/dist"
+            test -f apps/web/dist/index.html
+            grep -q "/compound/feat/${PR_NUMBER}/" apps/web/dist/index.html
           fi
-
-          git -C "$STORE" add -A
-          if git -C "$STORE" diff --staged --quiet; then
-            echo "pages-feat unchanged"
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            if [ "${{ github.event.action }}" = "closed" ]; then
-              git -C "$STORE" commit -m "Remove feat preview for PR #${PR_NUMBER}"
-            else
-              git -C "$STORE" commit -m "Update feat preview for PR #${PR_NUMBER}"
-            fi
-            git -C "$STORE" push origin pages-feat
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Publish feat previews to Pages
-        if: steps.pages_feat.outputs.changed == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            try {
-              await github.rest.actions.createWorkflowDispatch({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                workflow_id: "deploy-feat-pages.yml",
-                ref: "main",
-              });
-            } catch (error) {
-              if (error.status === 404) {
-                core.info(
-                  "deploy-feat-pages.yml is not on main yet; Pages publish for this preview starts after this pull request merges.",
-                );
-                return;
-              }
-              throw error;
-            }

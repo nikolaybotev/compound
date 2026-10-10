@@ -1,0 +1,107 @@
+name: publish-gh-pages-production
+
+# After cutover, GitHub Pages serves orphan branch gh-pages. Until the branch is
+# seeded and the repo setting is switched, this job exits 0 when gh-pages is
+# missing. deploy-pages.yml stays the live publisher until cutover completes.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to publish under prototype/
+        required: false
+        default: complete-loan-picture
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: gh-pages-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main
+
+      - name: Check out prototype
+        id: prototype_checkout
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || 'complete-loan-picture' }}
+          path: prototype
+
+      - name: Use main when the prototype ref is missing
+        if: steps.prototype_checkout.outcome == 'failure'
+        run: |
+          set -euo pipefail
+          rm -rf prototype
+          mkdir -p prototype
+          cp -a main/. prototype/
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.6.0
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: |
+            main/pnpm-lock.yaml
+            prototype/pnpm-lock.yaml
+
+      - name: Install production dependencies
+        working-directory: main
+        run: pnpm install --frozen-lockfile
+
+      - name: Install prototype dependencies
+        working-directory: prototype
+        run: pnpm install --frozen-lockfile
+
+      - name: Build production
+        working-directory: main
+        env:
+          VITE_BASE: /compound/
+        run: pnpm --dir apps/web build
+
+      - name: Build prototype
+        working-directory: prototype
+        env:
+          VITE_BASE: /compound/prototype/
+        run: pnpm --dir apps/web build
+
+      - name: Assemble staging
+        run: |
+          set -euo pipefail
+          mkdir -p staging/prototype
+          cp -a main/apps/web/dist/. staging/
+          cp -a prototype/apps/web/dist/. staging/prototype/
+          test -f staging/index.html
+          test -f staging/prototype/index.html
+          grep -q '/compound/' staging/index.html
+          grep -q '/compound/prototype/' staging/prototype/index.html
+          if grep -q '/compound/prototype/' staging/index.html; then
+            echo "production index references /compound/prototype/" >&2
+            exit 1
+          fi
+
+      - name: Publish production and prototype to gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="pages-prod/${{ github.sha }}"
+          MSG="Production publish from main ${{ github.sha }}"
+          bash main/.github/scripts/gh-pages-publish.sh production "${TAG}" "${MSG}" "${GITHUB_WORKSPACE}/staging"
