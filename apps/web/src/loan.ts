@@ -6,6 +6,17 @@ import {
   type Report,
 } from "../../../amortize.js";
 import {
+  armFromStorage,
+  armToStorage,
+  defaultArm,
+  parseArm,
+  resetMonths,
+  dropIndexBeyond,
+  toBuildReportArm,
+  type ArmDraft,
+  type LoanArm,
+} from "./arm";
+import {
   defaultPicture,
   percentThousandths,
   pictureFromStorage,
@@ -63,6 +74,7 @@ export type Loan = {
   years: number;
   ratePercent: number;
   startMonth: string;
+  arm?: LoanArm;
 };
 
 export type ParseResult =
@@ -263,7 +275,13 @@ export function loanReport(
     loan.years * 12,
     extras,
     loan.years,
+    armArgument(loan),
   );
+}
+
+function armArgument(loan: Loan) {
+  if (!loan.arm || !loan.arm.enabled) return undefined;
+  return toBuildReportArm(loan.arm.values, loan.arm.index);
 }
 
 export function savedByExtraCents(
@@ -315,6 +333,8 @@ export type Scenario = {
   prefill: Prefill;
   openYears: number[] | null;
   picture: PictureDraft;
+  arm: ArmDraft;
+  armStored: boolean;
 };
 
 export function defaultPrefill(): Prefill {
@@ -443,6 +463,8 @@ export function defaultScenario(now = new Date()): Scenario {
     prefill: defaultPrefill(),
     openYears: null,
     picture: defaultPicture(),
+    arm: defaultArm(),
+    armStored: false,
   };
 }
 
@@ -486,6 +508,22 @@ function parseOpenYears(value: unknown): number[] | null | undefined {
   return years;
 }
 
+function scenarioArm(
+  value: unknown,
+  loan: Loan,
+): { arm: ArmDraft; armStored: boolean } {
+  const loaded = armFromStorage(value);
+  if (!loaded.stored) return { arm: loaded.arm, armStored: false };
+  if (!loaded.arm.enabled) return { arm: loaded.arm, armStored: true };
+  const parsed = parseArm(loaded.arm, loan.years, Math.round(loan.ratePercent * 1000));
+  if (!parsed.ok) return { arm: defaultArm(), armStored: false };
+  const index = dropIndexBeyond(
+    loaded.arm.index,
+    resetMonths(parsed.values.fixedMonths, parsed.values.adjustMonths, loan.years * 12),
+  );
+  return { arm: { ...loaded.arm, index }, armStored: true };
+}
+
 export function loadScenario(storage: StorageLike | undefined, now = new Date()): Scenario {
   const fallback = defaultScenario(now);
   if (!storage) return fallback;
@@ -503,12 +541,22 @@ export function loadScenario(storage: StorageLike | undefined, now = new Date())
       rate: typeof record.rate === "string" ? record.rate : "",
       start: typeof record.start === "string" ? record.start : "",
     };
-    if (!parseLoan(draft).ok) return fallback;
+    const parsedLoan = parseLoan(draft);
+    if (!parsedLoan.ok) return fallback;
     const extras = parseExtras(record.extras);
     const prefill = parsePrefill(record.prefill);
     const openYears = parseOpenYears(record.openYears);
     if (!extras || !prefill || openYears === undefined) return fallback;
-    return { draft, extras, prefill, openYears, picture: pictureFromStorage(record.picture) };
+    const { arm, armStored } = scenarioArm(record.arm, parsedLoan.loan);
+    return {
+      draft,
+      extras,
+      prefill,
+      openYears,
+      picture: pictureFromStorage(record.picture),
+      arm,
+      armStored,
+    };
   } catch {
     return fallback;
   }
@@ -530,6 +578,7 @@ export function saveScenario(storage: StorageLike | undefined, scenario: Scenari
         prefill: scenario.prefill,
         openYears: scenario.openYears,
         picture: scenario.picture,
+        ...(scenario.armStored ? { arm: armToStorage(scenario.arm) } : {}),
       }),
     );
   } catch {
