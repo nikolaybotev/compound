@@ -27,6 +27,7 @@ import {
   loadScenario,
   loanReport,
   longDate,
+  monthsSavedText,
   parseDollarField,
   parseIndexField,
   parseLoan,
@@ -39,6 +40,7 @@ import {
   type LoanDraft,
   type Prefill,
   type Scenario,
+  yearsAndMonths,
 } from "./loan";
 import {
   buildPicture,
@@ -564,11 +566,11 @@ export function App() {
         <div class="payment-block" role="region" aria-label="Monthly payment">
           <h2>Monthly payment</h2>
           <p class="money payment">{formatMoney(report.monthly_payment_cents)}</p>
-          <p class="note">
-            {report.arm
-              ? "Initial payment. The extra payment is on top of this amount, and the payment resets at each adjustment."
-              : "The extra payment is on top of this amount."}
-          </p>
+          {report.arm ? (
+            <p class="note">
+              Initial payment. The extra payment is on top of this amount, and the payment resets at each adjustment.
+            </p>
+          ) : null}
         </div>
         <dl>
           <div role="region" aria-label="Loan amount">
@@ -585,7 +587,9 @@ export function App() {
           </div>
           <div role="region" aria-label="Payoff date">
             <dt>Payoff date</dt>
-            <dd class="money">{longDate(payoff.year, payoff.month)}</dd>
+            <dd class="money">
+              {`${longDate(payoff.year, payoff.month)} (${yearsAndMonths(report.payoff_month)})`}
+            </dd>
           </div>
           {report.arm ? (
             <div role="region" aria-label="Highest rate">
@@ -604,6 +608,12 @@ export function App() {
             </div>
           ) : null}
           {extras.size > 0 ? (
+            <div role="region" aria-label="Extra principal paid">
+              <dt>Extra principal paid</dt>
+              <dd class="money">{formatMoney(report.extra_applied_cents)}</dd>
+            </div>
+          ) : null}
+          {extras.size > 0 ? (
             <div role="region" aria-label="Interest saved">
               <dt>Interest saved</dt>
               <dd class="money">{formatMoney(report.interest_saved_cents)}</dd>
@@ -612,7 +622,7 @@ export function App() {
           {extras.size > 0 ? (
             <div role="region" aria-label="Months saved">
               <dt>Months saved</dt>
-              <dd class="money">{report.months_saved}</dd>
+              <dd class="money">{monthsSavedText(report.months_saved)}</dd>
             </div>
           ) : null}
         </dl>

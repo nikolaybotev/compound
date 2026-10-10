@@ -23,9 +23,7 @@ test("AC9 a fresh visit is the fixed heading with eight columns", async ({ page 
   await expect(page.locator("summary", { hasText: "ARM terms" })).toHaveCount(0);
   await expect(page.locator("thead th")).toHaveCount(8);
   await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,936.85");
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText(
-    "The extra payment is on top of this amount.",
-  );
+  await expectNoFixedNote(page);
   await expect(page.getByRole("region", { name: "Highest payment" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Highest rate" })).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem("compound-amortization-v1")?.includes('"arm"'))).toBeFalsy();
@@ -77,7 +75,7 @@ test("AC9 the First Entertainment 7/1 heading, terms, and summary", async ({ pag
 
   const monthly = page.getByRole("region", { name: "Monthly payment" });
   await expect(monthly).toContainText("$3,371.77");
-  await expect(monthly).toContainText(ARM_NOTE);
+  await expect(monthly.locator(".note")).toHaveText(ARM_NOTE);
   await expect(page.getByRole("region", { name: "Highest rate" })).toContainText("10.875% from November 2033");
   await expect(page.getByRole("region", { name: "Highest payment" })).toContainText(
     "$5,037.71 from November 2033",
@@ -150,9 +148,7 @@ test("switching to fixed and back keeps the terms and a closed disclosure stays 
   await expect(page.locator("summary", { hasText: "ARM terms" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Highest payment" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Total interest paid" })).toContainText("$643,835.49");
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText(
-    "The extra payment is on top of this amount.",
-  );
+  await expectNoFixedNote(page);
   const stored = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("compound-amortization-v1") ?? "{}"),
   );
@@ -323,6 +319,13 @@ test("AC10 an index at the first adjustment recomputes the path", async ({ page 
   const first = page.getByRole("row", { name: /Nov 2026/ });
   await expect(first).toContainText("$309.06");
   await expect(page.getByRole("region", { name: "Interest saved" })).toContainText("$309.06");
+  await expect(page.getByRole("region", { name: "Extra principal paid" })).toContainText("$100.00");
+  await expect(page.getByRole("region", { name: "Months saved" })).toHaveText(/Months saved\s*0$/);
+  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("October 2056 (30 years)");
+  await expect(page.getByRole("region", { name: "Monthly payment" }).locator(".note")).toHaveText(ARM_NOTE);
+
+  await page.locator("#product").selectOption("fixed");
+  await expectNoFixedNote(page);
 });
 
 test("Apply replaces only the extra column and leaves the index", async ({ page }) => {
@@ -350,6 +353,11 @@ test("a term change drops index entries that are no longer adjustment months", a
   await openYear(page, 2033);
   await expect(index(page, 85)).toHaveValue("");
 });
+
+async function expectNoFixedNote(page: Page) {
+  await expect(page.getByRole("region", { name: "Monthly payment" }).locator(".note")).toHaveCount(0);
+  await expect(page.getByText("The extra payment is on top of this amount.")).toHaveCount(0);
+}
 
 async function openYear(page: Page, year: number) {
   const body = page.locator(`tbody[data-year='${year}']`);
