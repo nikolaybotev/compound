@@ -38,7 +38,7 @@ The page stores more than one loan scenario and switches the one being edited fr
 
 ## Open questions (carried into spec.md)
 
-None. The choices made while drafting are D1–D18 in [spec.md](spec.md).
+None. The choices made while drafting are D1–D19 in [spec.md](spec.md).
 
 ## Original prompt (verbatim)
 
