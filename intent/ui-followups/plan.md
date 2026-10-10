@@ -68,7 +68,7 @@ DoD: `node --test`, `pnpm --dir apps/web test`, and `pnpm --dir apps/web test:e2
 
 ### Build notes (Phase 1)
 
-None yet.
+No departure from the plan. `groupByYear` takes `applied` as a fifth parameter (defaulting to `extras`, so nothing is edited) and sets `ScheduleMonth.edited`. The Safari `March` screenshot (AC12, form part) needs a Mac; the cloud VM has Chromium only, so the form is checked by the AC7 box-model assertion here and the Safari shot is left to the owner.
 
 ## Phase 2 — Chart legend follows the pointer
 
