@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from "preact/hooks";
+import type { ScenarioFigures } from "./loan";
+import { PrevailingBar } from "./prevailing-bar";
 
 type Props = {
   labels: string[];
+  figures: Array<ScenarioFigures | null>;
   active: number;
   saveError: boolean;
   importError: boolean;
@@ -15,6 +18,7 @@ type Props = {
 
 export function ScenarioBar({
   labels,
+  figures,
   active,
   saveError,
   importError,
@@ -140,8 +144,19 @@ export function ScenarioBar({
           aria-label={labels[active]}
           onClick={toggleList}
         >
-          <span class="scenario-trigger-text">{labels[active]}</span>
-        </button>
+        <span class="scenario-trigger-text">{labels[active]}</span>
+        {figures[active] ? (
+          <PrevailingBar
+            variant="dropdown"
+            modalCents={figures[active]!.modalPaymentCents}
+            taxCents={figures[active]!.taxCents}
+            insuranceCents={figures[active]!.insuranceCents}
+            fhaMipCents={figures[active]!.fhaMipCents}
+            pmiCents={figures[active]!.pmiCents}
+            prevailingExtraCents={figures[active]!.prevailingExtraCents}
+          />
+        ) : null}
+      </button>
         <button type="button" class="scenario-action" onClick={onExport}>Export</button>
         <button type="button" class="scenario-action" onClick={() => fileRef.current?.click()}>
           Import
@@ -187,6 +202,17 @@ export function ScenarioBar({
                   onClick={() => choose(index)}
                 >
                   <span class="scenario-row-text">{label}</span>
+                  {figures[index] ? (
+                    <PrevailingBar
+                      variant="dropdown"
+                      modalCents={figures[index]!.modalPaymentCents}
+                      taxCents={figures[index]!.taxCents}
+                      insuranceCents={figures[index]!.insuranceCents}
+                      fhaMipCents={figures[index]!.fhaMipCents}
+                      pmiCents={figures[index]!.pmiCents}
+                      prevailingExtraCents={figures[index]!.prevailingExtraCents}
+                    />
+                  ) : null}
                 </button>
                 {labels.length > 1 ? (
                   <button

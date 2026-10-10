@@ -37,6 +37,9 @@
   --muted: #5c6b66;
   --line: #d7ded9;
   --principal: #1b7a4d;
+  --prevailing-pi: #1b7a4d;
+  --prevailing-ti: #2a4365;
+  --prevailing-pe: #8a6218;
   --interest: #c5362b;
   --edited: #1d4ed8;
   --balance: #2a4365;
@@ -775,4 +778,70 @@ td {
   display: flex;
   gap: 0.75rem;
   margin-top: 0.75rem;
+}
+
+.scenario-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.scenario-row-button {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.prevailing-bar {
+  display: inline-flex;
+  flex-direction: row;
+  column-gap: 1px;
+  background: var(--paper);
+  flex: none;
+}
+
+.prevailing-bar--heading {
+  width: 4.5rem;
+  height: 0.5rem;
+}
+
+.prevailing-bar--dropdown {
+  width: 3rem;
+  height: 0.5rem;
+}
+
+.prevailing-segment {
+  flex-basis: 0;
+  min-height: 100%;
+}
+
+.prevailing-pi {
+  background: var(--prevailing-pi);
+}
+
+.prevailing-ti {
+  background: var(--prevailing-ti);
+}
+
+.prevailing-pe {
+  background: var(--prevailing-pe);
+}
+
+.prevailing-legend {
+  display: flex;
+  gap: 0.75rem;
+  margin: 0.25rem 0 0.75rem;
+  font-size: 0.85rem;
+}
+
+.prevailing-legend-pi {
+  color: var(--prevailing-pi);
+}
+
+.prevailing-legend-ti {
+  color: var(--prevailing-ti);
+}
+
+.prevailing-legend-pe {
+  color: var(--prevailing-pe);
 }
