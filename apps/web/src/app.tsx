@@ -25,7 +25,7 @@ import {
   formatMoney,
   groupByYear,
   isTrailingDotThousands,
-  loadScenario,
+  loadStored,
   loanReport,
   longDate,
   monthsSavedText,
@@ -33,7 +33,8 @@ import {
   parseIndexField,
   parseLoan,
   paymentDate,
-  saveScenario,
+  saveStored,
+  type StoredSet,
   shortDate,
   thousandsToDollarString,
   withIndex,
@@ -57,26 +58,36 @@ const MONTHLY_AMOUNT = "Additional amount to monthly payment";
 const YEARLY_AMOUNT = "Additional yearly payment";
 const PROPERTY_TAX_NOTE = "Nashua: 1.683%; Brentwood: 1.32%.";
 
-function readInitial(): Scenario & { loan: Loan; pictureValues: PictureValues } {
-  const scenario = loadScenario(typeof localStorage === "undefined" ? undefined : localStorage);
+function readInitial(): {
+  stored: StoredSet;
+  scenario: Scenario;
+  loan: Loan;
+  pictureValues: PictureValues;
+} {
+  const stored = loadStored(typeof localStorage === "undefined" ? undefined : localStorage);
+  const scenario = stored.scenarios[stored.active];
   const parsed = parseLoan(scenario.draft);
   if (!parsed.ok) throw new Error(parsed.message);
   const picture = parsePicture(scenario.picture);
   if (!picture.ok) throw new Error(picture.message);
-  return { ...scenario, loan: parsed.loan, pictureValues: picture.values };
+  return { stored, scenario, loan: parsed.loan, pictureValues: picture.values };
 }
 
 export function App() {
   const initial = useState(readInitial)[0];
-  const [draft, setDraft] = useState(initial.draft);
-  const [validText, setValidText] = useState({ down: initial.draft.down, rate: initial.draft.rate });
+  const [, setStored] = useState(initial.stored);
+  const [draft, setDraft] = useState(initial.scenario.draft);
+  const [validText, setValidText] = useState({
+    down: initial.scenario.draft.down,
+    rate: initial.scenario.draft.rate,
+  });
   const [loan, setLoan] = useState(initial.loan);
-  const [priceText, setPriceText] = useState(() => dollarsToThousandsText(initial.draft.price));
-  const [extras, setExtras] = useState(initial.extras);
-  const [applied, setApplied] = useState(initial.applied);
-  const [prefill, setPrefill] = useState(initial.prefill);
-  const [pictureDraft, setPictureDraft] = useState(initial.picture);
-  const [pictureSaved, setPictureSaved] = useState(initial.picture);
+  const [priceText, setPriceText] = useState(() => dollarsToThousandsText(initial.scenario.draft.price));
+  const [extras, setExtras] = useState(initial.scenario.extras);
+  const [applied, setApplied] = useState(initial.scenario.applied);
+  const [prefill, setPrefill] = useState(initial.scenario.prefill);
+  const [pictureDraft, setPictureDraft] = useState(initial.scenario.picture);
+  const [pictureSaved, setPictureSaved] = useState(initial.scenario.picture);
   const [pictureValues, setPictureValues] = useState(initial.pictureValues);
   const [error, setError] = useState<string | null>(null);
   const [invalidField, setInvalidField] = useState<string | null>(null);
@@ -84,23 +95,25 @@ export function App() {
   const [pictureInvalid, setPictureInvalid] = useState<PictureInputField | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [openYears, setOpenYears] = useState<Set<number>>(() =>
-    initial.openYears ? new Set(initial.openYears) : new Set([firstPaymentYear(initial.loan)]),
+    initial.scenario.openYears
+      ? new Set(initial.scenario.openYears)
+      : new Set([firstPaymentYear(initial.loan)]),
   );
-  const [armDraft, setArmDraft] = useState(initial.arm);
-  const [armSaved, setArmSaved] = useState(initial.arm);
+  const [armDraft, setArmDraft] = useState(initial.scenario.arm);
+  const [armSaved, setArmSaved] = useState(initial.scenario.arm);
   const [editingMonth, setEditingMonth] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [editingIndexMonth, setEditingIndexMonth] = useState<number | null>(null);
   const [editingIndexValue, setEditingIndexValue] = useState("");
   const snapshot = useRef<Scenario>({
-    draft: initial.draft,
-    extras: initial.extras,
-    applied: initial.applied,
-    prefill: initial.prefill,
-    openYears: initial.openYears ?? [firstPaymentYear(initial.loan)],
-    picture: initial.picture,
-    arm: initial.arm,
-    armStored: initial.armStored,
+    draft: initial.scenario.draft,
+    extras: initial.scenario.extras,
+    applied: initial.scenario.applied,
+    prefill: initial.scenario.prefill,
+    openYears: initial.scenario.openYears ?? [firstPaymentYear(initial.loan)],
+    picture: initial.scenario.picture,
+    arm: initial.scenario.arm,
+    armStored: initial.scenario.armStored,
   });
 
   function persist(patch: Partial<Scenario>) {
@@ -115,7 +128,13 @@ export function App() {
       armStored: patch.armStored ?? snapshot.current.armStored,
     };
     snapshot.current = next;
-    saveScenario(localStorage, next);
+    setStored((current) => {
+      const scenarios = [...current.scenarios];
+      scenarios[current.active] = next;
+      const updated: StoredSet = { active: current.active, scenarios };
+      if (saveStored(localStorage, updated)) return updated;
+      return current;
+    });
   }
 
   const lines = useMemo(
