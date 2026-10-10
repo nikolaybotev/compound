@@ -19,7 +19,7 @@ test("AC3 fresh Conventional heading and picture", async ({ page }) => {
   await expect(page.locator("#price")).toHaveValue("600");
   await expect(page.locator("#down")).toHaveValue("5");
   await expect(page.locator("#rate")).toHaveValue("7.375");
-  await expect(page.getByLabel("Complete monthly payment")).toHaveText("$4,853");
+  await expect(page.getByLabel("Prevailing monthly payment")).toHaveText("$4,853");
   await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,936.85");
   await expect(page.getByRole("region", { name: "Loan amount" })).toContainText("$570,000.00");
 

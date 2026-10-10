@@ -15,6 +15,7 @@ import {
   toBuildReportArm,
   type ArmDraft,
   type LoanArm,
+  armLabel,
 } from "./arm";
 import {
   buildPicture,
@@ -26,7 +27,6 @@ import {
   pictureFromStorage,
   type PictureDraft,
 } from "./picture";
-import { armLabel } from "./arm";
 
 export { percentThousandths };
 
