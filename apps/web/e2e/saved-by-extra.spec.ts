@@ -1,4 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { setStartMonth } from "./start-month";
 
 const origin = "http://127.0.0.1:4173";
 const leaks = new WeakMap<BrowserContext, string[]>();
@@ -69,7 +70,7 @@ test("AC4 Apply $100 monthly through payoff", async ({ page }) => {
 
 async function openExample(page: Page) {
   await page.goto("/");
-  await page.locator("#start").fill("2026-10");
+  await setStartMonth(page, 2026, 10);
   await page.locator("#price").fill("570");
   await page.locator("#down").fill("0");
   await page.locator("#years").fill("30");

@@ -572,3 +572,73 @@ td {
   font-family: var(--mono);
   font-size: 0.92rem;
 }
+
+.month-picker-anchor {
+  position: relative;
+}
+
+.month-button {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  padding: 0.35rem 0;
+  text-align: left;
+  font-family: var(--mono);
+  font-weight: 500;
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.month-picker {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 3;
+  width: 15rem;
+  margin-top: 0.3rem;
+  padding: 0.7rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+}
+
+.month-picker-year {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+  font-family: var(--mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.month-picker-year button {
+  border: 0;
+  background: transparent;
+  padding: 0.2rem 0.6rem;
+}
+
+.month-picker-year button:disabled {
+  color: var(--muted);
+  cursor: default;
+  opacity: 0.4;
+}
+
+.month-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.35rem;
+}
+
+.month-picker-grid button {
+  padding: 0.4rem 0;
+  text-align: center;
+}
+
+.month-picker-grid button[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--card);
+}

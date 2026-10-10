@@ -25,7 +25,7 @@ import {
 
 export { percentThousandths };
 
-const SHORT_MONTHS = [
+export const SHORT_MONTHS = [
   "Jan",
   "Feb",
   "Mar",
