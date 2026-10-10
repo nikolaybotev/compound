@@ -39,7 +39,8 @@ test("AC3 example loan, chart, and November 2039 card", async ({ page }) => {
   await expect(november).toContainText("$3,325.00");
   await expect(november).toContainText("$569,532.78");
   await expect(november).toContainText("$791,875.72");
-  await expect(november.getByRole("cell").nth(4)).toHaveText("");
+  await expect(november.getByRole("cell").nth(4)).toHaveText("$0.00");
+  await expect(november.getByRole("cell").nth(5)).toHaveText("");
 
   await expect(page.locator("[data-bar]")).toHaveCount(360);
   await indicateMonth(page, 157);
