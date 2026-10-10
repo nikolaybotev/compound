@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useLayoutEffect, useRef, useState } from "preact/hooks";
 import { HoodedFigure, PiggyBank } from "./icons";
 import { formatMoney, type BandAmounts } from "./loan";
 
@@ -39,9 +39,36 @@ function monthAt(element: HTMLElement, clientX: number, count: number): number {
   return Math.min(count, Math.max(1, index + 1));
 }
 
+type Point = { x: number; y: number };
+type Size = { w: number; h: number };
+
+const GAP = 16;
+const MARGIN = 8;
+
+function placeAxis(anchor: number, size: number, viewport: number): number {
+  if (anchor + GAP + size <= viewport - MARGIN) return anchor + GAP;
+  if (anchor - GAP - size >= MARGIN) return anchor - GAP - size;
+  return Math.max(MARGIN, Math.min(viewport - size - MARGIN, anchor + GAP));
+}
+
+export function placeLegend(anchor: Point, size: Size, viewport: Size): Point {
+  return {
+    x: placeAxis(anchor.x, size.w, viewport.w),
+    y: placeAxis(anchor.y, size.h, viewport.h),
+  };
+}
+
+function barAnchor(element: HTMLElement, month: number, count: number): Point {
+  const rect = element.getBoundingClientRect();
+  return { x: rect.left + ((month - 0.5) / Math.max(count, 1)) * rect.width, y: rect.top };
+}
+
 export function Chart({ bars }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const legendRef = useRef<HTMLDivElement>(null);
   const [month, setMonth] = useState<number | null>(null);
+  const [anchor, setAnchor] = useState<Point | null>(null);
+  const [size, setSize] = useState<Size | null>(null);
   const [pinned, setPinned] = useState(false);
   const [width, setWidth] = useState(0);
   const count = bars.length;
@@ -71,9 +98,19 @@ export function Chart({ bars }: Props) {
   }, [month]);
 
   const cardWidth = Math.min(348, Math.max(0, width - 16));
-  const center = indicated ? ((indicated.month - 0.5) / count) * width : 0;
-  const beside = center < width / 2 ? center + 36 : center - cardWidth - 36;
-  const cardLeft = Math.max(8, Math.min(Math.max(8, width - cardWidth - 8), beside));
+
+  useLayoutEffect(() => {
+    const legend = legendRef.current;
+    if (!legend) return;
+    const w = legend.offsetWidth;
+    const h = legend.offsetHeight;
+    setSize((current) => (current && current.w === w && current.h === h ? current : { w, h }));
+  }, [month, cardWidth, indicated !== null]);
+
+  const position =
+    anchor && size
+      ? placeLegend(anchor, size, { w: window.innerWidth, h: window.innerHeight })
+      : null;
 
   return (
     <div
@@ -85,8 +122,7 @@ export function Chart({ bars }: Props) {
       aria-label="Amortization chart"
       onPointerMove={(event) => {
         if (event.pointerType !== "mouse" || !ref.current) return;
-        const legend = ref.current.querySelector("[data-testid='legend']");
-        if (legend && event.target instanceof Node && legend.contains(event.target)) return;
+        setAnchor({ x: event.clientX, y: event.clientY });
         setMonth(monthAt(ref.current, event.clientX, count));
       }}
       onPointerLeave={() => {
@@ -95,20 +131,24 @@ export function Chart({ bars }: Props) {
       onPointerDown={(event) => {
         if (event.pointerType !== "touch" || !ref.current) return;
         setPinned(true);
+        setAnchor({ x: event.clientX, y: event.clientY });
         setMonth(monthAt(ref.current, event.clientX, count));
       }}
-      onFocus={() => {
-        setMonth((current) => current ?? 1);
+      onFocus={(event) => {
+        if (!event.currentTarget.matches(":focus-visible")) return;
+        const next = month ?? 1;
+        if (ref.current) setAnchor(barAnchor(ref.current, next, count));
+        setMonth(next);
       }}
       onKeyDown={(event) => {
         if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
         event.preventDefault();
         setPinned(true);
-        setMonth((current) => {
-          const base = current ?? 1;
-          const next = event.key === "ArrowRight" ? base + 1 : base - 1;
-          return Math.min(count, Math.max(1, next));
-        });
+        const base = month ?? 1;
+        const step = event.key === "ArrowRight" ? base + 1 : base - 1;
+        const next = Math.min(count, Math.max(1, step));
+        if (ref.current) setAnchor(barAnchor(ref.current, next, count));
+        setMonth(next);
       }}
     >
       <svg
@@ -148,7 +188,17 @@ export function Chart({ bars }: Props) {
       </svg>
       {indicated ? <BarIcons bar={indicated} count={count} /> : null}
       {indicated ? (
-        <div class="legend" data-testid="legend" style={{ left: `${cardLeft}px`, width: `${cardWidth}px` }}>
+        <div
+          class="legend"
+          data-testid="legend"
+          ref={legendRef}
+          style={{
+            left: `${position?.x ?? 0}px`,
+            top: `${position?.y ?? 0}px`,
+            width: `${cardWidth}px`,
+            visibility: position ? "visible" : "hidden",
+          }}
+        >
           <h2>{indicated.dateLabel}</h2>
           <ul class="legend-list">
             <li>

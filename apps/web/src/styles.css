@@ -222,13 +222,12 @@ dd {
 }
 
 .legend {
-  position: absolute;
-  top: 0.75rem;
+  position: fixed;
   z-index: 2;
   background: var(--card);
   border: 1px solid var(--line);
   padding: 0.85rem 0.95rem 0.7rem;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .legend h2 {
