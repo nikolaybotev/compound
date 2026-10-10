@@ -642,3 +642,137 @@ td {
   border-color: var(--ink);
   color: var(--card);
 }
+
+.scenario-row {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+}
+
+.scenario-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.scenario-trigger {
+  max-width: min(100%, 28rem);
+  text-align: left;
+}
+
+.scenario-trigger-text,
+.scenario-row-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scenario-action {
+  font: inherit;
+  padding: 0.25rem 0.5rem;
+}
+
+.scenario-import-error {
+  margin: 0;
+  color: var(--interest);
+  font-size: 0.9rem;
+}
+
+.scenario-save-error {
+  margin: 0;
+  color: var(--interest);
+  font-size: 0.9rem;
+}
+
+.scenario-dialog {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 0;
+  margin-top: 0.25rem;
+  min-width: min(100%, 28rem);
+  max-width: 100%;
+  padding: 0.5rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: 0 4px 16px rgb(23 33 31 / 12%);
+}
+
+.scenario-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: min(16rem, 70vh);
+  overflow-y: auto;
+}
+
+.scenario-list-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.scenario-list-item:hover .scenario-trash,
+.scenario-list-item:focus-within .scenario-trash {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .scenario-trash {
+    opacity: 1;
+  }
+}
+
+.scenario-row-button {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font: inherit;
+  padding: 0.35rem 0.25rem;
+  background: transparent;
+  border: none;
+}
+
+.scenario-row-button[aria-current="true"] {
+  font-weight: 700;
+}
+
+.scenario-trash {
+  flex: none;
+  opacity: 0;
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.scenario-new {
+  width: 100%;
+  margin-top: 0.35rem;
+  font: inherit;
+  padding: 0.35rem;
+}
+
+.scenario-confirm {
+  position: fixed;
+  z-index: 30;
+  left: 50%;
+  top: 30%;
+  transform: translateX(-50%);
+  max-width: min(24rem, 90vw);
+  padding: 1rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  box-shadow: 0 8px 24px rgb(23 33 31 / 18%);
+}
+
+.scenario-confirm-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}

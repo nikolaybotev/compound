@@ -8,6 +8,7 @@ type Props = {
   id: string;
   value: string;
   onChange: (value: string) => void;
+  closeSignal?: number;
 };
 
 function parseValue(value: string): { year: number; month: number } | null {
@@ -22,12 +23,16 @@ function clampYear(year: number): number {
   return Math.min(MAX_YEAR, Math.max(MIN_YEAR, year));
 }
 
-export function MonthPicker({ id, value, onChange }: Props) {
+export function MonthPicker({ id, value, onChange, closeSignal = 0 }: Props) {
   const parsed = parseValue(value);
   const [open, setOpen] = useState(false);
   const [shownYear, setShownYear] = useState(() => clampYear(parsed?.year ?? MIN_YEAR));
   const triggerRef = useRef<HTMLButtonElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [closeSignal]);
 
   useEffect(() => {
     if (!open) return;
