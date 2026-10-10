@@ -62,7 +62,9 @@ jobs:
       - name: Check out gh-pages publish script
         uses: actions/checkout@v4
         with:
-          sparse-checkout: .github/scripts/gh-pages-publish.sh
+          sparse-checkout: |
+            .github/scripts/gh-pages-publish.sh
+            .github/scripts/dispatch-deploy-gh-pages-branch.sh
           sparse-checkout-cone-mode: false
           path: publish-tools
 
@@ -142,7 +144,9 @@ jobs:
         if: steps.open_pr.outputs.has_open_pr == 'false'
         uses: actions/checkout@v4
         with:
-          sparse-checkout: .github/scripts/gh-pages-publish.sh
+          sparse-checkout: |
+            .github/scripts/gh-pages-publish.sh
+            .github/scripts/dispatch-deploy-gh-pages-branch.sh
           sparse-checkout-cone-mode: false
           path: publish-tools
 

@@ -27,6 +27,11 @@ if [[ "${http_code}" == "204" ]]; then
   exit 0
 fi
 
+if [[ "${http_code}" == "404" ]]; then
+  echo "Workflow ${workflow_id} is not on main yet; deploy dispatch skipped until merge."
+  exit 0
+fi
+
 echo "Failed to dispatch ${workflow_id} (HTTP ${http_code}):" >&2
 cat /tmp/gh-pages-dispatch.json >&2
 exit 1
