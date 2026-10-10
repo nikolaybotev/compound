@@ -22,6 +22,26 @@ test("AC3 fresh visit label, heading, and single row without trash", async ({ pa
   await expect(page.locator("#price")).toHaveValue("600");
   expect(await headingText(page)).toBe("600K | 5% down | 7.375% fixed = $4,853 / month");
   await expect(page.getByLabel("Prevailing monthly payment")).toHaveText("$4,853");
+  const payment = page.locator("span.complete-payment");
+  const bar = page.locator(".prevailing-bar--heading");
+  await expect(bar).toHaveAttribute(
+    "aria-label",
+    "Principal and interest $3,936.85, taxes and insurance $916.25, prevailing extra $0.00",
+  );
+  await expect(payment.locator(".prevailing-bar")).toHaveCount(0);
+  await expect(bar).toHaveCSS("column-gap", "1px");
+  const segments = bar.locator(".prevailing-segment");
+  await expect(segments).toHaveCount(2);
+  await expect(segments.nth(0)).toHaveCSS("background-color", "rgb(27, 122, 77)");
+  await expect(segments.nth(1)).toHaveCSS("background-color", "rgb(42, 67, 101)");
+  await expect(bar.locator(".prevailing-pe")).toHaveCount(0);
+  const legend = page.locator(".prevailing-legend");
+  await expect(legend).toHaveText(/PI.*TI.*PE/);
+  await expect(page.locator(".heading-line").locator(".prevailing-legend")).toHaveCount(0);
+  await page.locator("summary", { hasText: "Monthly payment and closing costs" }).click();
+  await expect(page.locator("[data-line='prevailing-principal-and-interest']")).toContainText("$3,936.85");
+  await expect(page.locator("[data-line='prevailing-extra']")).toContainText("$0.00");
+  await expect(page.locator("[data-line='prevailing-monthly-total']")).toContainText("$4,853.10");
   await expect(page.locator(".scenario-trash")).toHaveCount(0);
 });
 
@@ -128,6 +148,12 @@ test("AC7 prevailing heading after Apply patterns", async ({ page }) => {
   await applyMonthly(page, "100");
   await expect(page.getByLabel("Prevailing monthly payment")).toHaveText("$4,953");
   await expect(page.locator("#scenario")).toHaveAttribute("aria-label", /^\$4,953/);
+  await page.locator("summary", { hasText: "Monthly payment and closing costs" }).click();
+  await expect(page.locator("[data-line='prevailing-extra']")).toContainText("$100.00");
+  await expect(page.locator("[data-line='prevailing-monthly-total']")).toContainText("$4,953.10");
+  const gold = page.locator(".prevailing-bar--heading .prevailing-pe");
+  await expect(gold).toHaveCSS("background-color", "rgb(138, 98, 24)");
+  await expect(gold).toHaveCSS("flex-grow", "10000");
   await page.locator("#extra-monthly").fill("");
   await page.getByRole("button", { name: "Apply" }).click();
   await page.getByRole("button", { name: "Expand all years" }).click();
@@ -137,6 +163,8 @@ test("AC7 prevailing heading after Apply patterns", async ({ page }) => {
   }
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page.getByLabel("Prevailing monthly payment")).toHaveText("$4,853");
+  await expect(page.locator("[data-line='prevailing-extra']")).toContainText("$0.00");
+  await expect(page.locator(".prevailing-bar--heading .prevailing-pe")).toHaveCount(0);
   await extra(page, 1).fill("250");
   await extra(page, 1).press("Enter");
   await expect(page.getByLabel("Prevailing monthly payment")).toHaveText("$4,853");
@@ -168,6 +196,28 @@ test("AC10 version-1 legacy loads and writes v2 on edit", async ({ page }) => {
   expect(legacyAfter).toContain('"version":1');
   expect(setAfter).toContain('"version":2');
   expect(JSON.parse(setAfter ?? "{}").scenarios[0].price).toBe("570000");
+});
+
+test("AC9 schedule Prevailing extra column", async ({ page }) => {
+  await openExample(page);
+  await applyMonthly(page, "100");
+  const headers = page.locator("thead th");
+  await expect(headers).toHaveCount(9);
+  const interestIndex = await headers.evaluateAll((cells) =>
+    cells.findIndex((cell) => cell.textContent === "Interest"),
+  );
+  const prevailingIndex = await headers.evaluateAll((cells) =>
+    cells.findIndex((cell) => cell.textContent === "Prevailing extra"),
+  );
+  const extraIndex = await headers.evaluateAll((cells) =>
+    cells.findIndex((cell) => cell.textContent === "Extra payment"),
+  );
+  expect(prevailingIndex).toBe(interestIndex + 1);
+  const monthRow = page.getByRole("row", { name: /Nov 2026/ });
+  await expect(monthRow.getByRole("cell").nth(4)).toHaveText("$100.00");
+  await page.getByRole("button", { name: "Expand all years" }).click();
+  const yearCell = page.locator("tbody[data-year='2026'] tr.year-row td").nth(4);
+  await expect(yearCell).toHaveText("");
 });
 
 test("AC13 save failure alert and rollback", async ({ page }) => {
