@@ -43,7 +43,7 @@ Files: `.github/workflows/deploy-feature-preview.yml`
 1. `on: pull_request` types `opened`, `synchronize`, `reopened`, `closed`.
 2. `permissions: contents: write`, `actions: write`. Concurrency `feature-preview-pages`, `cancel-in-progress: false`.
 3. Job guard: same-repo head only.
-4. **Publish:** checkout PR head, pnpm install, build with `VITE_BASE=/compound/feat/<number>/` and `VITE_STORAGE_KEY=compound-amortization-feat-preview-v1`.
+4. **Publish:** checkout PR head, pnpm install, build with `VITE_BASE=/compound/feat/<number>/` and `VITE_STORAGE_KEY=compound-amortization-feat-<number>-v1`.
 5. Clone or init `pages-feat`, copy dist to `feat/<number>/`, commit, push.
 6. **Close:** remove `feat/<number>/`, commit, push if changed.
 7. When `pages-feat` moved, dispatch `deploy-feat-pages.yml` on `main` via GitHub API.
@@ -55,9 +55,10 @@ DoD: AC2; no `github-pages` environment on this workflow.
 Files: `.github/workflows/deploy-feat-pages.yml`
 
 1. `on: workflow_dispatch` only. Concurrency group `pages` with `deploy-pages.yml`.
-2. Mirror `https://nikolaybotev.github.io/compound/` and `prototype/` with `wget`; verify the same guards as production assemble.
+2. Mirror with `wget -p` (page requisites). Run `.github/scripts/verify-pages-mirror.mjs` on production and prototype before overlaying `feat/`.
 3. `rm -rf site/feat`, then copy `pages-feat/feat/` when present.
-4. `upload-pages-artifact` and `deploy-pages` on the `github-pages` environment. No checkout of `main`, no pnpm build.
+4. Run the verifier again on the full `site/` (includes each `feat/<n>/index.html`). Fail closed before upload if any linked file is missing.
+5. `upload-pages-artifact` and `deploy-pages` on the `github-pages` environment. No checkout of `main` for a build, no pnpm build.
 
 DoD: AC6. Stop and record a blocker if mirroring cannot be made safe; do not merge.
 

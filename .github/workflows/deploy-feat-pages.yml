@@ -3,7 +3,8 @@ name: deploy-feat-pages
 # Publishes feat/ previews without rebuilding production or prototype.
 # Triggered by workflow_dispatch from deploy-feature-preview.yml after
 # pages-feat updates. Mirrors the live site, replaces feat/ from pages-feat,
-# and uploads one full artifact. deploy-pages.yml on main is unchanged and
+# verifies every HTML/CSS-linked file (including url() fonts), then uploads
+# one full artifact or fails closed. deploy-pages.yml on main is unchanged and
 # is the only workflow that rebuilds production from source.
 
 on:
@@ -22,13 +23,16 @@ jobs:
   assemble:
     runs-on: ubuntu-latest
     steps:
+      - name: Check out mirror verifier
+        uses: actions/checkout@v4
+
       - name: Mirror published site
         run: |
           set -euo pipefail
           SITE="${GITHUB_WORKSPACE}/site"
           rm -rf "$SITE"
           mkdir -p "$SITE"
-          wget -q -e robots=off -r -l 10 -np -nH --cut-dirs=1 -P "$SITE" \
+          wget -q -e robots=off -r -l 10 -np -nH --cut-dirs=1 -p -P "$SITE" \
             https://nikolaybotev.github.io/compound/ \
             https://nikolaybotev.github.io/compound/prototype/
           test -f "$SITE/index.html"
@@ -40,6 +44,7 @@ jobs:
             exit 1
           fi
           rm -rf "$SITE/feat"
+          node .github/scripts/verify-pages-mirror.mjs "$SITE"
 
       - name: Check out pages-feat previews
         continue-on-error: true
@@ -55,6 +60,9 @@ jobs:
             mkdir -p site/feat
             cp -a pages-feat/feat/. site/feat/
           fi
+
+      - name: Verify full site artifact
+        run: node .github/scripts/verify-pages-mirror.mjs site
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

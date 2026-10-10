@@ -49,7 +49,7 @@ jobs:
         if: github.event.action != 'closed'
         env:
           VITE_BASE: /compound/feat/${{ github.event.pull_request.number }}/
-          VITE_STORAGE_KEY: compound-amortization-feat-preview-v1
+          VITE_STORAGE_KEY: compound-amortization-feat-${{ github.event.pull_request.number }}-v1
         run: pnpm --dir apps/web build
 
       - name: Update pages-feat branch

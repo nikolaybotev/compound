@@ -43,7 +43,7 @@ Same-repo pull requests that touch the web app can publish an amortization previ
 1. **Production trigger.** `deploy-pages.yml` runs on `push` to `main` and `workflow_dispatch` only. It does not run on `pull_request`.
 2. **Preview trigger.** A separate workflow runs on `pull_request` `opened`, `synchronize`, `reopened`, and `closed` when `github.event.pull_request.head.repo.full_name == github.repository`.
 3. **Preview path.** Build `apps/web` with `VITE_BASE=/compound/feat/<pull-request-number>/` (trailing slash).
-4. **Storage key.** Preview builds set `VITE_STORAGE_KEY=compound-amortization-feat-preview-v1`. Production and prototype builds do not set it; the app keeps `compound-amortization-v1`.
+4. **Storage key.** Preview builds set `VITE_STORAGE_KEY=compound-amortization-feat-<pull-request-number>-v1`. Production and prototype builds do not set it; the app keeps `compound-amortization-v1`.
 5. **Shared preview store.** Built preview static files live on git branch `pages-feat` under `feat/<pull-request-number>/`. Only the feature-preview workflow writes that branch.
 6. **Live site assembly.** Before `upload-pages-artifact`, `deploy-pages.yml` checks out `pages-feat` when present and copies `feat/` into the site artifact beside production root and `prototype/`. A missing `pages-feat` branch does not fail production deploy.
 7. **Refresh after preview change.** After pushing `pages-feat`, the feature workflow dispatches `deploy-feat-pages.yml` on `main`. That job mirrors `https://nikolaybotev.github.io/compound/` and `prototype/`, drops any mirrored `feat/`, copies `pages-feat/feat/` into the artifact, and deploys. It does not check out or build `main`.
@@ -59,7 +59,7 @@ Same-repo pull requests that touch the web app can publish an amortization previ
 | AC2 | Feature workflow does not set `environment: github-pages`, does not call `deploy-pages`, and does not dispatch `deploy-pages.yml`. |
 | AC6 | `deploy-feat-pages.yml` has no `pnpm build` from a `main` checkout; it mirrors the published site before overlaying `feat/`. |
 | AC3 | `loan.ts` uses `import.meta.env.VITE_STORAGE_KEY` with default `compound-amortization-v1`. |
-| AC4 | `pnpm --dir apps/web build` with `VITE_BASE=/compound/feat/1/` and `VITE_STORAGE_KEY=compound-amortization-feat-preview-v1` references `/compound/feat/1/` in `index.html`. |
+| AC4 | `pnpm --dir apps/web build` with `VITE_BASE=/compound/feat/1/` and `VITE_STORAGE_KEY=compound-amortization-feat-1-v1` references `/compound/feat/1/` in `index.html`. |
 | AC5 | `node --test` and `pnpm --dir apps/web test` pass. |
 
 ## 7. Decisions
@@ -72,11 +72,13 @@ Same-repo pull requests that touch the web app can publish an amortization previ
 
 **D4 — Dispatch refresh.** Feature workflow uses `workflow_dispatch` on `deploy-feat-pages.yml` at `ref: main` after each `pages-feat` push. That workflow mirrors the live production and prototype bytes, then overlays `pages-feat/feat/`. `deploy-pages.yml` rebuilds production only on `main` push or its own `workflow_dispatch`.
 
-**D9 — Mirror risk.** If the mirror step cannot fetch production and prototype, the feat publish job fails and uploads nothing. A failed mirror must not ship a partial tree.
+**D9 — Mirror risk.** If the mirror or verifier step fails, the feat publish job exits non-zero and does not call `upload-pages-artifact`. See D10.
 
 **D5 — Serialization.** Concurrency group `feature-preview-pages`, `cancel-in-progress: false`, on the feature workflow.
 
-**D6 — Storage key.** `compound-amortization-feat-preview-v1` for all feat previews; production and prototype keep `compound-amortization-v1`.
+**D6 — Storage key.** `compound-amortization-feat-<pull-request-number>-v1` per preview so open features do not share one `localStorage` loan; production and prototype keep `compound-amortization-v1`.
+
+**D10 — Mirror gate.** `deploy-feat-pages.yml` uses `wget -p` (page requisites) and `.github/scripts/verify-pages-mirror.mjs` on production and prototype entry points before and after merging `feat/`. Any missing HTML, JS, CSS, or `url()` asset aborts before `upload-pages-artifact`.
 
 **D7 — Forks.** `if` guard on head repo full name equals `github.repository`.
 
