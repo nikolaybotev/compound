@@ -84,7 +84,7 @@ DoD: `node --test`, `pnpm --dir apps/web test`, and `pnpm --dir apps/web test:e2
 
 ### Build notes (Phase 2)
 
-None yet.
+Departures, both small. (1) AC10's closing tap at `(20, 20)` lands inside the chart once the chart is scrolled to the top of a 375px viewport (the chart spans x 16-359), so the test scrolls the window back to the top before tapping `(20, 20)`, where that point is the page margin. (2) `onFocus` sets the keyboard anchor only when the chart matches `:focus-visible`; otherwise a touch tap's synthesized focus (which fires after `pointerdown`) overwrote the tap anchor with the chart-top anchor and put the card over the tap point. `placeLegend` is exported from `chart.tsx` as the pure placement rule.
 
 ## Phase 3 — Start-month picker
 

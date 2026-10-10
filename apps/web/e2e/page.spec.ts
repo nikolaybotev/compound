@@ -121,6 +121,80 @@ test("AC12 keyboard, tap, and expand all years", async ({ page }) => {
   await expect(page.getByText("Jan 2027")).toHaveCount(0);
 });
 
+test("AC9 the legend follows the pointer and flips at the window edge", async ({ page }) => {
+  await openExample(page);
+  const card = page.getByTestId("legend");
+  const viewport = page.viewportSize();
+  if (!viewport) throw new Error("no viewport");
+
+  const left = await indicateMonth(page, 157);
+  await expect(card.getByRole("heading", { name: "Nov 2039" })).toBeVisible();
+  const first = await card.boundingBox();
+  if (!first) throw new Error("no card");
+  expect(first.x).toBeGreaterThanOrEqual(left.x + 16 - 0.5);
+  expect(first.y).toBeGreaterThanOrEqual(left.y + 16 - 0.5);
+  expect(first.x + first.width).toBeLessThanOrEqual(viewport.width);
+  expect(first.y + first.height).toBeLessThanOrEqual(viewport.height);
+
+  const chart = await page.getByTestId("chart").boundingBox();
+  if (!chart) throw new Error("no chart");
+  const coveredX = first.x + 40;
+  const coveredY = first.y + 40;
+  await page.mouse.move(coveredX, coveredY);
+  const expected = Math.floor(((coveredX - chart.x) / chart.width) * 360) + 1;
+  await expect(
+    card.getByRole("heading", { name: dateLabel(expected) }),
+  ).toBeVisible();
+
+  const right = await indicateMonth(page, 355);
+  await expect(card.getByRole("heading", { name: dateLabel(355) })).toBeVisible();
+  const second = await card.boundingBox();
+  if (!second) throw new Error("no card");
+  expect(second.x + second.width).toBeLessThanOrEqual(right.x - 16 + 0.5);
+  expect(second.x).toBeGreaterThanOrEqual(8);
+
+  await page.mouse.move(5, 5);
+  await expect(card).toHaveCount(0);
+
+  await scrollChartToTop(page);
+  await page.getByTestId("chart").focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(card).toBeVisible();
+  const keyed = await card.boundingBox();
+  const top = await page.getByTestId("chart").boundingBox();
+  if (!keyed || !top) throw new Error("no box");
+  expect(keyed.y).toBeGreaterThanOrEqual(top.y + 16 - 0.5);
+});
+
+test.describe("phone", () => {
+  test.use({ viewport: { width: 375, height: 667 } });
+
+  test("AC10 a tapped card is inside the window and off the tap point", async ({ page }) => {
+    await openExample(page);
+    await scrollChartToTop(page);
+    const chart = await page.getByTestId("chart").boundingBox();
+    if (!chart) throw new Error("no chart");
+    const x = chart.x + chart.width * 0.5;
+    const y = chart.y + chart.height * 0.7;
+    await page.touchscreen.tap(x, y);
+    const card = page.getByTestId("legend");
+    await expect(card).toBeVisible();
+    const box = await card.boundingBox();
+    if (!box) throw new Error("no card");
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(375);
+    expect(box.y + box.height).toBeLessThanOrEqual(667);
+    const contains = x >= box.x && x <= box.x + box.width && y >= box.y && y <= box.y + box.height;
+    expect(contains).toBe(false);
+    expect(box.y + box.height).toBeGreaterThan(chart.y + chart.height);
+
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.touchscreen.tap(20, 20);
+    await expect(card).toHaveCount(0);
+  });
+});
+
 async function openExample(page: Page) {
   await page.goto("/");
   await page.locator("#start").fill("2026-10");
@@ -131,14 +205,25 @@ async function openExample(page: Page) {
   await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,792.22");
 }
 
+async function scrollChartToTop(page: Page) {
+  await page.getByTestId("chart").evaluate((element) => element.scrollIntoView());
+}
+
 async function indicateMonth(page: Page, month: number) {
   const chart = page.getByTestId("chart");
-  await chart.scrollIntoViewIfNeeded();
+  await scrollChartToTop(page);
   const box = await chart.boundingBox();
   if (!box) throw new Error("chart has no box");
   const x = box.x + ((month - 0.5) / 360) * box.width;
   const y = box.y + box.height * 0.72;
   await page.mouse.move(x, y);
+  return { x, y };
+}
+
+function dateLabel(month: number): string {
+  const index = 2026 * 12 + 9 + month;
+  const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${names[index % 12]} ${Math.floor(index / 12)}`;
 }
 
 async function blockForeignHosts(context: BrowserContext) {
