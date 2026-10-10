@@ -253,6 +253,7 @@ test("AC9 the ARM schedule has eleven columns with Rate, Payment, and Index", as
   await expect(cells.nth(2)).toHaveText("");
   await expect(cells.nth(3)).toHaveText("");
   await expect(cells.nth(6)).toHaveText("");
+  await expect(cells.nth(8)).toHaveText("$0.00");
 });
 
 test("AC10 an index at the first adjustment recomputes the path", async ({ page }) => {

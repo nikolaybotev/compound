@@ -72,6 +72,7 @@ export function App() {
   const [loan, setLoan] = useState(initial.loan);
   const [priceText, setPriceText] = useState(() => dollarsToThousandsText(initial.draft.price));
   const [extras, setExtras] = useState(initial.extras);
+  const [applied, setApplied] = useState(initial.applied);
   const [prefill, setPrefill] = useState(initial.prefill);
   const [pictureDraft, setPictureDraft] = useState(initial.picture);
   const [pictureSaved, setPictureSaved] = useState(initial.picture);
@@ -93,6 +94,7 @@ export function App() {
   const snapshot = useRef<Scenario>({
     draft: initial.draft,
     extras: initial.extras,
+    applied: initial.applied,
     prefill: initial.prefill,
     openYears: initial.openYears ?? [firstPaymentYear(initial.loan)],
     picture: initial.picture,
@@ -104,6 +106,7 @@ export function App() {
     const next: Scenario = {
       draft: patch.draft ?? snapshot.current.draft,
       extras: patch.extras ?? snapshot.current.extras,
+      applied: patch.applied ?? snapshot.current.applied,
       prefill: patch.prefill ?? snapshot.current.prefill,
       openYears: patch.openYears === undefined ? snapshot.current.openYears : patch.openYears,
       picture: patch.picture ?? snapshot.current.picture,
@@ -136,8 +139,8 @@ export function App() {
     [reportLoan, extras, lines.financedCents],
   );
   const years = useMemo(
-    () => groupByYear(reportLoan, report, extras, lines.financedCents),
-    [reportLoan, report, extras, lines.financedCents],
+    () => groupByYear(reportLoan, report, extras, lines.financedCents, applied),
+    [reportLoan, report, extras, lines.financedCents, applied],
   );
   const payoff = paymentDate(loan.startMonth, report.payoff_month);
   const bars: ChartBar[] = report.schedule.slice(0, report.payoff_month).map((row) => {
@@ -180,9 +183,11 @@ export function App() {
       if (index !== armSaved.index) nextArm = { ...armSaved, index };
     }
     const kept = dropExtrasBeyond(extras, parsed.loan.years * 12);
+    const keptApplied = dropExtrasBeyond(applied, parsed.loan.years * 12);
     setValidText({ down: next.down, rate: next.rate });
     setLoan(parsed.loan);
     setExtras(kept);
+    setApplied(keptApplied);
     if (nextArm !== armSaved) {
       setArmSaved(nextArm);
       setArmDraft({ ...armDraft, index: nextArm.index });
@@ -191,8 +196,8 @@ export function App() {
     setInvalidField(null);
     persist(
       nextArm === armSaved
-        ? { draft: next, extras: kept }
-        : { draft: next, extras: kept, arm: nextArm },
+        ? { draft: next, extras: kept, applied: keptApplied }
+        : { draft: next, extras: kept, applied: keptApplied, arm: nextArm },
     );
   }
 
@@ -376,8 +381,9 @@ export function App() {
       prefill.month,
     );
     setExtras(next);
+    setApplied(next);
     setEditingMonth(null);
-    persist({ extras: next });
+    persist({ extras: next, applied: next });
   }
 
   function commitExtra(month: number) {
@@ -635,7 +641,6 @@ export function App() {
         onToggle={(open) => changePrefill({ open })}
       >
         <div class="prefill-panel">
-          <p>Apply replaces the extra-payment column.</p>
           <div class="inputs">
             <Field
               id="extra-monthly"
@@ -666,9 +671,12 @@ export function App() {
               </select>
             </div>
           </div>
-          <button type="button" onClick={applyPrefill}>
-            Apply
-          </button>
+          <div class="apply-row">
+            <button type="button" onClick={applyPrefill}>
+              Apply
+            </button>
+            <p class="note">Apply rewrites all extra-payment column values.</p>
+          </div>
           {applyError ? (
             <p class="error" role="alert">
               {applyError}
