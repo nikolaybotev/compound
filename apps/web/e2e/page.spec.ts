@@ -19,8 +19,12 @@ test("AC3 example loan, chart, and November 2039 card", async ({ page }) => {
   await expect(page.getByRole("region", { name: "Loan amount" })).toContainText("$570,000.00");
   await expect(page.getByRole("region", { name: "Total interest paid" })).toContainText("$795,200.72");
   await expect(page.getByRole("region", { name: "Total cost of loan" })).toContainText("$1,365,200.72");
-  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("October 2056");
+  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("October 2056 (30 years)");
+  await expect(page.getByRole("region", { name: "Monthly payment" }).locator(".note")).toHaveCount(0);
+  await expect(page.getByText("The extra payment is on top of this amount.")).toHaveCount(0);
+  await expect(page.getByText("Extra principal paid")).toHaveCount(0);
   await expect(page.getByText("Interest saved")).toHaveCount(0);
+  await expect(page.getByText("Months saved")).toHaveCount(0);
 
   const year = page.locator("tbody[data-year='2026']");
   await expect(year.getByText("Nov 2026")).toBeVisible();

@@ -23,6 +23,8 @@ import {
   shortDate,
   STORAGE_KEY,
   thousandsToDollarString,
+  yearsAndMonths,
+  monthsSavedText,
 } from "../src/loan";
 import { defaultPicture as pictureDefaults } from "../src/picture";
 
@@ -355,3 +357,30 @@ function memoryStorage(): Storage {
     setItem: (key, value) => values.set(key, value),
   };
 }
+
+describe("yearsAndMonths", () => {
+  test.each([
+    [0, "0 months"],
+    [1, "1 month"],
+    [7, "7 months"],
+    [11, "11 months"],
+    [12, "1 year"],
+    [13, "1 year 1 month"],
+    [24, "2 years"],
+    [28, "2 years 4 months"],
+    [181, "15 years 1 month"],
+    [332, "27 years 8 months"],
+    [336, "28 years"],
+    [360, "30 years"],
+  ])("%i months is %s", (months, text) => {
+    expect(yearsAndMonths(months)).toBe(text);
+  });
+
+  test("months saved is a bare count under twelve", () => {
+    expect(monthsSavedText(0)).toBe("0");
+    expect(monthsSavedText(11)).toBe("11");
+    expect(monthsSavedText(12)).toBe("1 year");
+    expect(monthsSavedText(28)).toBe("2 years 4 months");
+    expect(monthsSavedText(179)).toBe("14 years 11 months");
+  });
+});
