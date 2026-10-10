@@ -140,6 +140,10 @@ maybe_tag_production_commit() {
     echo "PAGES_POINT_VERSION unset; gh-pages commit left untagged until the point version for this main publish is identified (intent/feature-previews/plan.md)."
     return 0
   fi
+  if git ls-remote --exit-code origin "refs/tags/${PAGES_POINT_VERSION}" >/dev/null 2>&1; then
+    echo "Tag ${PAGES_POINT_VERSION} already exists; this publish stays on the existing tag (branch push succeeded, tag not moved)."
+    return 0
+  fi
   git tag -a "${PAGES_POINT_VERSION}" -m "${COMMIT_MSG}"
   git push origin "refs/tags/${PAGES_POINT_VERSION}"
   echo "Tagged production gh-pages commit ${PAGES_POINT_VERSION}."

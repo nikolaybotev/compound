@@ -23,7 +23,7 @@ Files: `.github/scripts/gh-pages-publish.sh`
 1. `production` — replace production root only; fast-forward retry.
 2. `feature-update` / `feature-remove` — `feat/<n>/` only; **no git tags**.
 3. `production-rollback <message> <prod-version-tag>` — reapply production root from that tag onto current tip; leave `prototype/` and `feat/` on tip unchanged; forward commit only; **no new version tag**.
-4. **Production tagging:** after a successful `production` push, annotate tag `PAGES_POINT_VERSION` on the new `gh-pages` commit when that environment variable is set. The workflow reads `vars.PAGES_POINT_VERSION` (repository variable). The repo currently has no git tags, no GitHub releases, and `package.json` version `0.0.0`; **do not invent a version**. The first production `gh-pages` tag is applied on the first publish after Nikolay identifies the point version to track and sets `PAGES_POINT_VERSION`. Until then, publishes commit without tagging and log that fact.
+4. **Production tagging:** after a successful `production` push, annotate tag `PAGES_POINT_VERSION` on the new `gh-pages` commit when that variable is set and the tag name is not already on the remote. If the tag already exists, log that this publish stays on the existing tag, do not move the tag, and exit 0 after the branch push. A second `main` publish at the same point version stays green. The workflow reads `vars.PAGES_POINT_VERSION`. The repo currently has no git tags, no GitHub releases, and `package.json` version `0.0.0`; **do not invent a version**. The first production `gh-pages` tag waits until the point version is identified.
 5. Skip all publishes with exit 0 when `gh-pages` is not seeded.
 
 ## Phase 3 — Workflows
