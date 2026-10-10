@@ -13,11 +13,13 @@ import {
 import { Chart, type ChartBar } from "./chart";
 import { Disclosure } from "./disclosure";
 import { MonthPicker } from "./month-picker";
+import { ScenarioBar } from "./scenarios";
 import {
   MONTH_NAMES,
   THOUSANDS_MESSAGE,
   bands,
   buildPrefillMap,
+  defaultScenario,
   dollarsToThousandsText,
   dropExtrasBeyond,
   extraInputValue,
@@ -32,8 +34,12 @@ import {
   parseDollarField,
   parseIndexField,
   parseLoan,
+  parseStoredSet,
   paymentDate,
   saveStored,
+  scenarioFigures,
+  scenarioLabelText,
+  serializeStoredSet,
   type StoredSet,
   shortDate,
   thousandsToDollarString,
@@ -47,6 +53,7 @@ import {
 import {
   buildPicture,
   formatWholeDollars,
+  headingDollarsFromCents,
   parsePicture,
   type PictureInputField,
   type PictureValues,
@@ -74,8 +81,12 @@ function readInitial(): {
 }
 
 export function App() {
-  const initial = useState(readInitial)[0];
-  const [, setStored] = useState(initial.stored);
+  const [initial] = useState(() => readInitial());
+  const [loanSet, setLoanSet] = useState(initial.stored);
+  const [saveError, setSaveError] = useState(false);
+  const [importError, setImportError] = useState(false);
+  const [dialogReset, setDialogReset] = useState(0);
+  const [startPickerClose, setStartPickerClose] = useState(0);
   const [draft, setDraft] = useState(initial.scenario.draft);
   const [validText, setValidText] = useState({
     down: initial.scenario.draft.down,
@@ -116,6 +127,65 @@ export function App() {
     armStored: initial.scenario.armStored,
   });
 
+  function reseedFromScenario(scenario: Scenario) {
+    const parsed = parseLoan(scenario.draft);
+    if (!parsed.ok) throw new Error(parsed.message);
+    const picture = parsePicture(scenario.picture);
+    if (!picture.ok) throw new Error(picture.message);
+    setDraft(scenario.draft);
+    setValidText({ down: scenario.draft.down, rate: scenario.draft.rate });
+    setLoan(parsed.loan);
+    setPriceText(dollarsToThousandsText(scenario.draft.price));
+    setExtras(scenario.extras);
+    setApplied(scenario.applied);
+    setPrefill(scenario.prefill);
+    setPictureDraft(scenario.picture);
+    setPictureSaved(scenario.picture);
+    setPictureValues(picture.values);
+    setOpenYears(
+      scenario.openYears
+        ? new Set(scenario.openYears)
+        : new Set([firstPaymentYear(parsed.loan)]),
+    );
+    setArmDraft(scenario.arm);
+    setArmSaved(scenario.arm);
+    setError(null);
+    setInvalidField(null);
+    setPictureError(null);
+    setPictureInvalid(null);
+    setApplyError(null);
+    setEditingMonth(null);
+    setEditingIndexMonth(null);
+    snapshot.current = {
+      draft: scenario.draft,
+      extras: scenario.extras,
+      applied: scenario.applied,
+      prefill: scenario.prefill,
+      openYears: scenario.openYears ?? [firstPaymentYear(parsed.loan)],
+      picture: scenario.picture,
+      arm: scenario.arm,
+      armStored: scenario.armStored,
+    };
+  }
+
+  function commitStoredSet(nextSet: StoredSet, reseed: boolean): boolean {
+    const previous = loanSet;
+    if (!saveStored(localStorage, nextSet)) {
+      setSaveError(true);
+      reseedFromScenario(previous.scenarios[previous.active]);
+      setLoanSet(previous);
+      return false;
+    }
+    setSaveError(false);
+    setLoanSet(nextSet);
+    if (reseed) {
+      reseedFromScenario(nextSet.scenarios[nextSet.active]);
+      setStartPickerClose((value) => value + 1);
+      setDialogReset((value) => value + 1);
+    }
+    return true;
+  }
+
   function persist(patch: Partial<Scenario>) {
     const next: Scenario = {
       draft: patch.draft ?? snapshot.current.draft,
@@ -128,19 +198,88 @@ export function App() {
       armStored: patch.armStored ?? snapshot.current.armStored,
     };
     snapshot.current = next;
-    setStored((current) => {
-      const scenarios = [...current.scenarios];
-      scenarios[current.active] = next;
-      const updated: StoredSet = { active: current.active, scenarios };
-      if (saveStored(localStorage, updated)) return updated;
-      return current;
-    });
+    const scenarios = [...loanSet.scenarios];
+    scenarios[loanSet.active] = next;
+    const updated: StoredSet = { active: loanSet.active, scenarios };
+    if (saveStored(localStorage, updated)) {
+      setSaveError(false);
+      setLoanSet(updated);
+    } else {
+      setSaveError(true);
+    }
+  }
+
+  const scenarioLabels = useMemo(
+    () =>
+      loanSet.scenarios.map((scenario) => {
+        const figures = scenarioFigures(scenario);
+        return figures ? scenarioLabelText(scenario, figures) : "";
+      }),
+    [loanSet],
+  );
+
+  function selectScenario(index: number) {
+    if (index === loanSet.active) return;
+    const nextSet: StoredSet = { active: index, scenarios: loanSet.scenarios };
+    commitStoredSet(nextSet, true);
+  }
+
+  function addScenario() {
+    const fresh = defaultScenario(new Date());
+    const scenarios = [...loanSet.scenarios, fresh];
+    const nextSet: StoredSet = { active: scenarios.length - 1, scenarios };
+    commitStoredSet(nextSet, true);
+  }
+
+  function removeScenario(index: number) {
+    if (loanSet.scenarios.length <= 1) return;
+    const scenarios = loanSet.scenarios.filter((_, row) => row !== index);
+    let active = loanSet.active;
+    const removedActive = index === loanSet.active;
+    if (index < active) active -= 1;
+    else if (removedActive) active = Math.min(active, scenarios.length - 1);
+    const nextSet: StoredSet = { active, scenarios };
+    commitStoredSet(nextSet, removedActive);
+  }
+
+  function exportScenarios() {
+    const blob = new Blob([serializeStoredSet(loanSet)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "compound-loan-scenarios.json";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function importScenarios(file: File) {
+    let text: string;
+    try {
+      text = await file.text();
+    } catch {
+      setImportError(true);
+      return;
+    }
+    const parsed = parseStoredSet(text);
+    if (!parsed.ok) {
+      setImportError(true);
+      return;
+    }
+    setImportError(false);
+    if (!commitStoredSet(parsed.set, true)) return;
   }
 
   const lines = useMemo(
     () => buildPicture(loan, validText.rate, validText.down, pictureValues),
     [loan, validText, pictureValues],
   );
+  const activeFigures = useMemo(
+    () => scenarioFigures(loanSet.scenarios[loanSet.active]),
+    [loanSet],
+  );
+  const prevailingHeadingDollars = activeFigures
+    ? formatWholeDollars(headingDollarsFromCents(activeFigures.totalCents))
+    : formatWholeDollars(lines.headingDollars);
   const rateThousandths = Math.round(loan.ratePercent * 1000);
   const armParsed = useMemo(
     () => parseArm(armSaved, loan.years, rateThousandths),
@@ -420,6 +559,18 @@ export function App() {
 
   return (
     <main class="column">
+      <ScenarioBar
+        labels={scenarioLabels}
+        active={loanSet.active}
+        saveError={saveError}
+        importError={importError}
+        dialogReset={dialogReset}
+        onSelect={selectScenario}
+        onNew={addScenario}
+        onRemove={removeScenario}
+        onExport={exportScenarios}
+        onImport={importScenarios}
+      />
       <h1>Amortization</h1>
       <p class="heading-line">
         <input
@@ -473,8 +624,8 @@ export function App() {
           <option value="arm">ARM</option>
         </select>
         <span> = </span>
-        <span class="complete-payment" aria-label="Complete monthly payment">
-          {formatWholeDollars(lines.headingDollars)}
+        <span class="complete-payment" aria-label="Prevailing monthly payment">
+          {prevailingHeadingDollars}
         </span>
         <span> / month</span>
       </p>
@@ -489,7 +640,12 @@ export function App() {
         />
         <div class="field">
           <label for="start">Start month</label>
-          <MonthPicker id="start" value={draft.start} onChange={(value) => update("start", value)} />
+          <MonthPicker
+            id="start"
+            value={draft.start}
+            closeSignal={startPickerClose}
+            onChange={(value) => update("start", value)}
+          />
         </div>
       </div>
       {armOn && armParsed.ok ? (
