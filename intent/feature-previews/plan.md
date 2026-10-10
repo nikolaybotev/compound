@@ -96,9 +96,9 @@ One commit on `gh-pages` deleting `prototype/`. Not a standing job.
 | 2 Merge PR #20 | 2026-10-10 | Squash merge `d57f32d3179ffdd5941d57c7df04c5e411ba02e4` (“Feature preview deploy for pull requests (#20)”). |
 | 3 Actions deploys idle | 2026-10-10 | `deploy-pages` run `38017068606` success after merge; no further `main` pushes before seed. |
 | 4 Seed `gh-pages` | 2026-10-10 | Orphan branch `c400ba596e5f39b115563558b64ff39289ad3ae4`; production from `main` at merge; `prototype/` from backup; no `feat/`; tag `0.6` on seed commit. |
-| 5 Actions deploy from `gh-pages` | | |
-| 6 Smoke test (post deploy) | | |
-| `gh-pages` ruleset | | |
+| 5 Actions deploy from `gh-pages` | 2026-10-10 | PR **#21** merge `eed689d`; bootstrap dispatch when `deploy-gh-pages-branch.yml` changes on `main` push. |
+| 6 Smoke test (post deploy) | 2026-10-10 | Production **600 K \| 5% down \| 7.375% fixed = $4,853 / month**, P&I **$3,936.85** (`index-ua9QFxUU.js`); prototype backup bundles **`index-D-QChoyJ.js`**. `deploy-gh-pages-branch` run succeeded after PR **#22** bootstrap. |
+| `gh-pages` ruleset | 2026-10-10 | API **403** — apply manually: ruleset **Protect gh-pages branch**, target `refs/heads/gh-pages`, rules **deletion** + **non_fast_forward**. |
 
 ### Build notes
 
