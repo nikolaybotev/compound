@@ -12,6 +12,7 @@ import {
 } from "./arm";
 import { Chart, type ChartBar } from "./chart";
 import { Disclosure } from "./disclosure";
+import { MonthPicker } from "./month-picker";
 import {
   MONTH_NAMES,
   THOUSANDS_MESSAGE,
@@ -469,13 +470,7 @@ export function App() {
         />
         <div class="field">
           <label for="start">Start month</label>
-          <input
-            id="start"
-            type="month"
-            value={draft.start}
-            aria-invalid={invalidField === "start"}
-            onInput={(event) => update("start", event.currentTarget.value)}
-          />
+          <MonthPicker id="start" value={draft.start} onChange={(value) => update("start", value)} />
         </div>
       </div>
       {armOn && armParsed.ok ? (

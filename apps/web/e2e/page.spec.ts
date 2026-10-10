@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { setStartMonth } from "./start-month";
 
 const origin = "http://127.0.0.1:4173";
 const leaks = new WeakMap<BrowserContext, string[]>();
@@ -85,7 +86,8 @@ test("AC9 built JavaScript does not name bankrate", async () => {
 test("AC11 pinned clock loads October 2026 and an invalid price keeps the loan", async ({ page }) => {
   await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
   await page.goto("/");
-  await expect(page.locator("#start")).toHaveValue("2026-10");
+  await expect(page.locator("#start")).toHaveAttribute("data-value", "2026-10");
+  await expect(page.locator("#start")).toHaveText("October 2026");
   await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,936.85");
   await expect(page.locator("[data-bar]")).toHaveCount(360);
 
@@ -119,6 +121,67 @@ test("AC12 keyboard, tap, and expand all years", async ({ page }) => {
   await expect(page.getByText("Jan 2027")).toBeVisible();
   await expand.click();
   await expect(page.getByText("Jan 2027")).toHaveCount(0);
+});
+
+test("AC8 the start month is a page-drawn picker", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
+  await page.goto("/");
+  const trigger = page.locator("#start");
+  expect(await trigger.evaluate((element) => element.tagName)).toBe("BUTTON");
+  await expect(trigger).toHaveText("October 2026");
+  await expect(trigger).toHaveAttribute("data-value", "2026-10");
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("October 2056 (30 years)");
+
+  const dialog = page.getByRole("dialog", { name: "Choose start month" });
+  await expect(dialog).toHaveCount(0);
+  await trigger.click();
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator(".month-picker-year span")).toHaveText("2026");
+  await expect(dialog.locator(".month-picker-grid button")).toHaveCount(12);
+  await expect(dialog.getByRole("button", { name: "October 2026" })).toHaveAttribute("aria-pressed", "true");
+  await expect(dialog.getByRole("button", { name: "November 2026" })).toHaveAttribute("aria-pressed", "false");
+
+  await dialog.getByRole("button", { name: "November 2026" }).click();
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toHaveText("November 2026");
+  await expect(trigger).toHaveAttribute("data-value", "2026-11");
+  await expect(trigger).toBeFocused();
+  await expect(page.locator("tbody[data-year='2026'] tr").nth(1)).toContainText("Dec 2026");
+  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("November 2056 (30 years)");
+
+  await trigger.click();
+  await dialog.getByRole("button", { name: "Previous year" }).click();
+  await expect(dialog.locator(".month-picker-year span")).toHaveText("2025");
+  await dialog.getByRole("button", { name: "Next year" }).click();
+  await dialog.getByRole("button", { name: "Next year" }).click();
+  await expect(dialog.locator(".month-picker-year span")).toHaveText("2027");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toHaveText("November 2026");
+  await expect(trigger).toBeFocused();
+
+  await trigger.click();
+  await expect(dialog).toBeVisible();
+  await trigger.click();
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+
+  await trigger.click();
+  await page.locator("h1").click();
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toHaveText("November 2026");
+
+  const label = page.locator("label[for='start']");
+  await label.click();
+  await expect(dialog).toBeVisible();
+  await label.click();
+  await expect(dialog).toHaveCount(0);
+
+  await page.reload();
+  await expect(page.locator("#start")).toHaveText("November 2026");
+  await expect(page.locator("#start")).toHaveAttribute("data-value", "2026-11");
 });
 
 test("AC9 the legend follows the pointer and flips at the window edge", async ({ page }) => {
@@ -197,7 +260,7 @@ test.describe("phone", () => {
 
 async function openExample(page: Page) {
   await page.goto("/");
-  await page.locator("#start").fill("2026-10");
+  await setStartMonth(page, 2026, 10);
   await page.locator("#price").fill("570");
   await page.locator("#down").fill("0");
   await page.locator("#years").fill("30");
