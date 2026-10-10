@@ -1,12 +1,13 @@
 name: deploy-feature-preview
 
 # Publishes feat/<12-char-sha>/ builds on orphan gh-pages. Open pull requests
-# also maintain feat/<pr>/index.html redirecting to the latest sha. Does not
+# also maintain feat/<pr>/index.html redirecting to the latest sha. Closing
+# the pull request does not remove that pointer. Does not
 # rebuild production or prototype. Until gh-pages exists, exits 0.
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened]
   push:
     branches-ignore:
       - main
@@ -26,30 +27,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out pull request
-        if: github.event.action != 'closed'
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up pnpm
-        if: github.event.action != 'closed'
         uses: pnpm/action-setup@v4
         with:
           version: 12.6.0
 
       - name: Set up Node.js 24
-        if: github.event.action != 'closed'
         uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: pnpm
 
       - name: Install dependencies
-        if: github.event.action != 'closed'
         run: pnpm install --frozen-lockfile
 
       - name: Build feature preview
-        if: github.event.action != 'closed'
         env:
           FEAT_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
@@ -76,13 +72,8 @@ jobs:
         run: |
           set -euo pipefail
           SHORT_SHA="${HEAD_SHA:0:12}"
-          if [ "${{ github.event.action }}" = "closed" ]; then
-            MSG="Remove feat pointer for PR #${PR_NUMBER} (${SHORT_SHA})"
-            bash publish-tools/.github/scripts/gh-pages-publish.sh feature-pointer-remove "${MSG}" "${PR_NUMBER}"
-          else
-            MSG="Feat preview PR #${PR_NUMBER} -> ${SHORT_SHA}"
-            bash publish-tools/.github/scripts/gh-pages-publish.sh feature-pr-publish "${MSG}" "${PR_NUMBER}" "${SHORT_SHA}" "${GITHUB_WORKSPACE}/apps/web/dist"
-          fi
+          MSG="Feat preview PR #${PR_NUMBER} -> ${SHORT_SHA}"
+          bash publish-tools/.github/scripts/gh-pages-publish.sh feature-pr-publish "${MSG}" "${PR_NUMBER}" "${SHORT_SHA}" "${GITHUB_WORKSPACE}/apps/web/dist"
 
   preview-branch:
     if: github.event_name == 'push'

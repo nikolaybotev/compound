@@ -19,7 +19,7 @@ Files: `.github/scripts/gh-pages-publish.sh`
 1. `production` — production root only; production semver tag when `PAGES_POINT_VERSION` set and tag absent on remote.
 2. `feature-sha` — `feat/<12-char-sha>/` full build only.
 3. `feature-pr-publish` — `feat/<sha>/` plus `feat/<pr>/index.html` redirect to `/compound/feat/<sha>/`.
-4. `feature-pointer-remove` — delete `feat/<pr>/` only on PR close.
+4. `feature-pointer-remove` — manual only; the workflow does not call it on pull request close.
 5. `production-rollback` — production root from prod tag onto current tip.
 6. Skip when `gh-pages` not seeded.
 
@@ -44,4 +44,4 @@ Files: `.github/scripts/gh-pages-publish.sh`
 ### Build notes
 
 - Feature retry reapplies the same mode paths (`feature-sha` or `feature-pr-publish` or pointer remove).
-- PR close removes `feat/<n>/` redirect only; `feat/<sha>/` trees stay.
+- PR close leaves `feat/<n>/index.html` redirect at the last published sha; `feat/<sha>/` trees stay.

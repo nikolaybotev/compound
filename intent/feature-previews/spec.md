@@ -8,7 +8,7 @@
 
 ## 1. Summary
 
-Feature previews on orphan `gh-pages` store each build under `feat/<12-char-commit-sha>/` (full `index.html` and `assets/`). An open same-repo pull request also keeps `feat/<pull-request-number>/index.html` redirecting to the latest sha for that PR. Pushes without an open pull request publish only the sha folder; older sha folders remain. Closing a pull request removes the pointer only, not sha folders. `publish-gh-pages-production.yml` updates only production root files on `gh-pages` and does not touch `prototype/` or `feat/`. Until cutover, `deploy-pages.yml` remains the live Actions publisher with production and `prototype/` in one artifact.
+Feature previews on orphan `gh-pages` store each build under `feat/<12-char-commit-sha>/` (full `index.html` and `assets/`). An open same-repo pull request also keeps `feat/<pull-request-number>/index.html` redirecting to the latest sha for that PR. Pushes without an open pull request publish only the sha folder; older sha folders remain. Closing a pull request does not remove `feat/<pull-request-number>/`; the redirect stays aimed at the last published sha. `publish-gh-pages-production.yml` updates only production root files on `gh-pages` and does not touch `prototype/` or `feat/`. Until cutover, `deploy-pages.yml` remains the live Actions publisher with production and `prototype/` in one artifact.
 
 ## 2. Goals and non-goals
 
@@ -33,7 +33,7 @@ Feature previews on orphan `gh-pages` store each build under `feat/<12-char-comm
 
 1. **Live publisher (until cutover).** `deploy-pages.yml` unchanged (production + `prototype/`).
 2. **Branch production publisher.** Production root only on `gh-pages`.
-3. **Feature publisher.** `feature-sha`, `feature-pr-publish` (sha tree + PR redirect), `feature-pointer-remove` on PR close. Same-repo PRs; branch push without open PR uses `feature-sha` only.
+3. **Feature publisher.** `feature-sha`, `feature-pr-publish` (sha tree + PR redirect). Same-repo PRs on open, sync, reopen; branch push without open PR uses `feature-sha` only. PR close does not run a publish job and does not remove the pointer.
 4. **Redirect.** HTML redirect at `feat/<pr>/index.html` to `/compound/feat/<sha>/`; not a symlink.
 5. **Storage keys** as in G4; production and prototype stay `compound-amortization-v1`.
 
