@@ -17,7 +17,9 @@ import {
   type LoanArm,
 } from "./arm";
 import {
+  buildPicture,
   defaultPicture,
+  parsePicture,
   percentThousandths,
   pictureFromStorage,
   type PictureDraft,
@@ -57,6 +59,16 @@ export const MONTH_NAMES = [
 
 export const STORAGE_KEY =
   import.meta.env.VITE_STORAGE_KEY ?? "compound-amortization-v1";
+
+export function storageSetKey(legacyKey: string = STORAGE_KEY): string {
+  if (legacyKey.endsWith("-v1")) return `${legacyKey.slice(0, -3)}-v2`;
+  return `${legacyKey}-scenarios`;
+}
+
+export type StoredSet = {
+  active: number;
+  scenarios: Scenario[];
+};
 
 export type LoanDraft = {
   price: string;
@@ -561,7 +573,7 @@ function parsePrefill(value: unknown): Prefill | null {
 }
 
 function parseOpenYears(value: unknown): number[] | null | undefined {
-  if (value === undefined) return null;
+  if (value === undefined || value === null) return null;
   if (!Array.isArray(value)) return undefined;
   const years: number[] = [];
   for (const year of value) {
@@ -587,6 +599,340 @@ function scenarioArm(
   return { arm: { ...loaded.arm, index }, armStored: true };
 }
 
+function mapsEqual(a: Map<number, number>, b: Map<number, number>): boolean {
+  if (a.size !== b.size) return false;
+  for (const [month, amount] of a) {
+    if (b.get(month) !== amount) return false;
+  }
+  return true;
+}
+
+function openYearsEqual(a: number[] | null, b: number[] | null): boolean {
+  if (a === null && b === null) return true;
+  if (a === null || b === null) return false;
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index] !== b[index]) return false;
+  }
+  return true;
+}
+
+function pictureDraftEqual(a: PictureDraft, b: PictureDraft): boolean {
+  return (
+    a.tax === b.tax &&
+    a.insurance === b.insurance &&
+    a.upfrontMip === b.upfrontMip &&
+    a.origination === b.origination &&
+    a.title === b.title &&
+    a.processing === b.processing &&
+    a.appraisal === b.appraisal &&
+    a.recording === b.recording &&
+    a.open === b.open
+  );
+}
+
+function draftEqual(a: LoanDraft, b: LoanDraft): boolean {
+  return (
+    a.price === b.price &&
+    a.down === b.down &&
+    a.years === b.years &&
+    a.rate === b.rate &&
+    a.start === b.start
+  );
+}
+
+function scenariosDiffer(legacy: Scenario, active: Scenario): boolean {
+  if (!draftEqual(legacy.draft, active.draft)) return true;
+  if (!mapsEqual(legacy.extras, active.extras)) return true;
+  if (!mapsEqual(legacy.applied, active.applied)) return true;
+  if (!openYearsEqual(legacy.openYears, active.openYears)) return true;
+  if (!pictureDraftEqual(legacy.picture, active.picture)) return true;
+  if (legacy.armStored !== active.armStored) return true;
+  if (legacy.prefill.monthly !== active.prefill.monthly) return true;
+  if (legacy.prefill.yearly !== active.prefill.yearly) return true;
+  if (legacy.prefill.month !== active.prefill.month) return true;
+  if (legacy.prefill.open !== active.prefill.open) return true;
+  if (legacy.armStored) {
+    return JSON.stringify(armToStorage(legacy.arm)) !== JSON.stringify(armToStorage(active.arm));
+  }
+  return false;
+}
+
+function parseScenarioRecord(record: Record<string, unknown>, now = new Date()): Scenario | null {
+  const draft: LoanDraft = {
+    price: typeof record.price === "string" ? record.price : "",
+    down: typeof record.down === "string" ? record.down : "",
+    years: typeof record.years === "string" ? record.years : "",
+    rate: typeof record.rate === "string" ? record.rate : "",
+    start: typeof record.start === "string" ? record.start : "",
+  };
+  const parsedLoan = parseLoan(draft);
+  if (!parsedLoan.ok) return null;
+  const extras = parseExtras(record.extras);
+  const prefill = parsePrefill(record.prefill);
+  const openYears = parseOpenYears(record.openYears);
+  if (!extras || !prefill || openYears === undefined) return null;
+  const { arm, armStored } = scenarioArm(record.arm, parsedLoan.loan);
+  const applied = record.applied === undefined ? null : parseExtras(record.applied);
+  return {
+    draft,
+    extras,
+    applied: new Map(applied ?? extras),
+    prefill,
+    openYears,
+    picture: pictureFromStorage(record.picture),
+    arm,
+    armStored,
+  };
+}
+
+function scenarioToStorageObject(scenario: Scenario): Record<string, unknown> {
+  return {
+    price: scenario.draft.price,
+    down: scenario.draft.down,
+    years: scenario.draft.years,
+    rate: scenario.draft.rate,
+    start: scenario.draft.start,
+    extras: [...scenario.extras.entries()],
+    applied: [...scenario.applied.entries()],
+    prefill: scenario.prefill,
+    openYears: scenario.openYears,
+    picture: scenario.picture,
+    ...(scenario.armStored ? { arm: armToStorage(scenario.arm) } : {}),
+  };
+}
+
+function parseStoredSetEnvelope(parsed: Record<string, unknown>, now = new Date()): StoredSet | null {
+  if (parsed.version === 1) {
+    const scenario = parseScenarioRecord(parsed, now);
+    if (!scenario) return null;
+    return { active: 0, scenarios: [scenario] };
+  }
+  if (parsed.version !== 2) return null;
+  if (!Array.isArray(parsed.scenarios) || parsed.scenarios.length === 0) return null;
+  const scenarios: Scenario[] = [];
+  for (const entry of parsed.scenarios) {
+    if (!entry || typeof entry !== "object") return null;
+    const scenario = parseScenarioRecord(entry as Record<string, unknown>, now);
+    if (!scenario) return null;
+    scenarios.push(scenario);
+  }
+  let active = 0;
+  if (typeof parsed.active === "number" && Number.isInteger(parsed.active)) {
+    active = parsed.active;
+  }
+  if (active < 0 || active >= scenarios.length) active = 0;
+  return { active, scenarios };
+}
+
+export function parseStoredSet(
+  text: string,
+  now = new Date(),
+): { ok: true; set: StoredSet } | { ok: false } {
+  const trimmed = text.replace(/^\uFEFF/, "");
+  if (trimmed === "") return { ok: false };
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (!parsed || typeof parsed !== "object") return { ok: false };
+    const set = parseStoredSetEnvelope(parsed as Record<string, unknown>, now);
+    if (!set) return { ok: false };
+    return { ok: true, set };
+  } catch {
+    return { ok: false };
+  }
+}
+
+function tryParseSetKey(raw: string | null, now: Date): StoredSet | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    return parseStoredSetEnvelope(parsed as Record<string, unknown>, now);
+  } catch {
+    return null;
+  }
+}
+
+function tryParseLegacyScenario(raw: string | null, now: Date): Scenario | null {
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    const record = parsed as Record<string, unknown>;
+    if (record.version !== 1) return null;
+    return parseScenarioRecord(record, now);
+  } catch {
+    return null;
+  }
+}
+
+export function loadStored(storage: StorageLike | undefined, now = new Date()): StoredSet {
+  const fallback: StoredSet = { active: 0, scenarios: [defaultScenario(now)] };
+  if (!storage) return fallback;
+  const setKey = storageSetKey(STORAGE_KEY);
+  const fromSet = tryParseSetKey(storage.getItem(setKey), now);
+  const legacyScenario = tryParseLegacyScenario(storage.getItem(STORAGE_KEY), now);
+
+  if (fromSet) {
+    if (legacyScenario) {
+      const activeScenario = fromSet.scenarios[fromSet.active];
+      if (scenariosDiffer(legacyScenario, activeScenario)) {
+        const scenarios = [...fromSet.scenarios];
+        scenarios[fromSet.active] = legacyScenario;
+        return { active: fromSet.active, scenarios };
+      }
+    }
+    return fromSet;
+  }
+
+  if (legacyScenario) {
+    return { active: 0, scenarios: [legacyScenario] };
+  }
+
+  return fallback;
+}
+
+type FullStorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
+
+function restoreKey(storage: FullStorageLike, key: string, snapshot: string | null): void {
+  if (snapshot === null) storage.removeItem(key);
+  else storage.setItem(key, snapshot);
+}
+
+export function saveStored(storage: FullStorageLike | undefined, set: StoredSet): boolean {
+  if (!storage) return true;
+  const legacyKey = STORAGE_KEY;
+  const setKey = storageSetKey(legacyKey);
+  const legacySnapshot = storage.getItem(legacyKey);
+  const setSnapshot = storage.getItem(setKey);
+  const activeScenario = set.scenarios[set.active] ?? set.scenarios[0];
+  const setPayload = JSON.stringify({
+    version: 2,
+    active: set.active,
+    scenarios: set.scenarios.map((scenario) => scenarioToStorageObject(scenario)),
+  });
+  const legacyPayload = JSON.stringify({
+    version: 1,
+    ...scenarioToStorageObject(activeScenario),
+  });
+  try {
+    storage.setItem(setKey, setPayload);
+    storage.setItem(legacyKey, legacyPayload);
+    return true;
+  } catch {
+    try {
+      restoreKey(storage, legacyKey, legacySnapshot);
+      restoreKey(storage, setKey, setSnapshot);
+    } catch {
+      // Restore failed; still report failure.
+    }
+    return false;
+  }
+}
+
+export function prevailingExtraCents(report: Report, termMonths: number): number {
+  const rows = report.schedule.slice(0, report.payoff_month);
+  const counts = new Map<number, number>();
+  for (const row of rows) {
+    const extra = row.extra_cents;
+    if (extra > 0) counts.set(extra, (counts.get(extra) ?? 0) + 1);
+  }
+  for (const [amount, count] of counts) {
+    if (count * 5 >= termMonths * 4) return amount;
+  }
+  return 0;
+}
+
+export function modalPaymentCents(report: Report): number {
+  const rows = report.schedule.slice(0, report.payoff_month);
+  const counts = new Map<number, { count: number; firstMonth: number }>();
+  for (const row of rows) {
+    const payment = report.arm ? (row.payment_cents ?? 0) : report.monthly_payment_cents;
+    const entry = counts.get(payment) ?? { count: 0, firstMonth: row.month };
+    entry.count += 1;
+    counts.set(payment, entry);
+  }
+  let bestPayment = 0;
+  let bestCount = 0;
+  let bestFirstMonth = Number.POSITIVE_INFINITY;
+  for (const [payment, { count, firstMonth }] of counts) {
+    if (count > bestCount || (count === bestCount && firstMonth < bestFirstMonth)) {
+      bestCount = count;
+      bestPayment = payment;
+      bestFirstMonth = firstMonth;
+    }
+  }
+  return bestPayment;
+}
+
+export function prevailingTotalCents(
+  modalPaymentCents: number,
+  taxCents: number,
+  insuranceCents: number,
+  fhaMipCents: number,
+  pmiCents: number,
+  prevailingExtraCents: number,
+): number {
+  return modalPaymentCents + taxCents + insuranceCents + fhaMipCents + pmiCents + prevailingExtraCents;
+}
+
+export type ScenarioFigures = {
+  modalPaymentCents: number;
+  prevailingExtraCents: number;
+  taxCents: number;
+  insuranceCents: number;
+  fhaMipCents: number;
+  pmiCents: number;
+  totalCents: number;
+};
+
+export function scenarioFigures(scenario: Scenario): ScenarioFigures | null {
+  const parsedLoan = parseLoan(scenario.draft);
+  if (!parsedLoan.ok) return null;
+  const pictureParsed = parsePicture(scenario.picture);
+  if (!pictureParsed.ok) return null;
+  const rateThousandths = Math.round(parsedLoan.loan.ratePercent * 1000);
+  const armParsed = parseArm(scenario.arm, parsedLoan.loan.years, rateThousandths);
+  const armOn = scenario.arm.enabled && armParsed.ok;
+  const reportLoan: Loan = armOn
+    ? {
+        ...parsedLoan.loan,
+        arm: { enabled: true, values: armParsed.values, index: scenario.arm.index },
+      }
+    : parsedLoan.loan;
+  const lines = buildPicture(
+    parsedLoan.loan,
+    scenario.draft.rate,
+    scenario.draft.down,
+    pictureParsed.values,
+  );
+  const prevailingReport = loanReport(
+    armOn ? reportLoan : parsedLoan.loan,
+    scenario.applied,
+    lines.financedCents,
+  );
+  const termMonths = parsedLoan.loan.years * 12;
+  const modal = modalPaymentCents(prevailingReport);
+  const extra = prevailingExtraCents(prevailingReport, termMonths);
+  const total = prevailingTotalCents(
+    modal,
+    lines.taxCents,
+    lines.insuranceCents,
+    lines.fhaMipCents,
+    lines.pmiCents,
+    extra,
+  );
+  return {
+    modalPaymentCents: modal,
+    prevailingExtraCents: extra,
+    taxCents: lines.taxCents,
+    insuranceCents: lines.insuranceCents,
+    fhaMipCents: lines.fhaMipCents,
+    pmiCents: lines.pmiCents,
+    totalCents: total,
+  };
+}
+
 export function loadScenario(storage: StorageLike | undefined, now = new Date()): Scenario {
   const fallback = defaultScenario(now);
   if (!storage) return fallback;
@@ -597,32 +943,7 @@ export function loadScenario(storage: StorageLike | undefined, now = new Date())
     if (!parsed || typeof parsed !== "object") return fallback;
     const record = parsed as Record<string, unknown>;
     if (record.version !== 1) return fallback;
-    const draft: LoanDraft = {
-      price: typeof record.price === "string" ? record.price : "",
-      down: typeof record.down === "string" ? record.down : "",
-      years: typeof record.years === "string" ? record.years : "",
-      rate: typeof record.rate === "string" ? record.rate : "",
-      start: typeof record.start === "string" ? record.start : "",
-    };
-    const parsedLoan = parseLoan(draft);
-    if (!parsedLoan.ok) return fallback;
-    const extras = parseExtras(record.extras);
-    const prefill = parsePrefill(record.prefill);
-    const openYears = parseOpenYears(record.openYears);
-    if (!extras || !prefill || openYears === undefined) return fallback;
-    const { arm, armStored } = scenarioArm(record.arm, parsedLoan.loan);
-    const applied =
-      record.applied === undefined ? null : parseExtras(record.applied);
-    return {
-      draft,
-      extras,
-      applied: new Map(applied ?? extras),
-      prefill,
-      openYears,
-      picture: pictureFromStorage(record.picture),
-      arm,
-      armStored,
-    };
+    return parseScenarioRecord(record, now) ?? fallback;
   } catch {
     return fallback;
   }

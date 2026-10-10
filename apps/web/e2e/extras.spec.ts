@@ -100,7 +100,10 @@ test("AC8 reload keeps the edited cell, the prefill, and an open 2027", async ({
   await expect(page.locator("#extra-monthly")).toHaveValue("100");
   await expect(page.locator("#extra-yearly-month")).toHaveValue("1");
 
-  await page.evaluate(() => localStorage.setItem("compound-amortization-v1", "{"));
+  await page.evaluate(() => {
+    localStorage.setItem("compound-amortization-v1", "{");
+    localStorage.removeItem("compound-amortization-v2");
+  });
   await page.reload();
   await expect(page.locator("#start")).toHaveAttribute("data-value", "2026-10");
   await expect(page.locator("#start")).toHaveText("October 2026");
