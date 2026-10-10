@@ -49,7 +49,7 @@ DoD: `node --test`, `pnpm --dir apps/web test`, and `pnpm --dir apps/web test:e2
 
 ### Build notes (Phase 0)
 
-None yet.
+No departure from the plan. `monthsSavedText` and `yearsAndMonths` are in `loan.ts`. The ARM `Extra principal paid` / `Months saved` / `Payoff date` checks sit at the end of the existing AC10 test in `arm.spec.ts`, after Index is cleared (so the worst case is back and `payoff_month` is 360), and that test then switches to `fixed` to check the note is gone.
 
 ## Phase 1 — Extra-payments form and column: alignment, sentence, blue, subtotal
 

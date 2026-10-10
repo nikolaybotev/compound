@@ -324,6 +324,19 @@ export function longDate(year: number, month: number): string {
   return `${MONTH_NAMES[month - 1]} ${year}`;
 }
 
+export function yearsAndMonths(months: number): string {
+  const years = Math.floor(months / 12);
+  const rest = months % 12;
+  const parts: string[] = [];
+  if (years > 0) parts.push(`${years} ${years === 1 ? "year" : "years"}`);
+  if (rest > 0 || years === 0) parts.push(`${rest} ${rest === 1 ? "month" : "months"}`);
+  return parts.join(" ");
+}
+
+export function monthsSavedText(months: number): string {
+  return months < 12 ? String(months) : yearsAndMonths(months);
+}
+
 export type Prefill = {
   monthly: string;
   yearly: string;
