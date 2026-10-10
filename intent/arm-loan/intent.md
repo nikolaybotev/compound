@@ -10,7 +10,7 @@
 
 ## Problem
 
-The calculator, the skill, and the page amortize one fixed note rate. The skill refuses an adjustable-rate loan outright. The owner is pricing a Lender A 7/1 ARM against a 30-year fixed, has the lender's rate terms in hand (fixed period, adjustment frequency, index, margin, 5/2/5 caps, floors, lookback), and has no way to see the worst-case payment and interest that those terms allow, or to try an index path of their own, inside the tools this repo already has.
+The calculator, the skill, and the page amortize one fixed note rate. The skill refuses an adjustable-rate loan outright. The owner is pricing a Example Credit Union 7/1 ARM against a 30-year fixed, has the lender's rate terms in hand (fixed period, adjustment frequency, index, margin, 5/2/5 caps, floors, lookback), and has no way to see the worst-case payment and interest that those terms allow, or to try an index path of their own, inside the tools this repo already has.
 
 ## Proposed outcome
 
@@ -18,7 +18,7 @@ The same calculator runs a fixed-then-adjusting ARM. With only the loan and the 
 
 ## Affected users and systems
 
-- **Users:** The owner, comparing the Lender A 7/1 ARM with a fixed loan and modeling rate paths. Anyone running the script, the skill, or the page.
+- **Users:** The owner, comparing the Example Credit Union 7/1 ARM with a fixed loan and modeling rate paths. Anyone running the script, the skill, or the page.
 - **Systems:** `amortize.js` (the pure walk), `compound_interest_monthly.js` (the CLI), `.agents/skills/mortgage-loan-calculator/SKILL.md`, `apps/web`, `README.md`, `AGENTS.md`, `REVIEW.md`. `origination_fees.js` and the fee skill are untouched. The Pages deploy is untouched.
 
 ## Constraints and principles
@@ -30,15 +30,17 @@ The same calculator runs a fixed-then-adjusting ARM. With only the loan and the 
 - The fixed-rate loan stays the default product. ARM is a mode with extra inputs. Worst case is the ARM default, not a change to the fixed-rate page.
 - Pages publishing stays as it is: content on `gh-pages`, deployed by the Actions workflow on `main`. No deploy redesign.
 - The queued UI follow-ups are a separate list and are not folded in.
-- Facts are checked before they harden, including the Lender A caps, index, margin, floors, and adjustment frequency. Spec wins over plan.
+- Facts are checked before they harden, including the Example Credit Union caps, index, margin, floors, and adjustment frequency. Spec wins over plan.
 - A question is left open only if it is truly undecidable. Otherwise the conservative option is decided and recorded.
 - Model choices named by the owner: Claude Fable for spec and plan work, Grok for spec and plan review, Claude Sonnet for the build.
 
 ## Sources
 
-- Parameter sheet: `Lender_A_7-1_ARM_Variables_ce19.pdf`, one page, titled "Lender A 7/1 ARM Variables". Its rows, verbatim: Initial Fixed Period 7 Years; Adjustment Frequency Annually; Benchmark Index 1-Year Constant Maturity Treasury (CMT); Margin 2.50%; Rate Cap Structure (Initial/Periodic/Lifetime) 5/2/5; Initial Floor Rate 2.50%; Lifetime Floor Rate 2.50%; Lookback Period 45 Days; Upfront Buy-Down Limit 5.50%.
-- ARM terms: `Lender_A_ARM_Terms_ffdb.pdf`, a 31-page printout of the Gemini chat "Understanding Lender A ARM Terms" (created 2026-10-08, published 2026-10-09). Its footer URL is `(link removed)`. Loan Officer A's reply with the terms is on pages 23–24 and is the same list as the parameter sheet, plus: "Our base closing cost fees are the same regardless of loan type. The above parameters are the same for both the 7/1 ARM and 10/1 ARM. The primary difference is the initial fixed-rate period before the first adjustment, which is 7 years for the 7/1 ARM and 10 years for the 10/1 ARM."
-- Gemini study link `(link removed)`: fetched 2026-10-10. It answered HTTP 200 and redirected to `(link removed)`, the same share the printout carries, with the page title "Gemini - Understanding Lender A ARM Terms". The conversation body is rendered by script and is not in the fetched HTML, so the printout above is the transcript used here. No separate transcript file was attached; the "ARM terms" PDF is that transcript.
+The public **Example Credit Union** 7/1 figures in this repo were read from a lender parameter sheet and a study printout; that example is invented for explanation and is not any real credit union's or lender's product.
+
+- Parameter sheet: `example_lender_7-1_ARM_Variables_ce19.pdf`, one page, titled "7/1 ARM Variables". Its rows, verbatim: Initial Fixed Period 7 Years; Adjustment Frequency Annually; Benchmark Index 1-Year Constant Maturity Treasury (CMT); Margin 2.50%; Rate Cap Structure (Initial/Periodic/Lifetime) 5/2/5; Initial Floor Rate 2.50%; Lifetime Floor Rate 2.50%; Lookback Period 45 Days; Upfront Buy-Down Limit 5.50%.
+- ARM terms study: `example_lender_ARM_Terms_ffdb.pdf`, a 31-page printout of a Gemini chat about ARM terms (created 2026-10-08, published 2026-10-09). Its footer URL is `(link removed)`. Loan Officer A's reply with the terms is on pages 23–24 and is the same list as the parameter sheet, plus: "Our base closing cost fees are the same regardless of loan type. The above parameters are the same for both the 7/1 ARM and 10/1 ARM. The primary difference is the initial fixed-rate period before the first adjustment, which is 7 years for the 7/1 ARM and 10 years for the 10/1 ARM."
+- Gemini study link `(link removed)`: fetched 2026-10-10. It answered HTTP 200 and redirected to `(link removed)`, the same share the printout carries, with the page title "Gemini - Understanding ARM Terms". The conversation body is rendered by script and is not in the fetched HTML, so the printout above is the transcript used here. No separate transcript file was attached; the "ARM terms" PDF is that transcript.
 - Standard US ARM mechanics checked on 2026-10-10 against the Fannie Mae Multistate Adjustable Rate Note and Rider for the one-year Treasury index (Forms 3501 and 3108) and the Fixed/Adjustable Rate Note for 30-day Average SOFR (`singlefamily.fanniemae.com/media/38916`), and against the CFPB Consumer Handbook on Adjustable-Rate Mortgages. The specific clauses are recorded in [spec.md](spec.md) D3–D7.
 
 ## Open questions (carried into spec.md)
@@ -72,7 +74,7 @@ The same calculator runs a fixed-then-adjusting ARM. With only the loan and the 
 
 ## Source transcript (verbatim)
 
-From the printout `Lender_A_ARM_Terms_ffdb.pdf` of the Gemini chat "Understanding Lender A ARM Terms". The ARM exchanges are pasted below as printed, with the PDF's ligature glyphs restored to letters. Pages 13 through 20, on closing costs, impounds, and homeowner's insurance, are omitted and marked. The owner's turns are quoted; Gemini's replies follow each.
+From the printout `example_lender_ARM_Terms_ffdb.pdf` of the Gemini chat "Understanding Example Credit Union ARM Terms". The ARM exchanges are pasted below as printed, with the PDF's ligature glyphs restored to letters. Pages 13 through 20, on closing costs, impounds, and homeowner's insurance, are omitted and marked. The owner's turns are quoted; Gemini's replies follow each.
 
 > What are all the raw terms of an ARM mortgage on the US market? In particular, what should I ask Loan Officer A in order to understand all the raw math and terms on their 7-1 promo ARM shown at (link removed). Here is Loan Officer A's email from yesterday again.
 
@@ -90,7 +92,7 @@ Lifetime Cap: The absolute maximum percentage points the rate can rise above the
 Floor: The absolute minimum interest rate allowable on the loan, regardless of how low the index drops.
 Lookback Period: The exact number of days prior to the rate adjustment date (usually 45 days) when the lender measures the index.
 
-Questions to Validate the Lender A ARM
+Questions to Validate the Example Credit Union ARM
 
 The rate sheet for the property establishes the zero-point par rate for the 7/1 ARM. Loan Officer A also notes a minimum floor rate. Before authorizing Person B to finalize the negotiations, ask Loan Officer A for the exact internal formulas needed to project the worst-case amortization scenarios:
 
@@ -269,7 +271,7 @@ This is the lender's retail pricing limit on the initial locked rate. The pricin
 
 Loan Officer A's email also revealed two critical structural details about your quote:
 
-The Index is CMT, not SOFR: This is the most significant takeaway. Lender A is pricing this ARM against the 1-Year Constant Maturity Treasury (CMT) index rather than the industry-standard SOFR. Because the CMT tracks 1-year Treasury yields, this explains why your loan adjusts exactly 1 time annually (a true 7/1 ARM) rather than every 6 months like modern SOFR-based ARMs.
+The Index is CMT, not SOFR: This is the most significant takeaway. Example Credit Union is pricing this ARM against the 1-Year Constant Maturity Treasury (CMT) index rather than the industry-standard SOFR. Because the CMT tracks 1-year Treasury yields, this explains why your loan adjusts exactly 1 time annually (a true 7/1 ARM) rather than every 6 months like modern SOFR-based ARMs.
 The absolute worst case follows from the par rate and the cap structure. Because Loan Officer A confirmed a 5/2/5 cap structure, the initial cap and the lifetime cap are identical. The rate can rise by that full lifetime cap on the first adjustment day at year eight, and that ceiling is permanent for the remaining 23 years of the loan.
 
 > So in my ARM variable spec sheet I need to add a Buy-Down Limit Variable
@@ -278,7 +280,7 @@ Yes, that is absolutely the correct way to model it so you don't confuse the two
 
 I have updated your spreadsheet to reflect all of Loan Officer A's answers, corrected the Initial Floor Rate to 2.50% to match the contract terms, and added a specific line item for the Upfront Buy-Down Limit at 5.500%.
 
-Lender A 7/1 ARM Variables
+Example Credit Union 7/1 ARM Variables
 
 Since you now have the exact margin (2.50%), index (1-Year CMT), and cap structure (5/2/5), you have everything mathematically required to clear the financing contingency with Person B and counter the seller on the property.
 
@@ -294,7 +296,7 @@ Monthly 1-Year CMT (Series GS1): https://fred.stlouisfed.org/series/GS1
 
 How to read the data for your loan:
 
-If you go to the Daily (DGS1) chart and see that the rate on your exact 45-day lookback date is 4.42%, Lender A will add your 2.50% fixed margin to that number. This means your new fully indexed mortgage rate would become 6.92% for that upcoming year (assuming it hasn't hit the lifetime cap or triggered a periodic cap limit).
+If you go to the Daily (DGS1) chart and see that the rate on your exact 45-day lookback date is 4.42%, Example Credit Union will add your 2.50% fixed margin to that number. This means your new fully indexed mortgage rate would become 6.92% for that upcoming year (assuming it hasn't hit the lifetime cap or triggered a periodic cap limit).
 
 > So unlike the SOFR there is no separate 30-day running average chart for the CMT?
 
@@ -308,6 +310,6 @@ Instead of a 30-day average, standard Fannie Mae and Freddie Mac CMT ARM contrac
 
 How the 45-Day Lookback usually works for a CMT ARM:
 
-When you reach your adjustment window in year eight, Lender A will count exactly 45 days backward from your adjustment date. They will then pull the most recent Weekly Average CMT published by the Federal Reserve prior to that exact lookback day. They add your 2.50% margin to that single weekly average, and that sum becomes your newly locked rate for the next 12 months.
+When you reach your adjustment window in year eight, Example Credit Union will count exactly 45 days backward from your adjustment date. They will then pull the most recent Weekly Average CMT published by the Federal Reserve prior to that exact lookback day. They add your 2.50% margin to that single weekly average, and that sum becomes your newly locked rate for the next 12 months.
 
 Before signing the final closing disclosures for the property, simply have Loan Officer A confirm whether your specific promissory note dictates the use of the Daily reading or the standard Weekly average for the index measurement.
