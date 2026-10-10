@@ -732,3 +732,75 @@ test('arm-loan --index CSV rules mirror --extra', () => {
     assert.equal(report.arm.adjustments[0].rate_percent, 2.5);
   });
 });
+
+test('arm-loan AC7 the skill lifts the ARM refusal and states the ARM rules', () => {
+  const skillPath = path.join(__dirname, '.agents', 'skills', 'mortgage-loan-calculator', 'SKILL.md');
+  const skill = fs.readFileSync(skillPath, 'utf8').replace(/[ \t]*\n[ \t]*(?=[a-z(])/g, ' ');
+  const phrases = [
+    'fixed-then-adjusting',
+    'worst-case payment and interest',
+    'a given index path',
+    'interest-only, payment-option, or negative-amortization',
+    'the fixed period, the adjustment interval, the margin, the initial, periodic, and lifetime caps, and the lifetime floor',
+    'The first-adjustment floor is optional',
+    'uses the lifetime floor',
+    'The index name and the lookback period are not required',
+    'does not fetch a value',
+    'the run is the worst case',
+    '`month,index` CSV',
+    'only at adjustment months',
+    '"The first adjustment" is month `F + 1`',
+    '"Year k" of the loan is payment `(k - 1) * 12 + 1`',
+    'On a 10/1, "year 8" is month 85, which is inside the fixed period, and the first adjustment is month 121',
+    'ask the user which adjustment they mean',
+    'Do not slide it to `F + 1`',
+    '"Every adjustment" is one row for each adjustment month through the term',
+    '`rate - margin`',
+    'the only arithmetic this skill does',
+    'ask for the index instead and do not write a negative row',
+    '`arm.max_rate_percent`',
+    '`arm.max_payment_cents`',
+    '`arm.max_payment_month`',
+    '`arm.adjustments`',
+    'A recast question on an ARM is declined in one sentence',
+    'already re-amortizes at each reset',
+    'Never pass `--round-eighth` unless the user says the note rounds to an eighth',
+    'Do not pass `--initial-floor` unless the user gave a first-adjustment floor',
+    '--caps INITIAL/PERIODIC/LIFETIME',
+  ];
+  for (const phrase of phrases) {
+    assert.ok(skill.includes(phrase), `missing: ${phrase}`);
+  }
+  assert.doesNotMatch(skill, /does not cover adjustable/);
+  assert.doesNotMatch(skill, /adjustable-rate or interest-only loan, say/);
+  const refusal = skill.slice(skill.indexOf('## Loans this calculator will not run'), skill.indexOf('## Run the script'));
+  assert.match(refusal, /interest-only, payment-option, or negative-amortization/);
+  assert.doesNotMatch(refusal, /adjustable/);
+});
+
+test('arm-loan AC7 REVIEW.md, AGENTS.md, and README.md carry the ARM items', () => {
+  const review = fs.readFileSync(path.join(__dirname, 'REVIEW.md'), 'utf8');
+  assert.match(review, /intent\/arm-loan\//);
+  assert.match(review, /requirement 18/);
+  assert.match(review, /initial cap instead of|periodic cap instead of the initial cap/);
+  assert.match(review, /`--index` file/);
+  const agents = fs.readFileSync(path.join(__dirname, 'AGENTS.md'), 'utf8');
+  assert.equal(agents.split('buildReport(principal, ratePercent, monthCount, extrasByMonth, yearsForJson, arm)').length - 1, 2);
+  assert.equal(agents.includes('buildReport(principal, ratePercent, monthCount, extrasByMonth, yearsForJson)'), false);
+  assert.match(agents, /Highest payment: 5,037\.71 \(from month 85\)/);
+  assert.match(agents, /`5\.875`, `6\.92`/);
+  const readme = fs.readFileSync(path.join(__dirname, 'README.md'), 'utf8');
+  for (const flag of ['--fixed-years', '--fixed-months', '--adjust-months', '--margin', '--caps', '--floor', '--initial-floor', '--round-eighth', '--index']) {
+    assert.ok(readme.includes(flag), `README missing ${flag}`);
+  }
+  assert.ok(readme.includes('month,index'));
+  assert.ok(readme.includes('month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved,rate,payment,index'));
+});
+
+test('arm-loan the skill symlink still resolves to the calculator', () => {
+  const skillDir = path.join(__dirname, '.agents', 'skills', 'mortgage-loan-calculator');
+  assert.equal(
+    fs.realpathSync(path.join(skillDir, 'scripts', 'compound_interest_monthly.js')),
+    fs.realpathSync(script),
+  );
+});
