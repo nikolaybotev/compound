@@ -74,3 +74,4 @@ DoD: AC4, AC5.
 
 - First PR preview creates branch `pages-feat` with an empty `feat/` tree aside from the first preview folder.
 - Departure (2026-10-10): dropped dispatch of `deploy-pages.yml` from feature jobs. Feat publish mirrors the live site instead of rebuilding production (D4, D9).
+- Departure (2026-10-10): `deploy-feature-preview.yml` treats `createWorkflowDispatch` 404 as success with a log line until `deploy-feat-pages.yml` is on `main`; other dispatch errors still fail the job.
