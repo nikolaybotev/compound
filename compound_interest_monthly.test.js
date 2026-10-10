@@ -2,6 +2,7 @@
 
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -475,4 +476,259 @@ test('loan-recast AC6 skill recast procedure and term flags', () => {
   }
   assert.match(skill, /G5/);
   assert.match(skill, /G6/);
+});
+
+const indexFixture = path.join(__dirname, 'fixtures', 'index-4.42-first-reset.csv');
+const feArgs = [
+  '--amount', '570000', '--rate', '5.875', '--years', '30',
+  '--fixed-years', '7', '--adjust-months', '12',
+  '--margin', '2.5', '--caps', '5/2/5', '--floor', '2.5',
+];
+
+function feWith(flag, value) {
+  const copy = [...feArgs];
+  const at = copy.indexOf(flag);
+  if (at === -1) return [...copy, flag, value];
+  copy[at + 1] = value;
+  return copy;
+}
+
+function sha256(text) {
+  return crypto.createHash('sha256').update(text).digest('hex');
+}
+
+function failure(args) {
+  const result = run(args);
+  assert.notEqual(result.status, 0, `expected failure for ${args.join(' ')}`);
+  assert.equal(result.stdout, '');
+  return result.stderr;
+}
+
+test('arm-loan AC1 the fixed-rate summary, JSON, and CSV are byte-identical', () => {
+  const base = ['--amount', '570000', '--rate', '7', '--years', '30'];
+  const summary = run(base);
+  assert.equal(summary.status, 0);
+  assert.equal(summary.stdout, [
+    'Monthly payment: 3,792.22',
+    'Payoff month: 360',
+    'Total interest: 795,200.72',
+    'Extra applied: 0.00',
+    'Extra unapplied: 0.00',
+    'Interest saved: 0.00',
+    'Months saved: 0',
+    '',
+  ].join('\n'));
+  assert.equal(sha256(summary.stdout), 'adc8f5d8b2e6695d469ad69923bc4ef46ef2b4677a58c89fc57fd02c8d540ad5');
+
+  const csv = run([...base, '--schedule']);
+  assert.equal(csv.status, 0);
+  assert.equal(csv.stdout.split('\n')[0],
+    'month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved');
+  assert.equal(sha256(csv.stdout), 'd3129f7e97827934a05d350a599c3b375c2296a604ca0ec076ff2c3920cea620');
+
+  const json = run([...base, '--json', '--schedule']);
+  assert.equal(json.status, 0);
+  assert.equal(sha256(json.stdout), '8a214dc5815a70c16721113f23c186b90340d7ec633c017209f1915860819292');
+  const parsed = JSON.parse(json.stdout);
+  assert.equal('arm' in parsed, false);
+  assert.equal('rate_percent' in parsed.schedule[0], false);
+});
+
+test('arm-loan AC6 the FE summary ends with the four ARM lines', () => {
+  const result = run(feArgs);
+  assert.equal(result.status, 0, result.stderr);
+  const lines = result.stdout.trimEnd().split('\n');
+  assert.equal(lines.length, 11);
+  assert.equal(lines[0], 'Monthly payment: 3,371.77');
+  assert.deepEqual(lines.slice(-4), [
+    'Initial rate: 5.875%',
+    'Highest rate: 10.875% (from month 85)',
+    'Highest payment: 5,037.71 (from month 85)',
+    'Adjustments: 23',
+  ]);
+});
+
+test('arm-loan AC6 --json reports the arm object and --schedule rows', () => {
+  const report = jsonRun([...feArgs, '--json']);
+  assert.equal(report.arm.adjustments.length, 23);
+  assert.equal(report.arm.max_payment_cents, 503771);
+  assert.equal(report.interest_cents, 110363633);
+  assert.equal(report.rate_percent, 5.875);
+  assert.equal(report.monthly_payment_cents, 337177);
+  assert.equal('schedule' in report, false);
+
+  const withSchedule = jsonRun([...feArgs, '--json', '--schedule']);
+  const row85 = scheduleRow(withSchedule.schedule, 85);
+  assert.equal(row85.rate_percent, 10.875);
+  assert.equal(row85.payment_cents, 503771);
+  assert.equal(row85.index_percent, null);
+  assert.equal(scheduleRow(withSchedule.schedule, 84).rate_percent, 5.875);
+});
+
+test('arm-loan AC6 --schedule prints the ten-column header and formatted columns', () => {
+  const result = run([...feArgs, '--schedule']);
+  assert.equal(result.status, 0, result.stderr);
+  const lines = result.stdout.trimEnd().split('\n');
+  assert.equal(lines.length, 361);
+  assert.equal(lines[0],
+    'month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved,rate,payment,index');
+  assert.equal(lines[84], '84,2500.14,871.62,509796.12,880611.93,0.00,0.00,5.875,3371.77,');
+  assert.equal(lines[85], '85,4620.03,417.68,509378.44,875991.90,0.00,0.00,10.875,5037.71,');
+
+  const indexed = run([...feArgs, '--index', indexFixture, '--schedule']);
+  assert.equal(indexed.status, 0, indexed.stderr);
+  const row = indexed.stdout.trimEnd().split('\n')[85];
+  assert.match(row, /,6\.92,3695\.72,4\.42$/);
+});
+
+test('arm-loan AC6 the index fixture reproduces F5', () => {
+  assert.equal(fs.readFileSync(indexFixture, 'utf8'), 'month,index\n85,4.42\n');
+  const report = jsonRun([...feArgs, '--index', indexFixture, '--json']);
+  assert.equal(report.arm.adjustments[0].rate_percent, 6.92);
+  assert.equal(report.arm.adjustments[0].payment_cents, 369572);
+  assert.equal(report.arm.adjustments[0].index_percent, 4.42);
+  assert.equal(report.interest_cents, 106408179);
+});
+
+test('arm-loan --fixed-months, --round-eighth, --initial-floor, and extras reach the walk', () => {
+  const tenOne = jsonRun([
+    '--amount', '570000', '--rate', '5.875', '--years', '30',
+    '--fixed-months', '120', '--adjust-months', '12', '--margin', '2.5',
+    '--caps', '5/2/5', '--floor', '2.5', '--json',
+  ]);
+  assert.equal(tenOne.arm.adjustments[0].month, 121);
+  assert.equal(tenOne.interest_cents, 100262267);
+
+  const rounded = jsonRun([...feArgs, '--index', indexFixture, '--round-eighth', '--json']);
+  assert.equal(rounded.arm.round_eighth, true);
+  assert.equal(rounded.arm.adjustments[0].rate_percent, 6.875);
+  assert.equal(rounded.interest_cents, 106345915);
+
+  const floor = jsonRun([...feArgs, '--initial-floor', '3', '--json']);
+  assert.equal(floor.arm.initial_floor_percent, 3);
+  assert.equal(floor.arm.floor_percent, 2.5);
+
+  const extra = jsonRun([...feArgs, '--extra', firstYear, '--json']);
+  assert.equal(extra.interest_saved_cents, 357936);
+  assert.equal(extra.months_saved, 0);
+  assert.equal(extra.arm.adjustments[0].payment_cents, 502039);
+
+  const zeroCaps = jsonRun([...feWith('--floor', '5.875').map((v, i, a) => (a[i - 1] === '--caps' ? '0/0/0' : a[i - 1] === '--margin' ? '0' : v)), '--json']);
+  assert.equal(zeroCaps.arm.ceiling_percent, 5.875);
+  assert.equal(zeroCaps.arm.max_rate_percent, 5.875);
+});
+
+test('arm-loan AC6 conflicting and missing ARM flags exit non-zero and name the flags', () => {
+  const base = ['--amount', '570000', '--rate', '5.875', '--years', '30'];
+  const both = failure([...feArgs, '--fixed-months', '84']);
+  assert.match(both, /--fixed-years/);
+  assert.match(both, /--fixed-months/);
+
+  const noCaps = failure([...base, '--fixed-years', '7']);
+  assert.match(noCaps, /--adjust-months/);
+  assert.match(noCaps, /--margin/);
+  assert.match(noCaps, /--caps/);
+  assert.match(noCaps, /--floor/);
+
+  const missingFixed = failure([
+    ...base, '--adjust-months', '12', '--margin', '2.5', '--caps', '5/2/5', '--floor', '2.5',
+  ]);
+  assert.match(missingFixed, /--fixed-years or --fixed-months/);
+
+  for (const flags of [
+    ['--index', indexFixture],
+    ['--initial-floor', '2.5'],
+    ['--round-eighth'],
+  ]) {
+    const message = failure([...base, ...flags]);
+    assert.match(message, /missing required ARM argument/);
+    assert.match(message, /--caps/);
+  }
+});
+
+test('arm-loan AC5 the CLI prints the library message for a rejected term', () => {
+  const fixedEqualsTerm = failure(feWith('--fixed-years', '30'));
+  assert.match(fixedEqualsTerm, /^ARM fixed period \(fixedMonths\) must be at least 1 month and shorter than the 360-month term\n$/);
+
+  const floorAbove = failure(feWith('--floor', '11'));
+  assert.match(floorAbove, /^ARM lifetime floor \(floorThousandths\) must not be above the ceiling/);
+
+  const floorZero = failure(feWith('--floor', '0'));
+  assert.match(floorZero, /^ARM lifetime floor \(floorThousandths\) must be greater than zero\n$/);
+
+  withCsv('month,index\n86,4.42\n', (file) => {
+    const message = failure([...feArgs, '--index', file]);
+    assert.equal(message, 'ARM index month 86 is not an adjustment month\n');
+  });
+  withCsv('month,index\n84,4.42\n', (file) => {
+    assert.match(failure([...feArgs, '--index', file]), /month 84 is not an adjustment month/);
+  });
+  withCsv('month,index\n361,4.42\n', (file) => {
+    assert.match(failure([...feArgs, '--index', file]), /month 361 is not an adjustment month/);
+  });
+});
+
+test('arm-loan AC5 the CLI rejects a duplicate index month and a negative cap at parse time', () => {
+  withCsv('month,index\n85,4.42\n85,4.00\n', (file) => {
+    const message = failure([...feArgs, '--index', file]);
+    assert.match(message, /invalid --index: month 85 on row 3 is a duplicate/);
+  });
+  const caps = failure(feWith('--caps', '5/-2/5'));
+  assert.match(caps, /invalid --caps/);
+  assert.match(failure(feWith('--caps', '5/2')), /invalid --caps/);
+  assert.match(failure(feWith('--caps', '5/2/5/1')), /invalid --caps/);
+});
+
+test('arm-loan ARM flag grammar', () => {
+  const base = ['--amount', '570000', '--rate', '5.875', '--years', '30'];
+  const arm = ['--fixed-years', '7', '--adjust-months', '12', '--margin', '2.5', '--caps', '5/2/5', '--floor', '2.5'];
+  function swap(flag, value) {
+    const copy = [...arm];
+    copy[copy.indexOf(flag) + 1] = value;
+    return [...base, ...copy];
+  }
+  assert.match(failure(swap('--margin', '2.5001')), /invalid --margin/);
+  assert.match(failure(swap('--margin', '-1')), /missing value for --margin|invalid --margin/);
+  assert.match(failure(swap('--margin', 'abc')), /invalid --margin/);
+  assert.match(failure(swap('--floor', '2.5001')), /invalid --floor/);
+  assert.match(failure(swap('--fixed-years', '0')), /invalid --fixed-years/);
+  assert.match(failure(swap('--fixed-years', '7.5')), /invalid --fixed-years/);
+  assert.match(failure(swap('--adjust-months', '0')), /invalid --adjust-months/);
+  assert.match(failure(swap('--caps', '5/2/5x')), /invalid --caps/);
+  assert.match(failure([...base, ...arm, '--initial-floor', 'x']), /invalid --initial-floor/);
+  assert.match(failure([...base, ...arm, '--round-eighth', '--round-eighth']), /duplicate argument: --round-eighth/);
+  assert.match(failure([...base, ...arm, '--index', '/nonexistent/index.csv']), /cannot read --index file: ENOENT/);
+  const zero = run(swap('--margin', '0'));
+  assert.equal(zero.status, 0, zero.stderr);
+  assert.match(failure(swap('--fixed-years', '30')), /fixed period/);
+});
+
+test('arm-loan --index CSV rules mirror --extra', () => {
+  withCsv('month,rate\n85,4.42\n', (file) => {
+    assert.match(failure([...feArgs, '--index', file]), /header must be month,index/);
+  });
+  withCsv('month,index\n85\n', (file) => {
+    assert.match(failure([...feArgs, '--index', file]), /must have columns month and index/);
+  });
+  withCsv('month,index\n85,-1\n', (file) => {
+    assert.match(failure([...feArgs, '--index', file]), /invalid --index: index on row 2/);
+  });
+  withCsv('month,index\n85,4.4201\n', (file) => {
+    assert.match(failure([...feArgs, '--index', file]), /invalid --index: index on row 2/);
+  });
+  withCsv('month,index\n\n85,4.42\n', (file) => {
+    assert.match(failure([...feArgs, '--index', file]), /row 2 is empty/);
+  });
+  withCsv('\ufeffmonth,index\r\n85,4.42\r\n', (file) => {
+    const report = jsonRun([...feArgs, '--index', file, '--json']);
+    assert.equal(report.interest_cents, 106408179);
+  });
+  withCsv('month,index\n', (file) => {
+    const report = jsonRun([...feArgs, '--index', file, '--json']);
+    assert.equal(report.interest_cents, 110363633);
+  });
+  withCsv('month,index\n85,0\n', (file) => {
+    const report = jsonRun([...feArgs, '--index', file, '--json']);
+    assert.equal(report.arm.adjustments[0].rate_percent, 2.5);
+  });
 });

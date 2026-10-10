@@ -1,6 +1,6 @@
 # compound
 
-A zero-dependency Node.js calculator for a fixed-rate, fully amortizing mortgage. It reports the scheduled monthly payment, the interest the loan costs, and, when asked, a month-by-month schedule.
+A zero-dependency Node.js calculator for a fixed-rate, fully amortizing mortgage, or a fixed-then-adjusting ARM. It reports the scheduled monthly payment, the interest the loan costs, and, when asked, a month-by-month schedule.
 
 This code was [first published as a GitHub Gist](https://gist.github.com/nikolaybotev/29154383c238a5958352edee512ce787) (August 2022, same `compound_interest_monthly.js` file).
 
@@ -52,6 +52,44 @@ The extra is applied after that month's interest, so it does not reduce the inte
 node compound_interest_monthly.js --amount 570000 --rate 7 --years 30 \
   --extra fixtures/first-year-100.csv --json
 ```
+
+## Adjustable-rate
+
+A fixed-then-adjusting ARM is the same walk with resets. Give any ARM flag and the others it needs, and the calculator treats `--rate` as the initial rate:
+
+```bash
+node compound_interest_monthly.js \
+  --amount 570000 --rate 5.875 --years 30 \
+  --fixed-years 7 --adjust-months 12 \
+  --margin 2.5 --caps 5/2/5 --floor 2.5
+```
+
+That loan (First Entertainment's 7/1 sheet) pays $3,371.77 for 84 months, resets to 10.875% at payment 85 with a payment of $5,037.71, and costs $1,103,636.33 of interest. The summary appends `Initial rate`, `Highest rate`, `Highest payment`, and `Adjustments`.
+
+| Flag | Meaning |
+|---|---|
+| `--fixed-years N` or `--fixed-months N` | Payments at the initial rate (`^[1-9]\d*$`). Exactly one is required, and the fixed period must be shorter than the term. |
+| `--adjust-months N` | Months between resets (`^[1-9]\d*$`). The first reset is payment `F + 1`, then every `N` payments. |
+| `--margin P` | Added to the index at a reset. A percent, `^\d+(?:\.\d{1,3})?$`; `0` is allowed. |
+| `--caps I/P/L` | Initial, periodic, and lifetime caps in points, each `0` or more. The ceiling is `--rate` plus the lifetime cap. |
+| `--floor P` | Lifetime floor, greater than zero and not above the ceiling. |
+| `--initial-floor P` | Floor at the first reset. Defaults to `--floor`. |
+| `--round-eighth` | Round index plus margin to the nearest 0.125 point before the caps and floors. Off by default. |
+| `--index FILE` | A `month,index` CSV. |
+
+`--amount`, `--rate`, a term, one fixed flag, `--adjust-months`, `--margin`, `--caps`, and `--floor` are required in ARM mode. A missing flag exits non-zero and names every missing flag. `--index`, `--initial-floor`, or `--round-eighth` without the required flags is the same error. Without any ARM flag nothing changes: the fixed-rate output is byte for byte what it was.
+
+**Worst case.** With no index, the first reset moves the rate up by the initial cap and every later reset moves it up by the periodic cap, each time stopping at the ceiling. On 5/2/5 from 5.875% the first reset is 10.875% and every later reset stays there. On 2/2/5 the resets are 7.875%, 9.875%, 10.875%.
+
+**Index.** `--index` takes a UTF-8 CSV with the header `month,index`. `month` is a payment number that must be a reset month; any other month exits non-zero and says it is not an adjustment month. `index` is a percent with at most three decimals, zero allowed. A duplicate month exits non-zero. The BOM, blank-line, and column-count rules are the same as `--extra`. At a reset with an index, the target rate is the index plus the margin (rounded to an eighth with `--round-eighth`). The new rate is that target held between the lower bound and the upper bound: the upper bound is the previous rate plus the cap (initial at the first reset, periodic after) and never above the ceiling; the lower bound is the first-adjustment floor at the first reset, and after that the larger of the previous rate minus the periodic cap and the lifetime floor. A reset with no index takes the upper bound. `fixtures/index-4.42-first-reset.csv` is `85,4.42`; with it the first reset is 6.92% and the payment is $3,695.72, and the total interest is $1,064,081.79.
+
+**Reset payment.** At each reset the payment becomes the level payment that amortizes the actual unpaid balance, including any extra principal already paid, at the new rate over the payments left to maturity. Extra principal therefore lowers the next reset payment rather than shortening the loan: $100 in each of the first 12 payments saves $3,579.36 on this ARM and 0 months.
+
+`--json` adds `arm`: `fixed_months`, `adjust_months`, `margin_percent`, `initial_cap_percent`, `periodic_cap_percent`, `lifetime_cap_percent`, `floor_percent`, `initial_floor_percent`, `ceiling_percent`, `round_eighth`, `max_rate_percent`, `max_rate_month`, `max_payment_cents`, `max_payment_month`, and `adjustments` (`month`, `index_percent`, `fully_indexed_percent`, `rate_percent`, `payment_cents` for every reset through the payoff month). `monthly_payment_cents` and `rate_percent` stay the initial payment and the initial rate. With `--schedule`, each row also has `rate_percent`, `payment_cents`, and `index_percent`.
+
+`--schedule` alone prints a ten-column CSV: `month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved,rate,payment,index`. Money columns have two decimals and no grouping. `rate` and `index` print as percents with trailing zeros removed (`5.875`, `6.92`), and `index` is empty when none was given.
+
+The design is [intent/arm-loan/](intent/arm-loan/intent.md). An ARM is not covered by `origination_fees.js` or by the recast procedure.
 
 ## Origination fees
 
