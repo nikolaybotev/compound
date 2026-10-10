@@ -8,6 +8,8 @@ There are no npm dependencies; only the Node.js runtime is required.
 
 A skill at [`.agents/skills/mortgage-loan-calculator/SKILL.md`](.agents/skills/mortgage-loan-calculator/SKILL.md) asks for a missing principal, note rate, term, or extra plan, writes a `month,extra` CSV, and answers from this script. Term in months and fixed-rate recast are specified in [intent/loan-recast/](intent/loan-recast/intent.md). The first release design is [intent/mortgage-skill/](intent/mortgage-skill/intent.md). A second skill, [`.agents/skills/mortgage-origination-fees/SKILL.md`](.agents/skills/mortgage-origination-fees/SKILL.md), reports the prepaid finance charge implied by a note rate and an APR. Its design is [intent/origination-fees/](intent/origination-fees/intent.md).
 
+A third skill, [`.agents/skills/arm-loan-concepts/SKILL.md`](.agents/skills/arm-loan-concepts/SKILL.md), explains how a fixed-then-adjusting ARM's rate adjusts at change dates. It produces no payment, rate, or index value and runs nothing. Its design is [intent/arm-concepts/](intent/arm-concepts/).
+
 A local amortization page on the same calculator is [apps/web](apps/web). Its design is [intent/amortization-app/](intent/amortization-app/intent.md). From this directory, `pnpm --dir apps/web dev` serves it, `pnpm --dir apps/web build` writes a static `apps/web/dist` (Vite base `./` unless `VITE_BASE` is set), and `pnpm --dir apps/web preview` serves that build. The page calls `buildReport` in `amortize.js`. The published page is [https://nikolaybotev.github.io/compound/](https://nikolaybotev.github.io/compound/). A push to `main` publishes it; `gh workflow run deploy-pages.yml` publishes it again. That build sets `VITE_BASE=/compound/` and does not run on a schedule.
 
 ## Requirements
