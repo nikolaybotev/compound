@@ -44,7 +44,8 @@ export const MONTH_NAMES = [
   "December",
 ] as const;
 
-export const STORAGE_KEY = "compound-amortization-v1";
+export const STORAGE_KEY =
+  import.meta.env.VITE_STORAGE_KEY ?? "compound-amortization-v1";
 
 export type LoanDraft = {
   price: string;

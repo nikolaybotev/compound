@@ -10,6 +10,11 @@ name: deploy-pages
 # github-pages environment stays limited to main; this workflow does not
 # widen it. If the prototype ref cannot be checked out, the prototype build
 # uses the main tree and the production upload still happens.
+#
+# Pull-request previews live under feat/<number>/ on branch pages-feat.
+# deploy-feature-preview.yml writes that branch and dispatches this
+# workflow on main. This job merges pages-feat/feat into the artifact
+# before upload. Feature jobs never call deploy-pages directly.
 on:
   push:
     branches: [main]
@@ -109,6 +114,21 @@ jobs:
           if grep -q '/compound/prototype/' site/index.html; then
             echo "production index references /compound/prototype/" >&2
             exit 1
+          fi
+
+      - name: Check out pages-feat previews
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: pages-feat
+          path: pages-feat
+
+      - name: Merge feat previews into site
+        run: |
+          set -euo pipefail
+          if [ -d pages-feat/feat ]; then
+            mkdir -p site/feat
+            cp -a pages-feat/feat/. site/feat/
           fi
 
       - name: Upload Pages artifact

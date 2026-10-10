@@ -1,0 +1,108 @@
+name: deploy-feature-preview
+
+# Publishes PR previews under /compound/feat/<number>/ without touching the
+# github-pages environment. Built files live on branch pages-feat; this job
+# dispatches deploy-pages.yml on main to merge feat/ into the live artifact.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: feature-preview-pages
+  cancel-in-progress: false
+
+jobs:
+  preview:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pull request
+        if: github.event.action != 'closed'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up pnpm
+        if: github.event.action != 'closed'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.6.0
+
+      - name: Set up Node.js 24
+        if: github.event.action != 'closed'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        if: github.event.action != 'closed'
+        run: pnpm install --frozen-lockfile
+
+      - name: Build feature preview
+        if: github.event.action != 'closed'
+        env:
+          VITE_BASE: /compound/feat/${{ github.event.pull_request.number }}/
+          VITE_STORAGE_KEY: compound-amortization-feat-preview-v1
+        run: pnpm --dir apps/web build
+
+      - name: Update pages-feat branch
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          REPO="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          STORE="${RUNNER_TEMP}/pages-feat-store"
+          rm -rf "$STORE"
+          mkdir -p "$STORE"
+          git -C "$STORE" init
+          git -C "$STORE" config user.name "github-actions[bot]"
+          git -C "$STORE" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git -C "$STORE" ls-remote --exit-code "$REPO" refs/heads/pages-feat; then
+            git -C "$STORE" remote add origin "$REPO"
+            git -C "$STORE" fetch origin pages-feat --depth 1
+            git -C "$STORE" checkout -B pages-feat FETCH_HEAD
+          else
+            git -C "$STORE" checkout -B pages-feat
+            git -C "$STORE" remote add origin "$REPO"
+            mkdir -p "$STORE/feat"
+          fi
+
+          if [ "${{ github.event.action }}" = "closed" ]; then
+            rm -rf "$STORE/feat/${PR_NUMBER}"
+          else
+            mkdir -p "$STORE/feat/${PR_NUMBER}"
+            rm -rf "$STORE/feat/${PR_NUMBER}"
+            cp -a "${GITHUB_WORKSPACE}/apps/web/dist/." "$STORE/feat/${PR_NUMBER}/"
+            test -f "$STORE/feat/${PR_NUMBER}/index.html"
+            grep -q "/compound/feat/${PR_NUMBER}/" "$STORE/feat/${PR_NUMBER}/index.html"
+          fi
+
+          git -C "$STORE" add -A
+          if git -C "$STORE" diff --staged --quiet; then
+            echo "pages-feat unchanged"
+          else
+            if [ "${{ github.event.action }}" = "closed" ]; then
+              git -C "$STORE" commit -m "Remove feat preview for PR #${PR_NUMBER}"
+            else
+              git -C "$STORE" commit -m "Update feat preview for PR #${PR_NUMBER}"
+            fi
+            git -C "$STORE" push origin pages-feat
+          fi
+
+      - name: Refresh GitHub Pages
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: "deploy-pages.yml",
+              ref: "main",
+            });
