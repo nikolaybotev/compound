@@ -15,7 +15,7 @@ The amortization page keeps one loan. Every edit is written to a single localSto
 
 ## Proposed outcome
 
-The page stores more than one loan scenario and switches the one being edited from a list at the top. The list can add a scenario and, after a confirmation, remove one. The saved set can be exported as one JSON file and replaced by an import. Each scenario has a prevailing monthly total: the principal-and-interest payment that is in effect for the most months, plus the picture's taxes, home insurance, and PMI or MIP, plus a prevailing extra when the same applied extra covers at least 80 percent of the schedule. The heading shows that total. A color bar beside the amount splits it into principal and interest, taxes and insurance, and the prevailing extra. The schedule shows the prevailing extra next to each month's principal and interest, and the per-month extra column stays.
+The page stores more than one loan scenario and switches the one being edited from a list at the top. The list can add a scenario and, after a confirmation, remove one. The saved set can be exported as one JSON file and replaced by an import. Each scenario has a prevailing monthly total: the principal-and-interest payment that is in effect for the most months, plus the picture's taxes, home insurance, and PMI or MIP, plus a prevailing extra when the same applied extra covers at least 80 percent of the term's months. The heading shows that total. A color bar beside the amount splits it into principal and interest, taxes and insurance, and the prevailing extra. The schedule shows the prevailing extra next to each month's principal and interest, and the per-month extra column stays.
 
 ## Affected users and systems
 
@@ -26,10 +26,10 @@ The page stores more than one loan scenario and switches the one being edited fr
 
 - More than one scenario is stored. A control at the top switches the scenario being edited. The current single localStorage object under `compound-amortization-v1` still loads: it becomes the first scenario. Do not wipe a saved loan. Production and the prototype share that key. The published prototype only reads version 1, so the version-1 value stays the active scenario in the old shape, and the rest of the set is stored beside it where a version-1 reader cannot overwrite it.
 - Export writes every scenario as one JSON file. Import replaces the saved set with that file after the same validation a load uses. A bad file does not discard the current set.
-- Prevailing extra is the positive extra amount that is identical on at least 80 percent of the schedule months. Otherwise it is $0. Requested extras that were not applied do not count. Use the applied extra for each month.
+- Prevailing extra is the positive extra amount that is identical on at least 80 percent of the term's month count. Otherwise it is $0. A one-month lump that pays the loan off does not qualify. Requested extras that were not applied do not count. Use the applied extra for each month.
 - Principal and interest in the prevailing total is the principal-and-interest payment in effect for the greatest number of schedule months. A tie uses the earlier month. Taxes, home insurance, and PMI or MIP are the monthly picture amounts, 0 when that charge is 0. The prevailing monthly total is those parts plus the prevailing extra.
 - The heading shows that prevailing total. The schedule shows the prevailing extra with the monthly principal and interest. The existing per-month extra column stays.
-- The list label is the prevailing total, then a hyphen, then price in thousands, down payment percent, term, and fixed or the ARM structure (`7/1` and the like).
+- The list label is the prevailing total, then a hyphen, then price in thousands, down payment percent, the note rate, the parsed term, and fixed or the ARM structure (`7/1` and the like). The note rate is included because the heading's editable fields include it.
 - The page still calls `buildReport`. No second amortization formula. ARM math stays as specified.
 - The list has a + control that starts a new scenario, and each row has a trash icon, shown on hover, that removes that scenario after confirmation. The last remaining scenario is not removed.
 - Next to the prevailing monthly amount, a color bar splits into PI, TI, and PE by their shares of the total. A zero portion takes no width.
@@ -38,7 +38,7 @@ The page stores more than one loan scenario and switches the one being edited fr
 
 ## Open questions (carried into spec.md)
 
-None. The choices made while drafting are D1–D16 in [spec.md](spec.md).
+None. The choices made while drafting are D1–D18 in [spec.md](spec.md).
 
 ## Original prompt (verbatim)
 
