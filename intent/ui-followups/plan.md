@@ -102,4 +102,8 @@ DoD: `node --test`, `pnpm --dir apps/web test`, and `pnpm --dir apps/web test:e2
 
 ### Build notes (Phase 3)
 
-None yet.
+The e2e specs share one helper, `apps/web/e2e/start-month.ts` (`setStartMonth(page, year, month)`), instead of a step copied into each spec; it steps the year and clicks the month button, then asserts `data-value`. `arm.spec.ts` never filled `#start`, so it is unchanged. `SHORT_MONTHS` is exported from `loan.ts` for the picker.
+
+Per the owner's instruction for this phase, the app version is set here: `apps/web/package.json` `0.7.0` and `PAGES_POINT_VERSION: "0.7"` in `publish-gh-pages-production.yml` (with that file's comment). That is the one workflow edit in the release, so AC11's "`.github/workflows/` has no diff" holds for Phases 0-2 and has this single exception in Phase 3. Feature publishes are not tagged.
+
+Not done in this environment, and still needed from the owner: the two Safari screenshots (AC12: the form with `March` selected, the open picker) and the production check (AC13) after the publish runs.

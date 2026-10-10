@@ -1,4 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { setStartMonth } from "./start-month";
 import { buildReport, formatGroupedCents } from "../../../amortize.js";
 
 const origin = "http://127.0.0.1:4173";
@@ -134,7 +135,7 @@ test("AC6 a saved version-1 loan keeps its payment and shows thousands", async (
 
 async function openExample(page: Page) {
   await page.goto("/");
-  await page.locator("#start").fill("2026-10");
+  await setStartMonth(page, 2026, 10);
   await page.locator("#price").fill("570");
   await page.locator("#down").fill("0");
   await page.locator("#years").fill("30");
