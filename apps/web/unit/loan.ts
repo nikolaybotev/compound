@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import { buildReport } from "../../../amortize.js";
+import { defaultArm, parseArm } from "../src/arm";
 import {
   bands,
   buildPrefillMap,
@@ -16,13 +17,20 @@ import {
   isEditedExtra,
   isTrailingDotThousands,
   loadScenario,
+  loadStored,
   loanReport,
+  modalPaymentCents,
   parseLoan,
+  parseStoredSet,
   paymentDate,
   percentThousandths,
-  savedByExtraCents,
+  prevailingExtraCents,
   saveScenario,
+  saveStored,
+  scenarioFigures,
+  savedByExtraCents,
   shortDate,
+  storageSetKey,
   STORAGE_KEY,
   thousandsToDollarString,
   yearsAndMonths,
@@ -465,6 +473,360 @@ function memoryStorage(): Storage {
     setItem: (key, value) => values.set(key, value),
   };
 }
+
+function freshConventional(now = new Date("2026-10-15T12:00:00Z")) {
+  const scenario = defaultScenario(now);
+  scenario.draft = {
+    price: "600000",
+    down: "5",
+    years: "30",
+    rate: "7.375",
+    start: "2026-10",
+  };
+  return scenario;
+}
+
+function appliedEveryMonth(scenario: ReturnType<typeof defaultScenario>, dollars: number, months: number) {
+  const applied = new Map<number, number>();
+  for (let month = 1; month <= months; month += 1) applied.set(month, dollars);
+  scenario.applied = applied;
+  scenario.extras = new Map(applied);
+}
+
+describe("loan scenarios storage and prevailing figures", () => {
+  const now = new Date("2026-10-15T12:00:00Z");
+
+  test("F1 fresh fixed prevailing figures", () => {
+    const figures = scenarioFigures(freshConventional(now));
+    expect(figures).not.toBeNull();
+    if (!figures) return;
+    expect(figures.modalPaymentCents).toBe(393_685);
+    expect(figures.prevailingExtraCents).toBe(0);
+    expect(figures.totalCents).toBe(485_310);
+  });
+
+  test("F2 $100 every month after Apply qualifies as prevailing extra", () => {
+    const scenario = freshConventional(now);
+    appliedEveryMonth(scenario, 100, 360);
+    const figures = scenarioFigures(scenario);
+    expect(figures?.prevailingExtraCents).toBe(10_000);
+    expect(figures?.modalPaymentCents).toBe(393_685);
+    expect(figures?.totalCents).toBe(495_310);
+  });
+
+  test("F3 $100 in months 1–12 does not qualify", () => {
+    const scenario = freshConventional(now);
+    const applied = new Map<number, number>();
+    for (let month = 1; month <= 12; month += 1) applied.set(month, 100);
+    scenario.applied = applied;
+    const figures = scenarioFigures(scenario);
+    expect(figures?.prevailingExtraCents).toBe(0);
+    expect(figures?.totalCents).toBe(485_310);
+  });
+
+  test("F4 boundary at 288 months of $1", () => {
+    const scenario = freshConventional(now);
+    const applied = new Map<number, number>();
+    for (let month = 1; month <= 288; month += 1) applied.set(month, 1);
+    scenario.applied = applied;
+    expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(100);
+    expect(scenarioFigures(scenario)?.totalCents).toBe(485_410);
+    const shorter = new Map(applied);
+    shorter.delete(288);
+    scenario.applied = shorter;
+    expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(0);
+  });
+
+  test("F5 7/1 ARM worst case heading total", () => {
+    const scenario = freshConventional(now);
+    scenario.draft.rate = "5.875";
+    scenario.arm = defaultArm();
+    scenario.arm.enabled = true;
+    scenario.armStored = true;
+    const figures = scenarioFigures(scenario);
+    expect(figures?.modalPaymentCents).toBe(503_771);
+    expect(figures?.totalCents).toBe(595_396);
+  });
+
+  test("F6 ARM tie uses earlier payment amount", () => {
+    const scenario = freshConventional(now);
+    scenario.draft.rate = "5.875";
+    scenario.arm = defaultArm();
+    scenario.arm.fixedYears = "15";
+    scenario.arm.enabled = true;
+    scenario.armStored = true;
+    expect(scenarioFigures(scenario)?.modalPaymentCents).toBe(337_177);
+    expect(scenarioFigures(scenario)?.totalCents).toBe(428_802);
+  });
+
+  test("F7 payoff month does not shrink the 80 percent denominator", () => {
+    const scenario = defaultScenario(now);
+    scenario.draft = {
+      price: "570000",
+      down: "0",
+      years: "30",
+      rate: "7",
+      start: "2026-10",
+    };
+    appliedEveryMonth(scenario, 100, 360);
+    expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(10_000);
+  });
+
+  test("F9 committed extras without applied map do not count", () => {
+    const scenario = freshConventional(now);
+    appliedEveryMonth(scenario, 100, 360);
+    scenario.extras = new Map(scenario.applied);
+    scenario.applied = new Map();
+    expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(0);
+  });
+
+  test("F10 one-month lump payoff is not prevailing extra", () => {
+    const scenario = freshConventional(now);
+    scenario.applied = new Map([[1, 570_000]]);
+    expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(0);
+    expect(scenarioFigures(scenario)?.modalPaymentCents).toBe(393_685);
+    expect(scenarioFigures(scenario)?.totalCents).toBe(485_310);
+  });
+
+  test("F8 legacy-only load and prototype merge", () => {
+    const storage = memoryStorage();
+    const legacy = {
+      version: 1,
+      price: "570000",
+      down: "0",
+      years: "30",
+      rate: "7",
+      start: "2026-10",
+      extras: [[1, 100]],
+    };
+    storage.setItem(STORAGE_KEY, JSON.stringify(legacy));
+    const loaded = loadStored(storage, now);
+    expect(loaded.scenarios).toHaveLength(1);
+    expect(loaded.active).toBe(0);
+    expect(loaded.scenarios[0].draft.price).toBe("570000");
+    expect(storage.getItem(storageSetKey(STORAGE_KEY))).toBeNull();
+
+    saveStored(storage, loaded);
+    const setRaw = storage.getItem(storageSetKey(STORAGE_KEY));
+    expect(setRaw).toContain('"version":2');
+    const legacyAfter = JSON.parse(storage.getItem(STORAGE_KEY)!);
+    expect(legacyAfter.version).toBe(1);
+    expect(legacyAfter.price).toBe("570000");
+
+    const second = {
+      version: 2,
+      active: 0,
+      scenarios: [
+        legacy,
+        {
+          price: "600000",
+          down: "5",
+          years: "30",
+          rate: "7.375",
+          start: "2026-10",
+          extras: [],
+          applied: [],
+          prefill: { monthly: "", yearly: "", month: 1, open: false },
+          openYears: null,
+          picture: pictureDefaults(),
+        },
+      ],
+    };
+    storage.setItem(storageSetKey(STORAGE_KEY), JSON.stringify(second));
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ ...legacy, version: 1, price: "580000" }),
+    );
+    const merged = loadStored(storage, now);
+    expect(merged.scenarios).toHaveLength(2);
+    expect(merged.scenarios[0].draft.price).toBe("580000");
+    expect(merged.scenarios[1].draft.price).toBe("600000");
+  });
+
+  test("loadStored active index clamps and keeps scenarios", () => {
+    const storage = memoryStorage();
+    storage.setItem(
+      storageSetKey(STORAGE_KEY),
+      JSON.stringify({
+        version: 2,
+        active: 1,
+        scenarios: [
+          {
+            price: "600000",
+            down: "5",
+            years: "30",
+            rate: "7.375",
+            start: "2026-10",
+            extras: [],
+            applied: [],
+            prefill: { monthly: "", yearly: "", month: 1, open: false },
+            openYears: null,
+            picture: pictureDefaults(),
+          },
+          {
+            price: "570000",
+            down: "0",
+            years: "30",
+            rate: "7",
+            start: "2026-10",
+            extras: [],
+            applied: [],
+            prefill: { monthly: "", yearly: "", month: 1, open: false },
+            openYears: null,
+            picture: pictureDefaults(),
+          },
+        ],
+      }),
+    );
+    const loaded = loadStored(storage, now);
+    expect(loaded.active).toBe(1);
+    expect(loaded.scenarios[1].draft.price).toBe("570000");
+    storage.setItem(
+      storageSetKey(STORAGE_KEY),
+      JSON.stringify({ version: 2, active: 9, scenarios: loaded.scenarios.map((s) => ({
+        price: s.draft.price,
+        down: s.draft.down,
+        years: s.draft.years,
+        rate: s.draft.rate,
+        start: s.draft.start,
+        extras: [],
+        applied: [],
+        prefill: s.prefill,
+        openYears: s.openYears,
+        picture: s.picture,
+      })) }),
+    );
+    expect(loadStored(storage, now).active).toBe(0);
+  });
+
+  test("bad set payloads fall back without writing", () => {
+    const storage = memoryStorage();
+    storage.setItem(storageSetKey(STORAGE_KEY), "{");
+    expect(loadStored(storage, now).scenarios[0].draft.price).toBe("600000");
+    storage.clear();
+    storage.setItem(storageSetKey(STORAGE_KEY), "{");
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        price: "570000",
+        down: "0",
+        years: "30",
+        rate: "7",
+        start: "2026-10",
+      }),
+    );
+    const one = loadStored(storage, now);
+    expect(one.scenarios).toHaveLength(1);
+    expect(one.scenarios[0].draft.price).toBe("570000");
+    expect(storage.getItem(storageSetKey(STORAGE_KEY))).toBe("{");
+  });
+
+  test("valid set with missing or corrupt legacy key", () => {
+    const storage = memoryStorage();
+    const setPayload = {
+      version: 2,
+      active: 0,
+      scenarios: [
+        {
+          price: "570000",
+          down: "0",
+          years: "30",
+          rate: "7",
+          start: "2026-10",
+          extras: [],
+          applied: [],
+          prefill: { monthly: "", yearly: "", month: 1, open: false },
+          openYears: null,
+          picture: pictureDefaults(),
+        },
+      ],
+    };
+    storage.setItem(storageSetKey(STORAGE_KEY), JSON.stringify(setPayload));
+    expect(loadStored(storage, now).scenarios[0].draft.price).toBe("570000");
+    storage.setItem(STORAGE_KEY, "{");
+    expect(loadStored(storage, now).scenarios[0].draft.price).toBe("570000");
+  });
+
+  test("missing storage returns one fresh scenario", () => {
+    expect(loadStored(undefined, now).scenarios).toHaveLength(1);
+  });
+
+  test("saveStored writes version 2 set and version 1 legacy", () => {
+    const storage = memoryStorage();
+    const set = {
+      active: 0,
+      scenarios: [freshConventional(now), freshConventional(now)],
+    };
+    set.scenarios[1].draft.price = "570000";
+    expect(saveStored(storage, set)).toBe(true);
+    const parsed = JSON.parse(storage.getItem(storageSetKey(STORAGE_KEY))!);
+    expect(parsed.version).toBe(2);
+    expect(parsed.scenarios).toHaveLength(2);
+    expect(parsed.scenarios[0].version).toBeUndefined();
+    expect(JSON.parse(storage.getItem(STORAGE_KEY)!).version).toBe(1);
+  });
+
+  test("legacy key without -v1 uses -scenarios suffix", () => {
+    expect(storageSetKey("compound-amortization")).toBe("compound-amortization-scenarios");
+  });
+
+  test("saveStored restores keys when legacy write throws", () => {
+    const values = new Map<string, string>();
+    let legacyWriteAttempts = 0;
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        values.set(key, value);
+        if (key === STORAGE_KEY) {
+          legacyWriteAttempts += 1;
+          if (legacyWriteAttempts === 1) throw new Error("quota");
+        }
+      },
+      removeItem: (key: string) => values.delete(key),
+    };
+    values.set(STORAGE_KEY, '{"version":1}');
+    values.set(storageSetKey(STORAGE_KEY), '{"version":2}');
+    expect(saveStored(storage, { active: 0, scenarios: [freshConventional(now)] })).toBe(false);
+    expect(values.get(STORAGE_KEY)).toBe('{"version":1}');
+    expect(values.get(storageSetKey(STORAGE_KEY))).toBe('{"version":2}');
+  });
+
+  test("parseStoredSet accepts version 1 and 2 and rejects bad files", () => {
+    const storage = memoryStorage();
+    const legacy = JSON.stringify({
+      version: 1,
+      price: "570000",
+      down: "0",
+      years: "30",
+      rate: "7",
+      start: "2026-10",
+    });
+    expect(parseStoredSet(legacy, now).ok).toBe(true);
+    const v2 = JSON.stringify({
+      version: 2,
+      active: 0,
+      scenarios: [JSON.parse(legacy)],
+    });
+    delete (JSON.parse(v2).scenarios[0] as { version?: number }).version;
+    expect(parseStoredSet(v2, now).ok).toBe(true);
+    expect(parseStoredSet("{", now).ok).toBe(false);
+    expect(parseStoredSet(JSON.stringify({ version: 2, scenarios: [] }), now).ok).toBe(false);
+    expect(
+      parseStoredSet(
+        JSON.stringify({
+          version: 2,
+          active: 0,
+          scenarios: [{ price: "nope", down: "0", years: "30", rate: "7", start: "2026-10" }],
+        }),
+        now,
+      ).ok,
+    ).toBe(false);
+    const before = storage.getItem(STORAGE_KEY);
+    parseStoredSet("{", now);
+    expect(storage.getItem(STORAGE_KEY)).toBe(before);
+  });
+});
 
 describe("yearsAndMonths", () => {
   test.each([
