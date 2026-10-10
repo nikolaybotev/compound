@@ -1,5 +1,15 @@
 import { useMemo, useRef, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
+import {
+  ARM_FIELD_LABELS,
+  armLabel,
+  dropIndexBeyond,
+  formatPercentThousandths,
+  parseArm,
+  resetMonths,
+  type ArmDraft,
+  type ArmField,
+} from "./arm";
 import { Chart, type ChartBar } from "./chart";
 import { Disclosure } from "./disclosure";
 import {
@@ -70,6 +80,8 @@ export function App() {
   const [openYears, setOpenYears] = useState<Set<number>>(() =>
     initial.openYears ? new Set(initial.openYears) : new Set([firstPaymentYear(initial.loan)]),
   );
+  const [armDraft, setArmDraft] = useState(initial.arm);
+  const [armSaved, setArmSaved] = useState(initial.arm);
   const [editingMonth, setEditingMonth] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const snapshot = useRef<Scenario>({
@@ -78,6 +90,8 @@ export function App() {
     prefill: initial.prefill,
     openYears: initial.openYears ?? [firstPaymentYear(initial.loan)],
     picture: initial.picture,
+    arm: initial.arm,
+    armStored: initial.armStored,
   });
 
   function persist(patch: Partial<Scenario>) {
@@ -87,6 +101,8 @@ export function App() {
       prefill: patch.prefill ?? snapshot.current.prefill,
       openYears: patch.openYears === undefined ? snapshot.current.openYears : patch.openYears,
       picture: patch.picture ?? snapshot.current.picture,
+      arm: patch.arm ?? snapshot.current.arm,
+      armStored: patch.armStored ?? snapshot.current.armStored,
     };
     snapshot.current = next;
     saveScenario(localStorage, next);
@@ -96,13 +112,26 @@ export function App() {
     () => buildPicture(loan, validText.rate, validText.down, pictureValues),
     [loan, validText, pictureValues],
   );
+  const rateThousandths = Math.round(loan.ratePercent * 1000);
+  const armParsed = useMemo(
+    () => parseArm(armSaved, loan.years, rateThousandths),
+    [armSaved, loan.years, rateThousandths],
+  );
+  const armOn = armSaved.enabled && armParsed.ok;
+  const reportLoan = useMemo<Loan>(
+    () =>
+      armSaved.enabled && armParsed.ok
+        ? { ...loan, arm: { enabled: true, values: armParsed.values, index: armSaved.index } }
+        : loan,
+    [loan, armSaved, armParsed],
+  );
   const report = useMemo(
-    () => loanReport(loan, extras, lines.financedCents),
-    [loan, extras, lines.financedCents],
+    () => loanReport(reportLoan, extras, lines.financedCents),
+    [reportLoan, extras, lines.financedCents],
   );
   const years = useMemo(
-    () => groupByYear(loan, report, extras, lines.financedCents),
-    [loan, report, extras, lines.financedCents],
+    () => groupByYear(reportLoan, report, extras, lines.financedCents),
+    [reportLoan, report, extras, lines.financedCents],
   );
   const payoff = paymentDate(loan.startMonth, report.payoff_month);
   const bars: ChartBar[] = report.schedule.slice(0, report.payoff_month).map((row) => {
@@ -130,13 +159,99 @@ export function App() {
       setInvalidField(priceProblem ? "price" : parsed.field);
       return;
     }
+    let nextArm = armSaved;
+    if (armSaved.enabled) {
+      const armResult = parseArm(armSaved, parsed.loan.years, Math.round(parsed.loan.ratePercent * 1000));
+      if (!armResult.ok) {
+        setError(armResult.message);
+        setInvalidField(armResult.field);
+        return;
+      }
+      const index = dropIndexBeyond(
+        armSaved.index,
+        resetMonths(armResult.values.fixedMonths, armResult.values.adjustMonths, parsed.loan.years * 12),
+      );
+      if (index !== armSaved.index) nextArm = { ...armSaved, index };
+    }
     const kept = dropExtrasBeyond(extras, parsed.loan.years * 12);
     setValidText({ down: next.down, rate: next.rate });
     setLoan(parsed.loan);
     setExtras(kept);
+    if (nextArm !== armSaved) {
+      setArmSaved(nextArm);
+      setArmDraft({ ...armDraft, index: nextArm.index });
+    }
     setError(null);
     setInvalidField(null);
-    persist({ draft: next, extras: kept });
+    persist(
+      nextArm === armSaved
+        ? { draft: next, extras: kept }
+        : { draft: next, extras: kept, arm: nextArm },
+    );
+  }
+
+  function commitArm(next: ArmDraft) {
+    setArmSaved(next);
+    setArmDraft(next);
+    persist({ arm: next, armStored: true });
+  }
+
+  function chooseProduct(select: HTMLSelectElement) {
+    if (select.value === "fixed") {
+      if (armFieldInvalid(invalidField)) {
+        setError(null);
+        setInvalidField(null);
+      }
+      commitArm({ ...armSaved, enabled: false });
+      return;
+    }
+    const candidate: ArmDraft = {
+      ...armSaved,
+      enabled: true,
+      open: snapshot.current.armStored ? armSaved.open : true,
+    };
+    const result = parseArm(candidate, loan.years, rateThousandths);
+    if (!result.ok) {
+      select.value = "fixed";
+      setError(result.message);
+      setInvalidField(result.field);
+      return;
+    }
+    const index = dropIndexBeyond(
+      candidate.index,
+      resetMonths(result.values.fixedMonths, result.values.adjustMonths, loan.years * 12),
+    );
+    setError(null);
+    setInvalidField(null);
+    commitArm({ ...candidate, index });
+  }
+
+  function updateArm(field: ArmField, value: string) {
+    const next = { ...armDraft, [field]: value };
+    setArmDraft(next);
+    const parsed = parseArm(next, loan.years, rateThousandths);
+    if (!parsed.ok) {
+      setError(parsed.message);
+      setInvalidField(parsed.field);
+      return;
+    }
+    const index = dropIndexBeyond(
+      armSaved.index,
+      resetMonths(parsed.values.fixedMonths, parsed.values.adjustMonths, loan.years * 12),
+    );
+    if (armFieldInvalid(invalidField)) {
+      setError(null);
+      setInvalidField(null);
+    }
+    commitArm({ ...next, enabled: true, open: armSaved.open, index });
+  }
+
+  function setRoundEighth(roundEighth: boolean) {
+    commitArm({ ...armSaved, roundEighth });
+  }
+
+  function setArmOpen(open: boolean) {
+    commitArm({ ...armSaved, open });
   }
 
   function onPriceInput(value: string) {
@@ -295,7 +410,24 @@ export function App() {
           style={{ width: `${Math.max(draft.rate.length, 1) + 1}ch` }}
           onInput={(event) => update("rate", event.currentTarget.value)}
         />
-        <span>% fixed = </span>
+        <span>% </span>
+        {armOn && armParsed.ok ? (
+          <span class="arm-label" data-testid="arm-label">
+            {armLabel(armParsed.values.fixedMonths / 12, armParsed.values.adjustMonths)}
+          </span>
+        ) : null}
+        {armOn ? " " : null}
+        <select
+          id="product"
+          class="product"
+          aria-label="Loan product"
+          value={armSaved.enabled ? "arm" : "fixed"}
+          onChange={(event) => chooseProduct(event.currentTarget)}
+        >
+          <option value="fixed">fixed</option>
+          <option value="arm">ARM</option>
+        </select>
+        <span> = </span>
         <span class="complete-payment" aria-label="Complete monthly payment">
           {formatWholeDollars(lines.headingDollars)}
         </span>
@@ -321,6 +453,91 @@ export function App() {
           />
         </div>
       </div>
+      {armOn && armParsed.ok ? (
+        <Disclosure className="arm" title="ARM terms" open={armSaved.open} onToggle={setArmOpen}>
+          <div class="inputs">
+            <Field
+              id="arm-fixed-years"
+              label={ARM_FIELD_LABELS.fixedYears}
+              value={armDraft.fixedYears}
+              suffix="years"
+              invalid={invalidField === "fixedYears"}
+              onInput={(value) => updateArm("fixedYears", value)}
+            />
+            <Field
+              id="arm-adjust-months"
+              label={ARM_FIELD_LABELS.adjustMonths}
+              value={armDraft.adjustMonths}
+              suffix="months"
+              invalid={invalidField === "adjustMonths"}
+              onInput={(value) => updateArm("adjustMonths", value)}
+            />
+            <Field
+              id="arm-margin"
+              label={ARM_FIELD_LABELS.margin}
+              value={armDraft.margin}
+              suffix="%"
+              invalid={invalidField === "margin"}
+              onInput={(value) => updateArm("margin", value)}
+            />
+            <Field
+              id="arm-initial-cap"
+              label={ARM_FIELD_LABELS.initialCap}
+              value={armDraft.initialCap}
+              suffix="%"
+              invalid={invalidField === "initialCap"}
+              onInput={(value) => updateArm("initialCap", value)}
+            />
+            <Field
+              id="arm-periodic-cap"
+              label={ARM_FIELD_LABELS.periodicCap}
+              value={armDraft.periodicCap}
+              suffix="%"
+              invalid={invalidField === "periodicCap"}
+              onInput={(value) => updateArm("periodicCap", value)}
+            />
+            <Field
+              id="arm-lifetime-cap"
+              label={ARM_FIELD_LABELS.lifetimeCap}
+              value={armDraft.lifetimeCap}
+              suffix="%"
+              invalid={invalidField === "lifetimeCap"}
+              onInput={(value) => updateArm("lifetimeCap", value)}
+            />
+            <Field
+              id="arm-floor"
+              label={ARM_FIELD_LABELS.floor}
+              value={armDraft.floor}
+              suffix="%"
+              invalid={invalidField === "floor"}
+              onInput={(value) => updateArm("floor", value)}
+            />
+            <Field
+              id="arm-initial-floor"
+              label={ARM_FIELD_LABELS.initialFloor}
+              value={armDraft.initialFloor}
+              suffix="%"
+              invalid={invalidField === "initialFloor"}
+              onInput={(value) => updateArm("initialFloor", value)}
+            />
+          </div>
+          <label class="arm-check" for="arm-round-eighth">
+            <input
+              id="arm-round-eighth"
+              type="checkbox"
+              checked={armSaved.roundEighth}
+              onChange={(event) => setRoundEighth(event.currentTarget.checked)}
+            />
+            Round to nearest 1/8 point
+          </label>
+          <p class="arm-computed" data-line="arm-ceiling">
+            {`Ceiling ${formatPercentThousandths(rateThousandths + armParsed.values.lifetimeCapThousandths)}%`}
+          </p>
+          <p class="arm-computed" data-line="arm-first-adjustment">
+            {`First adjustment ${armDateLabel(loan, armParsed.values.fixedMonths + 1)} (payment ${armParsed.values.fixedMonths + 1})`}
+          </p>
+        </Disclosure>
+      ) : null}
       {error ? (
         <p class="error" role="alert">
           {error}
@@ -330,7 +547,11 @@ export function App() {
         <div class="payment-block" role="region" aria-label="Monthly payment">
           <h2>Monthly payment</h2>
           <p class="money payment">{formatMoney(report.monthly_payment_cents)}</p>
-          <p class="note">The extra payment is on top of this amount.</p>
+          <p class="note">
+            {report.arm
+              ? "Initial payment. The extra payment is on top of this amount, and the payment resets at each adjustment."
+              : "The extra payment is on top of this amount."}
+          </p>
         </div>
         <dl>
           <div role="region" aria-label="Loan amount">
@@ -349,6 +570,22 @@ export function App() {
             <dt>Payoff date</dt>
             <dd class="money">{longDate(payoff.year, payoff.month)}</dd>
           </div>
+          {report.arm ? (
+            <div role="region" aria-label="Highest rate">
+              <dt>Highest rate</dt>
+              <dd class="money">
+                {`${report.arm.max_rate_percent}% from ${armDateLabel(loan, report.arm.max_rate_month)}`}
+              </dd>
+            </div>
+          ) : null}
+          {report.arm ? (
+            <div role="region" aria-label="Highest payment">
+              <dt>Highest payment</dt>
+              <dd class="money">
+                {`${formatMoney(report.arm.max_payment_cents)} from ${armDateLabel(loan, report.arm.max_payment_month)}`}
+              </dd>
+            </div>
+          ) : null}
           {extras.size > 0 ? (
             <div role="region" aria-label="Interest saved">
               <dt>Interest saved</dt>
@@ -593,6 +830,26 @@ export function App() {
       />
     </main>
   );
+}
+
+const ARM_FIELDS: readonly string[] = [
+  "fixedYears",
+  "adjustMonths",
+  "margin",
+  "initialCap",
+  "periodicCap",
+  "lifetimeCap",
+  "floor",
+  "initialFloor",
+];
+
+function armFieldInvalid(field: string | null): boolean {
+  return field !== null && ARM_FIELDS.includes(field);
+}
+
+function armDateLabel(loan: Loan, paymentNumber: number): string {
+  const date = paymentDate(loan.startMonth, paymentNumber);
+  return longDate(date.year, date.month);
 }
 
 function MoneyRow(props: {
