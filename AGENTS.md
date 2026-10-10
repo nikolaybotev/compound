@@ -41,6 +41,7 @@ A zero-dependency Node.js calculator for a fixed monthly mortgage payment and it
 - `intent/extra-savings-column/` is the spec and plan for the Saved by extra column on that schedule.
 - `intent/loan-recast/` is the spec and plan for a term in months and a fixed-rate servicer recast via the skill. For a recast question or a term in months, that spec wins over `intent/mortgage-skill/`, which still records the first release's year-only term and recast refusal in its own files.
 - `intent/complete-loan-picture/` is the spec and plan for the Conventional heading, monthly picture, closing costs, and the prototype beside production.
+- `intent/ui-followups/` is the spec and plan for the ten queued page follow-ups (start-month picker, summary wording and durations, Extra principal paid, form alignment, the Apply sentence, blue edited cells, Saved by extra year subtotals, and the pointer-following legend). Where it changes a sentence of an earlier page spec, its D20 names the sentence and it wins. Design only until its phases land.
 - `README.md` describes the script and points at the skill.
 
 ## Things agents get wrong
