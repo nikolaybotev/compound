@@ -28,11 +28,13 @@ import {
   loanReport,
   longDate,
   parseDollarField,
+  parseIndexField,
   parseLoan,
   paymentDate,
   saveScenario,
   shortDate,
   thousandsToDollarString,
+  withIndex,
   type Loan,
   type LoanDraft,
   type Prefill,
@@ -84,6 +86,8 @@ export function App() {
   const [armSaved, setArmSaved] = useState(initial.arm);
   const [editingMonth, setEditingMonth] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState("");
+  const [editingIndexMonth, setEditingIndexMonth] = useState<number | null>(null);
+  const [editingIndexValue, setEditingIndexValue] = useState("");
   const snapshot = useRef<Scenario>({
     draft: initial.draft,
     extras: initial.extras,
@@ -244,6 +248,19 @@ export function App() {
       setInvalidField(null);
     }
     commitArm({ ...next, enabled: true, open: armSaved.open, index });
+  }
+
+  function commitIndex(month: number) {
+    if (editingIndexMonth !== month) return;
+    const parsed = parseIndexField(editingIndexValue);
+    setEditingIndexMonth(null);
+    if (!parsed.ok) return;
+    const index = withIndex(armSaved.index, month, parsed.percent);
+    if (index === armSaved.index) return;
+    const next = { ...armSaved, index };
+    setArmSaved(next);
+    setArmDraft({ ...armDraft, index });
+    persist({ arm: next, armStored: true });
   }
 
   function setRoundEighth(roundEighth: boolean) {
@@ -820,6 +837,9 @@ export function App() {
         openYears={openYears}
         editingMonth={editingMonth}
         editingValue={editingValue}
+        arm={armOn}
+        editingIndexMonth={editingIndexMonth}
+        editingIndexValue={editingIndexValue}
         onToggleYear={toggleYear}
         onToggleAll={toggleAll}
         onEdit={(month, value) => {
@@ -827,6 +847,11 @@ export function App() {
           setEditingValue(value);
         }}
         onCommit={commitExtra}
+        onIndexEdit={(month, value) => {
+          setEditingIndexMonth(month);
+          setEditingIndexValue(value);
+        }}
+        onIndexCommit={commitIndex}
       />
     </main>
   );

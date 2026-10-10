@@ -122,4 +122,11 @@ Files: `apps/web/src/schedule.tsx`, `apps/web/src/loan.ts`, `apps/web/src/app.ts
 4. `AGENTS.md`: the eleven ARM schedule columns (the ten-column header is the CSV), the index cell rules, and that Saved by extra on an ARM uses the same `arm` object on both runs.
 5. After the merge to `main` and the production publish run, check AC11 on https://nikolaybotev.github.io/compound/ with fresh storage: the fixed `$4,853` visit, then the AC9 ARM steps showing `$5,037.71`. Pull-request CI does not fetch that URL.
 
+Build notes (recorded in the change that built Phase 4):
+
+- `ScheduleMonth` carries `ratePercent`, `paymentCents`, `indexPercent`, and `isReset`, all `null` or `false` in fixed mode, so the fixed schedule is the same rows as before. `isReset` is computed from the loan's `arm` terms and the term, not from the report.
+- The index edit reuses the extra cell's pattern with its own `editingIndexMonth` and `editingIndexValue`. `parseIndexField` and `withIndex` live in `loan.ts` beside `parseDollarField`; an empty commit deletes the entry, and a commit that changes nothing does not write storage.
+- Committing an index changes only `arm.index` in the committed terms. It does not overwrite text the owner is typing in the ARM terms, which stay in `armDraft`.
+- Step 5 (the AC11 production check) runs after this change merges and the production publish has run; its result is in the pull request description and the hand-off, not in this file.
+
 DoD: `node --test`, `pnpm --dir apps/web test`, and `pnpm --dir apps/web test:e2e` exit 0, including AC9 and AC10. The fixed-mode schedule still has eight columns and the existing Saved by extra checks pass unchanged.

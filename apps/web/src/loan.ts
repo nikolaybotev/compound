@@ -91,6 +91,10 @@ export type BandAmounts = {
 export type ScheduleMonth = {
   month: number;
   dateLabel: string;
+  ratePercent: number | null;
+  paymentCents: number | null;
+  indexPercent: number | null;
+  isReset: boolean;
   principalCents: number;
   interestCents: number;
   extraCents: number;
@@ -373,6 +377,33 @@ export function buildPrefillMap(
   return extras;
 }
 
+const INDEX_PATTERN = /^\d+(?:\.\d{1,3})?$/;
+
+export function parseIndexField(
+  text: string,
+): { ok: true; percent: number | null } | { ok: false } {
+  const trimmed = text.trim();
+  if (trimmed === "") return { ok: true, percent: null };
+  if (!INDEX_PATTERN.test(trimmed)) return { ok: false };
+  const percent = Number(trimmed);
+  if (!Number.isFinite(percent) || percent < 0) return { ok: false };
+  return { ok: true, percent };
+}
+
+export function indexInputValue(percent: number | null): string {
+  return percent === null ? "" : String(percent);
+}
+
+export function withIndex(
+  index: Array<[number, number]>,
+  month: number,
+  percent: number | null,
+): Array<[number, number]> {
+  const rest = index.filter(([entry]) => entry !== month);
+  if (percent === null) return rest.length === index.length ? index : rest;
+  return [...rest, [month, percent] as [number, number]].sort((a, b) => a[0] - b[0]);
+}
+
 export function dropExtrasBeyond(
   extras: Map<number, number>,
   monthCount: number,
@@ -407,6 +438,10 @@ export function groupByYear(
   const fullInterestCents = report.interest_cents;
   const groups: ScheduleYear[] = [];
   const rows = report.schedule.slice(0, report.payoff_month);
+  const resets =
+    loan.arm && loan.arm.enabled
+      ? new Set(resetMonths(loan.arm.values.fixedMonths, loan.arm.values.adjustMonths, loan.years * 12))
+      : null;
   for (const row of rows) {
     const date = paymentDate(startMonth, row.month);
     const extraDollars = extras.get(row.month) ?? 0;
@@ -427,6 +462,10 @@ export function groupByYear(
     group.rows.push({
       month: row.month,
       dateLabel: shortDate(date.year, date.month),
+      ratePercent: resets ? (row.rate_percent ?? null) : null,
+      paymentCents: resets ? (row.payment_cents ?? null) : null,
+      indexPercent: resets ? (row.index_percent ?? null) : null,
+      isReset: resets ? resets.has(row.month) : false,
       principalCents: row.principal_cents,
       interestCents: row.interest_cents,
       extraCents,
