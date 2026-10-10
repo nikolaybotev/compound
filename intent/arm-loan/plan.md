@@ -81,6 +81,13 @@ Files: `.agents/skills/mortgage-loan-calculator/SKILL.md`, `REVIEW.md`, `AGENTS.
 2. `REVIEW.md`: Bugs adds an ARM payment, rate, or interest that disagrees with spec requirement 18; a first reset governed by the periodic cap; a rate above the ceiling or below the floor in effect; a reset payment that is not the level payment on the actual balance over the remaining months; an index accepted at a non-reset month; a fixed-rate JSON, CSV, or summary that changed; a page figure that disagrees with `buildReport` for the same `arm` object; a skill that supplies a fixed period, interval, margin, cap, floor, or index value the user did not give. Security allows reading the `--index` file the user passed, the same way it allows `--extra`. Compliance adds `intent/arm-loan/`. Important adds a wrong worst-case payment or rate and an ARM figure the spec forbids.
 3. `AGENTS.md`: the skill description line and the Architecture line for the skill, and the sentence that `intent/arm-loan/` wins over the earlier specs' ARM refusals.
 
+Build notes (recorded in the change that built Phase 2):
+
+- The existing skill tests (`AC7 skill states the ask rule` and `loan-recast AC6`) still require the words `adjustable` and `interest-only` in the skill. The description keeps `adjustable-rate (ARM)`, so those tests pass unedited; the new refusal paragraph itself does not say `adjustable`, and a new test pins that.
+- The ARM caps are passed as `--caps INITIAL/PERIODIC/LIFETIME` in the sheet's order. The skill's run example shows the ARM flags in brackets, as step 1 says, with `--fixed-years` and `--fixed-months` as alternatives.
+- The skill's temporary-file rule now allows the `month,index` CSV beside `month,extra`.
+- Step 3's AGENTS.md changes also touch the intro sentence and one "Things agents get wrong" sentence about the ARM skill rules, which Phase 1 did not cover.
+
 DoD: `node --test` exits 0. The skill file contains each AC7 item. `REVIEW.md` names `intent/arm-loan/`. The workspace symlink still resolves to the skill file.
 
 ## Phase 3 — Page: product, terms, model, summary
