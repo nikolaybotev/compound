@@ -2,7 +2,7 @@
 # workflow_dispatch deploy-gh-pages-branch.yml from main (GITHUB_TOKEN).
 set -euo pipefail
 
-if [[ ! -f "${GH_PAGES_PUSH_MARKER:?}" ]]; then
+if [[ ! -f "${GH_PAGES_PUSH_MARKER:?}" ]] && [[ "${FORCE_GH_PAGES_DEPLOY:-}" != "1" ]]; then
   echo "gh-pages branch unchanged; skip deploy-gh-pages-branch dispatch."
   exit 0
 fi
