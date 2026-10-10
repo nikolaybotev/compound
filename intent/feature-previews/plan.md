@@ -46,9 +46,20 @@ Files: `.github/workflows/deploy-feature-preview.yml`
 4. **Publish:** checkout PR head, pnpm install, build with `VITE_BASE=/compound/feat/<number>/` and `VITE_STORAGE_KEY=compound-amortization-feat-preview-v1`.
 5. Clone or init `pages-feat`, copy dist to `feat/<number>/`, commit, push.
 6. **Close:** remove `feat/<number>/`, commit, push if changed.
-7. Dispatch `deploy-pages.yml` on `main` via GitHub API.
+7. When `pages-feat` moved, dispatch `deploy-feat-pages.yml` on `main` via GitHub API.
 
 DoD: AC2; no `github-pages` environment on this workflow.
+
+## Phase 3b — Feat-only Pages publish
+
+Files: `.github/workflows/deploy-feat-pages.yml`
+
+1. `on: workflow_dispatch` only. Concurrency group `pages` with `deploy-pages.yml`.
+2. Mirror `https://nikolaybotev.github.io/compound/` and `prototype/` with `wget`; verify the same guards as production assemble.
+3. `rm -rf site/feat`, then copy `pages-feat/feat/` when present.
+4. `upload-pages-artifact` and `deploy-pages` on the `github-pages` environment. No checkout of `main`, no pnpm build.
+
+DoD: AC6. Stop and record a blocker if mirroring cannot be made safe; do not merge.
 
 ## Phase 4 — Docs and verification
 
@@ -61,3 +72,4 @@ DoD: AC4, AC5.
 ### Build notes
 
 - First PR preview creates branch `pages-feat` with an empty `feat/` tree aside from the first preview folder.
+- Departure (2026-10-10): dropped dispatch of `deploy-pages.yml` from feature jobs. Feat publish mirrors the live site instead of rebuilding production (D4, D9).

@@ -1,0 +1,73 @@
+name: deploy-feat-pages
+
+# Publishes feat/ previews without rebuilding production or prototype.
+# Triggered by workflow_dispatch from deploy-feature-preview.yml after
+# pages-feat updates. Mirrors the live site, replaces feat/ from pages-feat,
+# and uploads one full artifact. deploy-pages.yml on main is unchanged and
+# is the only workflow that rebuilds production from source.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mirror published site
+        run: |
+          set -euo pipefail
+          SITE="${GITHUB_WORKSPACE}/site"
+          rm -rf "$SITE"
+          mkdir -p "$SITE"
+          wget -q -e robots=off -r -l 10 -np -nH --cut-dirs=1 -P "$SITE" \
+            https://nikolaybotev.github.io/compound/ \
+            https://nikolaybotev.github.io/compound/prototype/
+          test -f "$SITE/index.html"
+          test -f "$SITE/prototype/index.html"
+          grep -q '/compound/' "$SITE/index.html"
+          grep -q '/compound/prototype/' "$SITE/prototype/index.html"
+          if grep -q '/compound/prototype/' "$SITE/index.html"; then
+            echo "production index references /compound/prototype/" >&2
+            exit 1
+          fi
+          rm -rf "$SITE/feat"
+
+      - name: Check out pages-feat previews
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: pages-feat
+          path: pages-feat
+
+      - name: Merge feat previews into site
+        run: |
+          set -euo pipefail
+          if [ -d pages-feat/feat ]; then
+            mkdir -p site/feat
+            cp -a pages-feat/feat/. site/feat/
+          fi
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: assemble
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,8 +1,9 @@
 name: deploy-feature-preview
 
 # Publishes PR previews under /compound/feat/<number>/ without touching the
-# github-pages environment. Built files live on branch pages-feat; this job
-# dispatches deploy-pages.yml on main to merge feat/ into the live artifact.
+# github-pages environment or rebuilding production. Built files live on
+# branch pages-feat; after a push there, this job dispatches
+# deploy-feat-pages.yml on main, which mirrors the live site and overlays feat/.
 
 on:
   pull_request:
@@ -52,6 +53,7 @@ jobs:
         run: pnpm --dir apps/web build
 
       - name: Update pages-feat branch
+        id: pages_feat
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -87,6 +89,7 @@ jobs:
           git -C "$STORE" add -A
           if git -C "$STORE" diff --staged --quiet; then
             echo "pages-feat unchanged"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             if [ "${{ github.event.action }}" = "closed" ]; then
               git -C "$STORE" commit -m "Remove feat preview for PR #${PR_NUMBER}"
@@ -94,15 +97,17 @@ jobs:
               git -C "$STORE" commit -m "Update feat preview for PR #${PR_NUMBER}"
             fi
             git -C "$STORE" push origin pages-feat
+            echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Refresh GitHub Pages
+      - name: Publish feat previews to Pages
+        if: steps.pages_feat.outputs.changed == 'true'
         uses: actions/github-script@v7
         with:
           script: |
             await github.rest.actions.createWorkflowDispatch({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              workflow_id: "deploy-pages.yml",
+              workflow_id: "deploy-feat-pages.yml",
               ref: "main",
             });

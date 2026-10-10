@@ -12,9 +12,10 @@ name: deploy-pages
 # uses the main tree and the production upload still happens.
 #
 # Pull-request previews live under feat/<number>/ on branch pages-feat.
-# deploy-feature-preview.yml writes that branch and dispatches this
-# workflow on main. This job merges pages-feat/feat into the artifact
-# before upload. Feature jobs never call deploy-pages directly.
+# deploy-feature-preview.yml writes that branch and dispatches
+# deploy-feat-pages.yml, which mirrors the live site and overlays feat/
+# without rebuilding production. Pushes to main still rebuild here and
+# merge pages-feat/feat into this artifact before upload.
 on:
   push:
     branches: [main]

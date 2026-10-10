@@ -28,7 +28,7 @@ Same-repo pull requests that touch the web app can publish an amortization previ
 
 ## 3. Principles
 
-- P1. `deploy-pages` on `main` remains the only job that calls `actions/deploy-pages`.
+- P1. `deploy-pages.yml` on `main` is the only workflow that rebuilds production and prototype from source. `deploy-feat-pages.yml` may call `actions/deploy-pages` after mirroring the live site; feature pull-request jobs do not.
 - P2. Feature work serializes on one concurrency group when updating shared preview storage.
 - P3. Preview builds set `VITE_BASE` and `VITE_STORAGE_KEY` at build time.
 
@@ -46,8 +46,8 @@ Same-repo pull requests that touch the web app can publish an amortization previ
 4. **Storage key.** Preview builds set `VITE_STORAGE_KEY=compound-amortization-feat-preview-v1`. Production and prototype builds do not set it; the app keeps `compound-amortization-v1`.
 5. **Shared preview store.** Built preview static files live on git branch `pages-feat` under `feat/<pull-request-number>/`. Only the feature-preview workflow writes that branch.
 6. **Live site assembly.** Before `upload-pages-artifact`, `deploy-pages.yml` checks out `pages-feat` when present and copies `feat/` into the site artifact beside production root and `prototype/`. A missing `pages-feat` branch does not fail production deploy.
-7. **Refresh after preview change.** After updating `pages-feat`, the feature workflow dispatches `deploy-pages.yml` on `main` so the live site picks up `feat/` without rebuilding production from the PR branch.
-8. **Cleanup.** On `closed`, remove `feat/<pull-request-number>/` from `pages-feat`, commit, push, and dispatch `deploy-pages.yml`. Do not delete `prototype/`.
+7. **Refresh after preview change.** After pushing `pages-feat`, the feature workflow dispatches `deploy-feat-pages.yml` on `main`. That job mirrors `https://nikolaybotev.github.io/compound/` and `prototype/`, drops any mirrored `feat/`, copies `pages-feat/feat/` into the artifact, and deploys. It does not check out or build `main`.
+8. **Cleanup.** On `closed`, remove `feat/<pull-request-number>/` from `pages-feat`, commit, push when changed, and dispatch `deploy-feat-pages.yml` when the branch moved. Do not delete `prototype/`.
 9. **Concurrency.** Feature preview jobs use one concurrency group with `cancel-in-progress: false`.
 10. **AGENTS.md.** Document preview URL pattern, that production stays `main`-only, local preview build with `VITE_BASE`, and the storage-key rule.
 
@@ -56,7 +56,8 @@ Same-repo pull requests that touch the web app can publish an amortization previ
 | ID | Check |
 |---|---|
 | AC1 | `deploy-pages.yml` still runs only on `main` push and `workflow_dispatch`. |
-| AC2 | Feature workflow does not set `environment: github-pages` and does not call `deploy-pages`. |
+| AC2 | Feature workflow does not set `environment: github-pages`, does not call `deploy-pages`, and does not dispatch `deploy-pages.yml`. |
+| AC6 | `deploy-feat-pages.yml` has no `pnpm build` from a `main` checkout; it mirrors the published site before overlaying `feat/`. |
 | AC3 | `loan.ts` uses `import.meta.env.VITE_STORAGE_KEY` with default `compound-amortization-v1`. |
 | AC4 | `pnpm --dir apps/web build` with `VITE_BASE=/compound/feat/1/` and `VITE_STORAGE_KEY=compound-amortization-feat-preview-v1` references `/compound/feat/1/` in `index.html`. |
 | AC5 | `node --test` and `pnpm --dir apps/web test` pass. |
@@ -69,7 +70,9 @@ Same-repo pull requests that touch the web app can publish an amortization previ
 
 **D3 — `pages-feat` branch.** Feature static files are stored on branch `pages-feat` at `feat/<n>/`. Production deploy merges that tree into the full artifact so `deploy-pages` still publishes one complete site.
 
-**D4 — Dispatch refresh.** Feature workflow uses `workflow_dispatch` on `deploy-pages.yml` at `ref: main` after each `pages-feat` update. Production and prototype are rebuilt from `main` only.
+**D4 — Dispatch refresh.** Feature workflow uses `workflow_dispatch` on `deploy-feat-pages.yml` at `ref: main` after each `pages-feat` push. That workflow mirrors the live production and prototype bytes, then overlays `pages-feat/feat/`. `deploy-pages.yml` rebuilds production only on `main` push or its own `workflow_dispatch`.
+
+**D9 — Mirror risk.** If the mirror step cannot fetch production and prototype, the feat publish job fails and uploads nothing. A failed mirror must not ship a partial tree.
 
 **D5 — Serialization.** Concurrency group `feature-preview-pages`, `cancel-in-progress: false`, on the feature workflow.
 
