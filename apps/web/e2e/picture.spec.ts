@@ -151,7 +151,7 @@ function savedByExtra(page: Page, month: number) {
   const row = page.locator("tr").filter({
     has: page.locator("td.money").first().getByText(String(month), { exact: true }),
   });
-  return row.getByRole("cell").nth(5);
+  return row.getByRole("cell").nth(6);
 }
 
 async function blockForeignHosts(context: BrowserContext) {

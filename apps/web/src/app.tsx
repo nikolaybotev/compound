@@ -58,6 +58,7 @@ import {
   type PictureInputField,
   type PictureValues,
 } from "./picture";
+import { PrevailingBar } from "./prevailing-bar";
 import { Schedule } from "./schedule";
 import { dollarsToCents } from "../../../amortize.js";
 
@@ -209,14 +210,18 @@ export function App() {
     }
   }
 
-  const scenarioLabels = useMemo(
+  const scenarioRows = useMemo(
     () =>
       loanSet.scenarios.map((scenario) => {
         const figures = scenarioFigures(scenario);
-        return figures ? scenarioLabelText(scenario, figures) : "";
+        return {
+          label: figures ? scenarioLabelText(scenario, figures) : "",
+          figures,
+        };
       }),
     [loanSet],
   );
+  const scenarioLabels = useMemo(() => scenarioRows.map((row) => row.label), [scenarioRows]);
 
   function selectScenario(index: number) {
     if (index === loanSet.active) return;
@@ -561,6 +566,7 @@ export function App() {
     <main class="column">
       <ScenarioBar
         labels={scenarioLabels}
+        figures={scenarioRows.map((row) => row.figures)}
         active={loanSet.active}
         saveError={saveError}
         importError={importError}
@@ -627,8 +633,26 @@ export function App() {
         <span class="complete-payment" aria-label="Prevailing monthly payment">
           {prevailingHeadingDollars}
         </span>
+        {activeFigures ? (
+          <PrevailingBar
+            variant="heading"
+            modalCents={activeFigures.modalPaymentCents}
+            taxCents={activeFigures.taxCents}
+            insuranceCents={activeFigures.insuranceCents}
+            fhaMipCents={activeFigures.fhaMipCents}
+            pmiCents={activeFigures.pmiCents}
+            prevailingExtraCents={activeFigures.prevailingExtraCents}
+          />
+        ) : null}
         <span> / month</span>
       </p>
+      {activeFigures ? (
+        <p class="prevailing-legend">
+          <span class="prevailing-legend-pi">PI</span>
+          <span class="prevailing-legend-ti">TI</span>
+          <span class="prevailing-legend-pe">PE</span>
+        </p>
+      ) : null}
       <div class="inputs">
         <Field
           id="years"
@@ -932,6 +956,25 @@ export function App() {
               rate={<span>{lines.pmiRateText}</span>}
             />
             <MoneyRow line="total-monthly" label="Total monthly payment" amount={lines.totalMonthlyCents} />
+            {activeFigures ? (
+              <>
+                <MoneyRow
+                  line="prevailing-principal-and-interest"
+                  label="Prevailing principal and interest"
+                  amount={activeFigures.modalPaymentCents}
+                />
+                <MoneyRow
+                  line="prevailing-extra"
+                  label="Prevailing extra"
+                  amount={activeFigures.prevailingExtraCents}
+                />
+                <MoneyRow
+                  line="prevailing-monthly-total"
+                  label="Prevailing monthly total"
+                  amount={activeFigures.totalCents}
+                />
+              </>
+            ) : null}
             <MoneyRow
               line="origination"
               label="Lender origination fee"
@@ -1022,6 +1065,7 @@ export function App() {
       </Disclosure>
       <Schedule
         years={years}
+        prevailingExtraCents={activeFigures?.prevailingExtraCents ?? 0}
         openYears={openYears}
         editingMonth={editingMonth}
         editingValue={editingValue}

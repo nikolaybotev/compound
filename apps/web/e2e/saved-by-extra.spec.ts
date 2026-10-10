@@ -16,9 +16,9 @@ test("AC2 header, month 1 only, and the 2026 year subtotal", async ({ page }) =>
   await openExample(page);
   await expect(yearSaved(page, 2026)).toHaveText("$0.00");
   const headers = page.locator("thead th");
-  await expect(headers.nth(4)).toHaveText("Extra payment");
-  await expect(headers.nth(5)).toHaveText("Saved by extra");
-  await expect(headers.nth(6)).toHaveText("Principal balance");
+  await expect(headers.nth(5)).toHaveText("Extra payment");
+  await expect(headers.nth(6)).toHaveText("Saved by extra");
+  await expect(headers.nth(7)).toHaveText("Principal balance");
 
   await extra(page, 1).fill("100");
   await extra(page, 1).press("Enter");
@@ -29,7 +29,7 @@ test("AC2 header, month 1 only, and the 2026 year subtotal", async ({ page }) =>
 
   const row = page.getByRole("row", { name: /Nov 2026/ });
   await expect(row.locator("input")).toHaveCount(1);
-  await expect(row.getByRole("cell").nth(5).locator("input")).toHaveCount(0);
+  await expect(row.getByRole("cell").nth(6).locator("input")).toHaveCount(0);
 });
 
 test("AC7 typing without commit leaves Saved by extra at zero", async ({ page }) => {
@@ -90,14 +90,14 @@ function extra(page: Page, month: number) {
 }
 
 function yearSaved(page: Page, year: number) {
-  return page.locator(`tbody[data-year='${year}'] tr.year-row td`).nth(5);
+  return page.locator(`tbody[data-year='${year}'] tr.year-row td`).nth(6);
 }
 
 function savedByExtra(page: Page, month: number) {
   const row = page.locator("tr").filter({
     has: page.locator("td.money").first().getByText(String(month), { exact: true }),
   });
-  return row.getByRole("cell").nth(5);
+  return row.getByRole("cell").nth(6);
 }
 
 async function blockForeignHosts(context: BrowserContext) {

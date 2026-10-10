@@ -90,4 +90,9 @@ DoD: `node --test`, `pnpm --dir apps/web test`, and `pnpm --dir apps/web test:e2
 
 ### Build notes (Phase 2)
 
-<Added only after the phase lands.>
+- `prevailing-bar.tsx`: heading and dropdown bars with PI/TI/PE segments and 1px paper gap.
+- `app.tsx`: legend, picture prevailing rows, `PrevailingBar` on heading.
+- `schedule.tsx`: `Prevailing extra` column after Interest.
+- `scenarios.tsx`: dropdown row bars.
+- E2e: AC3/AC7/AC9 in `scenarios.spec.ts`; column counts and AC8 picture rows in `arm.spec.ts`; `nth` shifts in `saved-by-extra.spec.ts`, `page.spec.ts`, and `picture.spec.ts`.
+- `AGENTS.md` and `REVIEW.md`: bar, prevailing extra, schedule columns, and Bugs lines from requirement 13.
