@@ -39,7 +39,7 @@ touch_nojekyll() {
 }
 
 apply_production() {
-  local staging="${1:?staging dir with production root and prototype/}"
+  local staging="${1:?staging dir with production index.html and assets/}"
   local entry base
   cd "${WORKDIR}"
   for entry in * .nojekyll; do
@@ -52,12 +52,9 @@ apply_production() {
   shopt -s dotglob nullglob
   for entry in "${staging}"/*; do
     base=$(basename "${entry}")
-    [[ "${base}" == prototype ]] && continue
     rm -rf "${WORKDIR}/${base}"
     cp -a "${entry}" "${WORKDIR}/${base}"
   done
-  rm -rf "${WORKDIR}/prototype"
-  cp -a "${staging}/prototype" "${WORKDIR}/prototype"
 }
 
 apply_feature_update() {

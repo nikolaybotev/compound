@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Implements | [spec.md](spec.md) Draft 2 |
-| Status | Draft 2 |
+| Implements | [spec.md](spec.md) Draft 3 |
+| Status | Draft 3 |
 | Stage | 3 · Build |
 
 Spec wins. Update this file in the same change whenever implementation departs from it.
@@ -16,29 +16,21 @@ None. This pull request does **not** run cutover steps below.
 
 Files: `apps/web/src/loan.ts` (done)
 
-`STORAGE_KEY` from `VITE_STORAGE_KEY`, default `compound-amortization-v1`.
-
 ## Phase 2 — gh-pages publish script
 
 Files: `.github/scripts/gh-pages-publish.sh`
 
-1. Modes: `production`, `feature-update`, `feature-remove`.
-2. Skip with exit 0 when `refs/heads/gh-pages` is absent.
-3. Ensure `.nojekyll` at repo root of `gh-pages`.
-4. Retry loop on non-fast-forward push (re-fetch, reapply only this mode’s paths, commit, tag, push). No force-push.
-
-DoD: Documented in AGENTS.md; feature retry behavior in PR description.
+1. `production` mode replaces only root production paths from staging (`index.html`, `assets/`, and any other top-level files from the production dist). Leaves `feat/`, `prototype/`, and `.nojekyll` on the branch unchanged (except `.nojekyll` is ensured each commit).
+2. `feature-update` / `feature-remove` touch only `feat/<n>/`.
+3. Fast-forward retry; skip when `gh-pages` is absent.
 
 ## Phase 3 — Workflows
 
 Files:
 
-- `.github/workflows/publish-gh-pages-production.yml` — `main` push + `workflow_dispatch`; build prod + prototype; `gh-pages-publish.sh production` with tag `pages-prod/<github.sha>`.
-- `.github/workflows/deploy-feature-preview.yml` — PR events; build feat; `feature-update` / `feature-remove` with tag `pages-feat/pr-<n>/<head-sha>`.
-- `.github/workflows/deploy-pages.yml` — unchanged live Actions publisher (remove `pages-feat` merge).
-- `.github/workflows/test.yml` — `branches-ignore: gh-pages`.
-
-Remove: `deploy-feat-pages.yml`, `verify-pages-mirror.mjs`, `pages-feat` branch workflow.
+- `.github/workflows/publish-gh-pages-production.yml` — `main` push + `workflow_dispatch`; production build only; no prototype ref or fallback.
+- `.github/workflows/deploy-feature-preview.yml` — PR feat publishes.
+- `.github/workflows/deploy-pages.yml` — unchanged; still builds production **and** `prototype/` for the live Actions site.
 
 DoD: AC1, AC2, AC6.
 
@@ -46,21 +38,21 @@ DoD: AC1, AC2, AC6.
 
 Files: `AGENTS.md`, `intent/feature-previews/spec.md`
 
-DoD: AC4, AC5.
-
 ## Cutover (manual — not run from this PR)
 
-1. Build a complete current production tree (`VITE_BASE=/compound/`) and `prototype/` (`VITE_BASE=/compound/prototype/`) from `main` and the prototype ref.
-2. Create orphan branch `gh-pages` with that tree, all assets, `.nojekyll`, and any existing `feat/` folders to keep.
-3. Verify files (HTML, JS, CSS, fonts) locally or with a checklist.
-4. Stop in-flight GitHub Actions Pages deploys for this repo.
-5. In repository **Settings → Pages**, set source to **Deploy from a branch**, branch `gh-pages`, root `/`.
-6. Load https://nikolaybotev.github.io/compound/ and https://nikolaybotev.github.io/compound/prototype/ and confirm.
-7. Disable or stop relying on `deploy-pages.yml` for live traffic (workflow file may remain until Nikolay removes it).
+1. Build production from `main` (`VITE_BASE=/compound/`) and copy the **current** live `prototype/` tree (from the Actions-published site or a one-off build) into a staging tree.
+2. Create orphan `gh-pages` with production root, `prototype/` as copied once, `.nojekyll`, and any `feat/` folders to keep.
+3. Verify files (production root, `prototype/`, fonts in each tree).
+4. Stop in-flight GitHub Actions Pages deploys.
+5. Switch Pages source to branch `gh-pages`, root `/`.
+6. Smoke-test https://nikolaybotev.github.io/compound/ and https://nikolaybotev.github.io/compound/prototype/.
+7. Rely on `publish-gh-pages-production.yml` for production root updates only; do not add a standing prototype republish job.
 
-**Rollback:** Set Pages source back to **GitHub Actions**, run `gh workflow run deploy-pages.yml`, confirm production URLs. To restore `gh-pages` content, add a commit on `gh-pages` that copies a tagged tree (`git checkout tags/pages-prod/<sha> -- .`) without rewriting branch history.
+**Prototype retirement:** One commit on `gh-pages` that deletes `prototype/` when Nikolay retires it.
+
+**Rollback:** Pages source back to GitHub Actions; run `deploy-pages.yml`. Restore `gh-pages` from a tag via a forward commit if needed.
 
 ### Build notes
 
-- 2026-10-10: Replaced mirror + `pages-feat` + `deploy-feat-pages.yml` with orphan `gh-pages` path-scoped commits (D2–D5).
-- Feature folder publish retry: on rejected push, `gh-pages-publish.sh` fetches the new tip, reapplies **only** `feat/<pr>/` (or production root + `prototype/` for main), commits again, up to 10 times.
+- 2026-10-10: Main `gh-pages` publish does not build or update `prototype/` (D3, D11). `deploy-pages.yml` still ships prototype until cutover.
+- Feature publish retry: reapply only `feat/<pr>/`; main publish retry reapply only production root files from staging.
