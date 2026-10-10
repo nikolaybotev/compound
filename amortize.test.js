@@ -94,7 +94,7 @@ test('F1 fixed $570,000 at 5.875% for 360 months', () => {
   assert.equal(report.interest_cents, 64383549);
 });
 
-test('AC2 F2 worst case on the First Entertainment 7/1 terms', () => {
+test('AC2 F2 worst case on the Example Credit Union 7/1 example terms', () => {
   const report = feReport();
   assert.equal(report.monthly_payment_cents, 337177);
   assert.equal(report.rate_percent, 5.875);

@@ -71,9 +71,9 @@ sequenceDiagram
     end
 ```
 
-## Example: First Entertainment 7/1
+## Example: Example Credit Union 7/1
 
-The table below is **one example** of the parameters and is **not the definition** of a fixed-then-adjusting ARM.
+The table below is **one example** of the parameters and is **not the definition** of a fixed-then-adjusting ARM. The example is invented for explanation, it is not an offer, and it does not describe any real credit union or lender.
 
 | Parameter sheet row | Value | Role in the procedure |
 |---|---|---|
@@ -94,4 +94,4 @@ The sheet also prints an Upfront Buy-Down Limit of 5.50%, which is a pricing rul
 
 ## How to answer
 
-Answer from this document and quote the step or relation the question is about. Do not compute a payment, an interest figure, a reset rate, or an index value. This skill **does not fetch** an index from any publisher. When the user wants a figure, say that **mortgage-loan-calculator** is the skill that runs the calculator and asks for the terms, and **does not run the calculator** from here. Do not supply the example's values as the user's terms, including the 45-day lookback, which is quoted only for the example loan or when the user gave it. When asked **which published fixing** of the index a note reads, or how two fixings compare, say the skill does not say which published fixing a note uses and has **no comparison of fixings**. Say the First Entertainment table is **one lender's example** when it is shown. Do not compute a **calendar date** for a change date: the first change is the payment after the fixed period and the note's schedule names the dates. Say that this procedure is the **fully amortizing** fixed-then-adjusting one, so **interest-only**, **payment-option**, **negative-amortization**, **balloon**, and **payment-capped** loans are outside it and the agent does not invent steps for them.
+Answer from this document and quote the step or relation the question is about. Do not compute a payment, an interest figure, a reset rate, or an index value. This skill **does not fetch** an index from any publisher. When the user wants a figure, say that **mortgage-loan-calculator** is the skill that runs the calculator and asks for the terms, and **does not run the calculator** from here. Do not supply the example's values as the user's terms, including the 45-day lookback, which is quoted only for the example loan or when the user gave it. When asked **which published fixing** of the index a note reads, or how two fixings compare, say the skill does not say which published fixing a note uses and has **no comparison of fixings**. Say the Example Credit Union table is **one invented example** when it is shown. Do not compute a **calendar date** for a change date: the first change is the payment after the fixed period and the note's schedule names the dates. Say that this procedure is the **fully amortizing** fixed-then-adjusting one, so **interest-only**, **payment-option**, **negative-amortization**, **balloon**, and **payment-capped** loans are outside it and the agent does not invent steps for them.

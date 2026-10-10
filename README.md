@@ -66,7 +66,7 @@ node compound_interest_monthly.js \
   --margin 2.5 --caps 5/2/5 --floor 2.5
 ```
 
-That loan (First Entertainment's 7/1 sheet) pays $3,371.77 for 84 months, resets to 10.875% at payment 85 with a payment of $5,037.71, and costs $1,103,636.33 of interest. The summary appends `Initial rate`, `Highest rate`, `Highest payment`, and `Adjustments`.
+That loan (the Example Credit Union 7/1 example in the docs) pays $3,371.77 for 84 months, resets to 10.875% at payment 85 with a payment of $5,037.71, and costs $1,103,636.33 of interest. The summary appends `Initial rate`, `Highest rate`, `Highest payment`, and `Adjustments`. The example is invented for explanation, it is not an offer, and it does not describe any real credit union or lender.
 
 | Flag | Meaning |
 |---|---|

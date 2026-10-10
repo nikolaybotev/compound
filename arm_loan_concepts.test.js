@@ -179,7 +179,7 @@ test('AC8 How to answer phrases', () => {
     'does not fetch',
     'does not run the calculator',
     'mortgage-loan-calculator',
-    "one lender's example",
+    "one invented example",
     '45',
     'calendar date',
     'which published fixing',
@@ -201,7 +201,7 @@ test('AC9 heading order and mermaid placement', () => {
     '## Parameters',
     '## Procedure',
     '## Sequence diagram',
-    '## Example: First Entertainment 7/1',
+    '## Example: Example Credit Union 7/1',
     '## How to answer',
   ];
   let last = -1;
@@ -214,6 +214,6 @@ test('AC9 heading order and mermaid placement', () => {
   }
   const fenceIdx = skill.indexOf('```mermaid');
   const seqIdx = skill.indexOf('## Sequence diagram');
-  const exampleIdx = skill.indexOf('## Example: First Entertainment 7/1');
+  const exampleIdx = skill.indexOf('## Example: Example Credit Union 7/1');
   assert.ok(fenceIdx > seqIdx && fenceIdx < exampleIdx);
 });
