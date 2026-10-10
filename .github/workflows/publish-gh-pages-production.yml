@@ -65,8 +65,8 @@ jobs:
       - name: Publish production root to gh-pages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PAGES_POINT_VERSION: ${{ vars.PAGES_POINT_VERSION }}
         run: |
           set -euo pipefail
-          TAG="pages-prod/${{ github.sha }}"
           MSG="Production publish from main ${{ github.sha }}"
-          bash main/.github/scripts/gh-pages-publish.sh production "${TAG}" "${MSG}" "${GITHUB_WORKSPACE}/staging"
+          bash main/.github/scripts/gh-pages-publish.sh production "${MSG}" "${GITHUB_WORKSPACE}/staging"

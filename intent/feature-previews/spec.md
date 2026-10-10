@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Derived from | [intent.md](intent.md) (2026-10-10) |
-| Status | Draft 3 |
+| Status | Draft 4 |
 | Stage | 2 · Design |
 
 ## 1. Summary
@@ -30,7 +30,7 @@ Same-repo pull requests publish previews under `https://nikolaybotev.github.io/c
 
 - P1. `gh-pages` holds built site files only (plus `.nojekyll`), on an orphan branch.
 - P2. Publishes retry on non-fast-forward: fetch tip, reapply only that job’s paths, push again. No force-push.
-- P3. Each publish tags the `gh-pages` commit for rollback (`pages-prod/<main-sha>`, `pages-feat/pr-<n>/<head-sha>`).
+- P3. Only successful **production** publishes on `gh-pages` receive an annotated tag: the point semver version of the `main` commit being published, once the repo tracks that version. Feature and other commits are not tagged.
 - P4. `deploy-pages.yml` must keep including `prototype/` in the Actions artifact until cutover; omitting it would delete the live path.
 
 ## 4. Requirements
@@ -64,7 +64,9 @@ Same-repo pull requests publish previews under `https://nikolaybotev.github.io/c
 
 **D4 — Fast-forward retry.** Up to 10 attempts; no branch force-push.
 
-**D5 — Tags.** `pages-prod/<full-main-sha>`; `pages-feat/pr-<n>/<head-sha>`.
+**D5 — Production tags only.** Tag name is the point version (for example the same identifier as a future `main` release tag). Set `PAGES_POINT_VERSION` for the workflow when that version is known. The repo has no tags and `package.json` is `0.0.0` today; do not invent a version. The first production `gh-pages` tag waits until the version is identified.
+
+**D12 — Production rollback.** `production-rollback` in `gh-pages-publish.sh` copies production root files from a tagged prod commit onto the current `gh-pages` tip (forward commit). It does not reset the branch; `prototype/` and `feat/` on the tip stay. Rollback commits are not version-tagged.
 
 **D6 — Storage.** `compound-amortization-feat-<n>-v1` per PR; production and prototype keep `compound-amortization-v1`.
 

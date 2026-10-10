@@ -64,13 +64,11 @@ jobs:
         run: |
           set -euo pipefail
           if [ "${{ github.event.action }}" = "closed" ]; then
-            TAG="pages-feat/pr-${PR_NUMBER}/${HEAD_SHA}-removed"
             MSG="Remove feat preview for PR #${PR_NUMBER} (${HEAD_SHA})"
-            bash publish-tools/.github/scripts/gh-pages-publish.sh feature-remove "${TAG}" "${MSG}" "${PR_NUMBER}"
+            bash publish-tools/.github/scripts/gh-pages-publish.sh feature-remove "${MSG}" "${PR_NUMBER}"
           else
-            TAG="pages-feat/pr-${PR_NUMBER}/${HEAD_SHA}"
             MSG="Feat preview PR #${PR_NUMBER} (${HEAD_SHA})"
-            bash publish-tools/.github/scripts/gh-pages-publish.sh feature-update "${TAG}" "${MSG}" "${PR_NUMBER}" "${GITHUB_WORKSPACE}/apps/web/dist"
+            bash publish-tools/.github/scripts/gh-pages-publish.sh feature-update "${MSG}" "${PR_NUMBER}" "${GITHUB_WORKSPACE}/apps/web/dist"
             test -f apps/web/dist/index.html
             grep -q "/compound/feat/${PR_NUMBER}/" apps/web/dist/index.html
           fi
