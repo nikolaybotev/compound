@@ -99,6 +99,7 @@ export type ScheduleMonth = {
   interestCents: number;
   extraCents: number;
   extraDollars: number;
+  edited: boolean;
   savedByExtraCents: number;
   principalBalanceCents: number;
   interestBalanceCents: number;
@@ -110,6 +111,7 @@ export type ScheduleYear = {
   principalCents: number;
   interestCents: number;
   extraCents: number;
+  savedByExtraCents: number;
   principalBalanceCents: number;
   interestBalanceCents: number;
 };
@@ -347,6 +349,7 @@ export type Prefill = {
 export type Scenario = {
   draft: LoanDraft;
   extras: Map<number, number>;
+  applied: Map<number, number>;
   prefill: Prefill;
   openYears: number[] | null;
   picture: PictureDraft;
@@ -417,6 +420,14 @@ export function withIndex(
   return [...rest, [month, percent] as [number, number]].sort((a, b) => a[0] - b[0]);
 }
 
+export function isEditedExtra(
+  extras: Map<number, number>,
+  applied: Map<number, number>,
+  month: number,
+): boolean {
+  return (extras.get(month) ?? 0) !== (applied.get(month) ?? 0);
+}
+
 export function dropExtrasBeyond(
   extras: Map<number, number>,
   monthCount: number,
@@ -446,6 +457,7 @@ export function groupByYear(
   report: Report,
   extras: Map<number, number> = new Map(),
   financedCents: number = loan.loanCents,
+  applied: Map<number, number> = extras,
 ): ScheduleYear[] {
   const startMonth = loan.startMonth;
   const fullInterestCents = report.interest_cents;
@@ -467,11 +479,13 @@ export function groupByYear(
         principalCents: 0,
         interestCents: 0,
         extraCents: 0,
+        savedByExtraCents: 0,
         principalBalanceCents: 0,
         interestBalanceCents: 0,
       };
       groups.push(group);
     }
+    const saved = savedByExtraCents(loan, extras, row.month, fullInterestCents, financedCents);
     group.rows.push({
       month: row.month,
       dateLabel: shortDate(date.year, date.month),
@@ -483,19 +497,15 @@ export function groupByYear(
       interestCents: row.interest_cents,
       extraCents,
       extraDollars,
-      savedByExtraCents: savedByExtraCents(
-        loan,
-        extras,
-        row.month,
-        fullInterestCents,
-        financedCents,
-      ),
+      edited: isEditedExtra(extras, applied, row.month),
+      savedByExtraCents: saved,
       principalBalanceCents: row.remaining_principal_cents,
       interestBalanceCents: row.remaining_interest_cents,
     });
     group.principalCents += row.principal_cents;
     group.interestCents += row.interest_cents;
     group.extraCents += extraCents;
+    group.savedByExtraCents += saved;
     group.principalBalanceCents = row.remaining_principal_cents;
     group.interestBalanceCents = row.remaining_interest_cents;
   }
@@ -512,6 +522,7 @@ export function defaultScenario(now = new Date()): Scenario {
   return {
     draft: defaultDraft(now),
     extras: new Map(),
+    applied: new Map(),
     prefill: defaultPrefill(),
     openYears: null,
     picture: defaultPicture(),
@@ -600,9 +611,12 @@ export function loadScenario(storage: StorageLike | undefined, now = new Date())
     const openYears = parseOpenYears(record.openYears);
     if (!extras || !prefill || openYears === undefined) return fallback;
     const { arm, armStored } = scenarioArm(record.arm, parsedLoan.loan);
+    const applied =
+      record.applied === undefined ? null : parseExtras(record.applied);
     return {
       draft,
       extras,
+      applied: new Map(applied ?? extras),
       prefill,
       openYears,
       picture: pictureFromStorage(record.picture),
@@ -627,6 +641,7 @@ export function saveScenario(storage: StorageLike | undefined, scenario: Scenari
         rate: scenario.draft.rate,
         start: scenario.draft.start,
         extras: [...scenario.extras.entries()],
+        applied: [...scenario.applied.entries()],
         prefill: scenario.prefill,
         openYears: scenario.openYears,
         picture: scenario.picture,

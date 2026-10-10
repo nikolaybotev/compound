@@ -137,6 +137,65 @@ test("AC14 a shorter term drops month 181 and restoring the term does not bring 
   await expect(extra(page, 1)).toHaveValue("100.00");
 });
 
+test("AC6 cells edited since the last Apply are blue", async ({ page }) => {
+  await openExample(page);
+  await applyMonthly(page, "100");
+  await page.getByRole("button", { name: "2027" }).click();
+  await expect(page.locator("input.extra[data-edited]")).toHaveCount(0);
+
+  await extra(page, 3).fill("250");
+  await extra(page, 3).press("Enter");
+  await expect(page.locator("input.extra[data-edited]")).toHaveCount(1);
+  await expect(extra(page, 3)).toHaveAttribute("data-edited", "true");
+  await expect(extra(page, 3)).toHaveCSS("color", "rgb(29, 78, 216)");
+  await expect(extra(page, 2)).not.toHaveAttribute("data-edited", /.*/);
+
+  await extra(page, 3).fill("100");
+  await extra(page, 3).press("Enter");
+  await expect(page.locator("input.extra[data-edited]")).toHaveCount(0);
+
+  await extra(page, 2).fill("");
+  await extra(page, 2).press("Enter");
+  await expect(extra(page, 2)).toHaveAttribute("data-edited", "true");
+  await expect(extra(page, 2)).toHaveCSS("border-bottom-color", "rgb(29, 78, 216)");
+
+  await extra(page, 3).fill("250");
+  await extra(page, 3).press("Enter");
+  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(extra(page, 2)).toHaveValue("100.00");
+  await expect(extra(page, 3)).toHaveValue("100.00");
+  await expect(page.locator("input.extra[data-edited]")).toHaveCount(0);
+
+  await extra(page, 3).fill("250");
+  await extra(page, 3).press("Enter");
+  await page.reload();
+  await expect(extra(page, 3)).toHaveAttribute("data-edited", "true");
+  await expect(page.locator("input.extra[data-edited]")).toHaveCount(1);
+
+  await extra(page, 4).fill("7");
+  await expect(extra(page, 4)).not.toHaveAttribute("data-edited", /.*/);
+});
+
+test("AC7 the Apply sentence sits beside the button and the form select lines up", async ({ page }) => {
+  await openExample(page);
+  await openPrefill(page);
+  const sentence = page.getByText("Apply rewrites all extra-payment column values.");
+  await expect(sentence).toHaveCount(1);
+  const row = page.locator(".apply-row");
+  await expect(row.getByText("Apply rewrites all extra-payment column values.")).toHaveCount(1);
+  await expect(row.getByRole("button", { name: "Apply" })).toHaveCount(1);
+  await expect(page.getByText("Apply replaces the extra-payment column.")).toHaveCount(0);
+
+  const select = await page.locator("#extra-yearly-month").boundingBox();
+  const input = await page.locator("#extra-yearly").boundingBox();
+  expect(select).not.toBeNull();
+  expect(input).not.toBeNull();
+  expect(Math.abs(select!.y + select!.height - (input!.y + input!.height))).toBeLessThanOrEqual(1);
+  expect(Math.abs(select!.height - input!.height)).toBeLessThanOrEqual(1);
+  await expect(page.locator("#extra-yearly-month")).toHaveCSS("appearance", "none");
+  await expect(page.locator("#product")).not.toHaveCSS("appearance", "none");
+});
+
 async function openExample(page: Page) {
   await page.goto("/");
   await page.locator("#start").fill("2026-10");
