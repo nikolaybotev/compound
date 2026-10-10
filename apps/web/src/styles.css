@@ -508,3 +508,38 @@ td {
     scroll-behavior: auto;
   }
 }
+
+.heading-line select.product {
+  width: auto;
+  padding: 0 0.15rem;
+  border-bottom: 1px dotted var(--muted);
+  font-family: var(--mono);
+  font-size: inherit;
+  font-weight: 500;
+}
+
+.arm-label {
+  white-space: nowrap;
+}
+
+.arm {
+  margin: 0 0 1.25rem;
+}
+
+.arm-check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.85rem 0 0;
+}
+
+.arm-check input {
+  width: auto;
+}
+
+.arm-computed {
+  margin: 0.6rem 0 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.92rem;
+}
