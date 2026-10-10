@@ -44,7 +44,7 @@ test("AC9 selecting ARM at the default rate shows the 12.375% ceiling", async ({
 
 test("AC9 the Example Credit Union 7/1 example heading, terms, and summary", async ({ page }) => {
   await openArm(page);
-  expect(await headingText(page)).toBe("600K | 5% down | 5.875% 7/1 ARM = $4,288 / month");
+  expect(await headingText(page)).toBe("600K | 5% down | 5.875% 7/1 ARM = $5,954 / month");
   const heading = page.locator(".heading-line");
   const labelBox = await page.getByTestId("arm-label").boundingBox();
   const selectBox = await page.locator("#product").boundingBox();
@@ -169,7 +169,7 @@ test("switching to fixed and back keeps the terms and a closed disclosure stays 
 test("a reload keeps the ARM scenario", async ({ page }) => {
   await openArm(page);
   await page.reload();
-  expect(await headingText(page)).toBe("600K | 5% down | 5.875% 7/1 ARM = $4,288 / month");
+  expect(await headingText(page)).toBe("600K | 5% down | 5.875% 7/1 ARM = $5,954 / month");
   await expect(page.locator("summary", { hasText: "ARM terms" })).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByRole("region", { name: "Highest payment" })).toContainText(
     "$5,037.71 from November 2033",

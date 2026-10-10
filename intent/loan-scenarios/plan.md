@@ -71,7 +71,10 @@ DoD: `node --test`, `pnpm --dir apps/web test`, and `pnpm --dir apps/web test:e2
 
 ### Build notes (Phase 1)
 
-<Added only after the phase lands.>
+- `scenarios.tsx`: page-drawn list, export/import, confirm dialog with focus trap, trash hover CSS.
+- `app.tsx`: `loanSet`, `reseedFromScenario`, prevailing heading dollar and `scenarioLabelText` on `#scenario`.
+- `month-picker.tsx`: `closeSignal` closes the picker on scenario switch.
+- `e2e/scenarios.spec.ts`: AC3–AC7, AC10, AC13. `arm.spec.ts` / `picture.spec.ts` heading name and ARM prevailing dollar.
 
 ## Phase 2 — Color bar, picture rows, and the schedule column
 
