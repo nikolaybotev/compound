@@ -3,7 +3,7 @@ name: publish-gh-pages-production
 # After cutover, GitHub Pages serves orphan branch gh-pages. This job updates
 # only production root files (index.html and assets/). It does not build, copy,
 # update, or delete prototype/ or feat/. deploy-pages.yml still ships
-# production and prototype/ until cutover.
+# production and prototype/ until cutover. Tags production gh-pages commits 0.6.
 
 on:
   push:

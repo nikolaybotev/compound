@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | Derived from | [intent.md](intent.md) (2026-10-10) |
-| Status | Draft 5 |
+| Status | Draft 6 |
 | Stage | 2 · Design |
 
 ## 1. Summary
@@ -58,4 +58,14 @@ Feature previews on orphan `gh-pages` store each build under `feat/<12-char-comm
 
 **D6 — Storage.** PR: `compound-amortization-feat-<pull-request-number>-v1`. No PR: `compound-amortization-feat-<12-char-sha>-v1`.
 
-(D4, D5, D7, D8, D11, D12 unchanged from Draft 4.)
+**D4 — Fast-forward retry.** Up to 10 attempts; no branch force-push.
+
+**D5 — Production tags only.** `publish-gh-pages-production.yml` sets `PAGES_POINT_VERSION` to `0.6`, the complete-loan-picture app release (`apps/web` version `0.6.0`). Point releases `0.1` through `0.5` are grandfathered on the Actions publisher and are not tagged on `gh-pages`. The first production `gh-pages` commit tagged is `0.6`. If tag `0.6` already exists, the publish stays green and does not move the tag. Feature publishes are not tagged.
+
+**D7 — Cutover seed.** One-time copy of current production root and `prototype/` onto `gh-pages` plus `.nojekyll`. See [plan.md](plan.md).
+
+**D8 — Forks.** Same-repo `pull_request` guard only.
+
+**D11 — Prototype retirement.** Later removal is a single commit on `gh-pages` deleting `prototype/`, not a standing workflow job.
+
+**D12 — Production rollback.** `production-rollback` reapplies production root from tag `0.6` (or another prod tag) onto the current tip without resetting `prototype/` or `feat/`.
