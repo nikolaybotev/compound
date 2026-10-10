@@ -42,7 +42,7 @@ test("AC9 selecting ARM at the default rate shows the 12.375% ceiling", async ({
   );
 });
 
-test("AC9 the First Entertainment 7/1 heading, terms, and summary", async ({ page }) => {
+test("AC9 the Example Credit Union 7/1 example heading, terms, and summary", async ({ page }) => {
   await openArm(page);
   expect(await headingText(page)).toBe("600K | 5% down | 5.875% 7/1 ARM = $4,288 / month");
   const heading = page.locator(".heading-line");
