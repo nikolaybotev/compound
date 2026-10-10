@@ -11,7 +11,7 @@
 
 ## Problem
 
-The calculator, the skill, and the page amortize one fixed note rate. The skill refuses an adjustable-rate loan outright. The owner is pricing a First Entertainment 7/1 ARM against a 30-year fixed, has the lender's rate terms in hand (fixed period, adjustment frequency, index, margin, 5/2/5 caps, floors, lookback), and has no way to see the worst-case payment and interest that those terms allow, or to try an index path of their own, inside the tools this repo already has.
+The calculator, the skill, and the page amortize one fixed note rate. The skill refuses an adjustable-rate loan outright. The owner is pricing a Example Credit Union 7/1 ARM against a 30-year fixed, has the lender's rate terms in hand (fixed period, adjustment frequency, index, margin, 5/2/5 caps, floors, lookback), and has no way to see the worst-case payment and interest that those terms allow, or to try an index path of their own, inside the tools this repo already has.
 
 ## Proposed outcome
 
@@ -19,7 +19,7 @@ The same calculator runs a fixed-then-adjusting ARM. With only the loan and the 
 
 ## Affected users and systems
 
-- **Users:** The owner, comparing the First Entertainment 7/1 ARM with a fixed loan and modeling rate paths. Anyone running the script, the skill, or the page.
+- **Users:** The owner, comparing the Example Credit Union 7/1 ARM with a fixed loan and modeling rate paths. Anyone running the script, the skill, or the page.
 - **Systems:** `amortize.js` (the pure walk), `compound_interest_monthly.js` (the CLI), `.agents/skills/mortgage-loan-calculator/SKILL.md`, `apps/web`, `README.md`, `AGENTS.md`, `REVIEW.md`. `origination_fees.js` and the fee skill are untouched. The Pages deploy is untouched.
 
 ## Constraints and principles
@@ -31,15 +31,17 @@ The same calculator runs a fixed-then-adjusting ARM. With only the loan and the 
 - The fixed-rate loan stays the default product. ARM is a mode with extra inputs. Worst case is the ARM default, not a change to the fixed-rate page.
 - Pages publishing stays as it is: content on `gh-pages`, deployed by the Actions workflow on `main`. No deploy redesign.
 - The queued UI follow-ups are a separate list and are not folded in.
-- Facts are checked before they harden, including the First Entertainment caps, index, margin, floors, and adjustment frequency. Spec wins over plan.
+- Facts are checked before they harden, including the Example Credit Union caps, index, margin, floors, and adjustment frequency. Spec wins over plan.
 - A question is left open only if it is truly undecidable. Otherwise the conservative option is decided and recorded.
 - Model choices named by the owner: Claude Fable for spec and plan work, Grok for spec and plan review, Claude Sonnet for the build.
 
 ## Sources
 
-- Parameter sheet: `First_Entertainment_7-1_ARM_Variables_ce19.pdf`, one page, titled "First Entertainment 7/1 ARM Variables". Its rows, verbatim: Initial Fixed Period 7 Years; Adjustment Frequency Annually; Benchmark Index 1-Year Constant Maturity Treasury (CMT); Margin 2.50%; Rate Cap Structure (Initial/Periodic/Lifetime) 5/2/5; Initial Floor Rate 2.50%; Lifetime Floor Rate 2.50%; Lookback Period 45 Days; Upfront Buy-Down Limit 5.50%.
-- ARM terms: `First_Entertainment_ARM_Terms_ffdb.pdf`, a 31-page printout of the Gemini chat "Understanding First Entertainment ARM Terms" (created 2026-10-08, published 2026-10-09). Its footer URL is `https://gemini.google.com/share/204b7fb81ff2`. Ed's reply with the terms is on pages 23–24 and is the same list as the parameter sheet, plus: "Our base closing cost fees are the same regardless of loan type. The above parameters are the same for both the 7/1 ARM and 10/1 ARM. The primary difference is the initial fixed-rate period before the first adjustment, which is 7 years for the 7/1 ARM and 10 years for the 10/1 ARM."
-- Gemini study link `https://share.gemini.google/gJVq4JiPAL9K`: fetched 2026-10-10. It answered HTTP 200 and redirected to `https://gemini.google.com/share/204b7fb81ff2`, the same share the printout carries, with the page title "Gemini - Understanding First Entertainment ARM Terms". The conversation body is rendered by script and is not in the fetched HTML, so the printout above is the transcript used here. No separate transcript file was attached; the "ARM terms" PDF is that transcript.
+The public **Example Credit Union** 7/1 figures in this repo were read from a lender parameter sheet and a study printout; that example is invented for explanation and is not any real credit union's or lender's product.
+
+- Parameter sheet: `example_lender_7-1_ARM_Variables_ce19.pdf`, one page, titled "7/1 ARM Variables". Its rows, verbatim: Initial Fixed Period 7 Years; Adjustment Frequency Annually; Benchmark Index 1-Year Constant Maturity Treasury (CMT); Margin 2.50%; Rate Cap Structure (Initial/Periodic/Lifetime) 5/2/5; Initial Floor Rate 2.50%; Lifetime Floor Rate 2.50%; Lookback Period 45 Days; Upfront Buy-Down Limit 5.50%.
+- ARM terms study: `example_lender_ARM_Terms_ffdb.pdf`, a 31-page printout of a Gemini chat about ARM terms (created 2026-10-08, published 2026-10-09). Its footer URL is `https://gemini.google.com/share/204b7fb81ff2`. Ed's reply with the terms is on pages 23–24 and is the same list as the parameter sheet, plus: "Our base closing cost fees are the same regardless of loan type. The above parameters are the same for both the 7/1 ARM and 10/1 ARM. The primary difference is the initial fixed-rate period before the first adjustment, which is 7 years for the 7/1 ARM and 10 years for the 10/1 ARM."
+- Gemini study link `https://share.gemini.google/gJVq4JiPAL9K`: fetched 2026-10-10. It answered HTTP 200 and redirected to `https://gemini.google.com/share/204b7fb81ff2`, the same share the printout carries, with the page title "Gemini - Understanding ARM Terms". The conversation body is rendered by script and is not in the fetched HTML, so the printout above is the transcript used here. No separate transcript file was attached; the "ARM terms" PDF is that transcript.
 - Standard US ARM mechanics checked on 2026-10-10 against the Fannie Mae Multistate Adjustable Rate Note and Rider for the one-year Treasury index (Forms 3501 and 3108) and the Fixed/Adjustable Rate Note for 30-day Average SOFR (`singlefamily.fanniemae.com/media/38916`), and against the CFPB Consumer Handbook on Adjustable-Rate Mortgages. The specific clauses are recorded in [spec.md](spec.md) D3–D7.
 
 ## Open questions (carried into spec.md)
@@ -73,7 +75,7 @@ The same calculator runs a fixed-then-adjusting ARM. With only the loan and the 
 
 ## Source transcript (verbatim)
 
-From the printout `First_Entertainment_ARM_Terms_ffdb.pdf` of the Gemini chat "Understanding First Entertainment ARM Terms". The ARM exchanges are pasted below as printed, with the PDF's ligature glyphs restored to letters. Pages 13 through 20, on closing costs, impounds, and homeowner's insurance, are omitted and marked. The owner's turns are quoted; Gemini's replies follow each.
+From the printout `example_lender_ARM_Terms_ffdb.pdf` of the Gemini chat "Understanding Example Credit Union ARM Terms". The ARM exchanges are pasted below as printed, with the PDF's ligature glyphs restored to letters. Pages 13 through 20, on closing costs, impounds, and homeowner's insurance, are omitted and marked. The owner's turns are quoted; Gemini's replies follow each.
 
 > What are all the raw terms of an ARM mortgage on the US market? In particular, what should I ask Ed in order to understand all the raw math and terms on their 7-1 promo ARM shown at https://www.firstent.org/rates/personal/#mortgage. Here is Ed's email from yesterday again.
 
@@ -91,7 +93,7 @@ Lifetime Cap: The absolute maximum percentage points the rate can rise above the
 Floor: The absolute minimum interest rate allowable on the loan, regardless of how low the index drops.
 Lookback Period: The exact number of days prior to the rate adjustment date (usually 45 days) when the lender measures the index.
 
-Questions to Validate the First Entertainment ARM
+Questions to Validate the Example Credit Union ARM
 
 The rate sheet in RE EXTURGENT 1240 Duffy Way CounterOffer Need Pricing Docs to Sign.pdf establishes your zero-point par rate for the 7/1 ARM at 5.875% (pricing of 100.000). Ed also explicitly notes a minimum floor rate of 5.5%. Before authorizing Connie to finalize the negotiations, ask Ed for the exact internal formulas needed to project your worst-case amortization scenarios:
 
@@ -171,14 +173,14 @@ Your premise is completely correct. The upper bound on any given adjustment date
 
 On the US mortgage market, standard Adjustable Rate Mortgages are structured and amortized exactly like traditional fixed loans, meaning the introductory fixed period and the subsequent variable adjustment period combine to form the total lifespan of the debt. For a standard 7/1 ARM, the initial locked rate lasts for 7 years, followed by 23 years of annual adjustments.
 
-To verify the specific duration of your First Entertainment quote, we can reverse-engineer the payment figures provided in the 7/1 ARM table.
+To verify the specific duration of your Example Credit Union quote, we can reverse-engineer the payment figures provided in the 7/1 ARM table.
 
 Principal: $570,000
 Zero-Point Par Rate: 5.875%
 Quoted P&I Payment: $3,372
 Amortization Calculation: Calculating the monthly principal and interest payment for a $570,000 balance at a 5.875% annual interest rate over 360 months yields exactly $3,372.06.
 
-Because the quoted monthly payment perfectly matches a 360-month mathematical schedule, your First Entertainment 7/1 ARM does indeed have a 30-year full term.
+Because the quoted monthly payment perfectly matches a 360-month mathematical schedule, your Example Credit Union 7/1 ARM does indeed have a 30-year full term.
 
 > I asked Ed to send me all the variables. I have this list of variables right now:
 > 1. Initial Fixed Period - 7 years for the 7/1 ARM
@@ -198,7 +200,7 @@ Because the quoted monthly payment perfectly matches a 360-month mathematical sc
 2. Adjustment Frequency: When the mortgage industry retired the old LIBOR benchmark (which utilized 1-year adjustment periods), the regulatory standard for the new SOFR benchmark shifted to 6-month adjustments. The actual financial product sold today is almost entirely the "7/6 ARM." However, because consumers, loan officers, and legacy software systems spent decades accustomed to the "7/1" naming convention, many lenders continue using "7/1 ARM" strictly as a familiar marketing label for loans that actually adjust every six months. You must verify the legal frequency on the Loan Estimate.
 3. Benchmark Index: Ed did not specify the index in his email. It is most likely the 30-Day Average SOFR, but this requires written confirmation.
 4. Margin: Ed did not provide the margin percentage in his quote.
-5. Floor: Ed explicitly noted a "floor rate of 5.5% on the 7/1 ARM after any applicable rate discounts including relationship discounts". The mechanical clarification you need is whether this 5.5% acts merely as a floor on your initial locked rate (meaning you cannot buy down your starting par rate below 5.5% using discount points at closing) or if it acts as the permanent Lifetime Floor across the entire 30-year loan. Typically, an ARM's lifetime floor is simply equal to its Margin (e.g., 2.75%). If First Entertainment enforces a hard lifetime floor of 5.5% regardless of the margin, you would be mathematically blocked from fully benefiting from future market crashes where the SOFR drops near zero.
+5. Floor: Ed explicitly noted a "floor rate of 5.5% on the 7/1 ARM after any applicable rate discounts including relationship discounts". The mechanical clarification you need is whether this 5.5% acts merely as a floor on your initial locked rate (meaning you cannot buy down your starting par rate below 5.5% using discount points at closing) or if it acts as the permanent Lifetime Floor across the entire 30-year loan. Typically, an ARM's lifetime floor is simply equal to its Margin (e.g., 2.75%). If Example Credit Union enforces a hard lifetime floor of 5.5% regardless of the margin, you would be mathematically blocked from fully benefiting from future market crashes where the SOFR drops near zero.
 6. Rate Cap Structure: Ed did not include the initial, periodic, or lifetime rate caps in his email.
 7. Lookback Period: Ed did not disclose the lookback period in his email.
 
@@ -273,11 +275,11 @@ This is the absolute mathematical minimum your interest rate can ever drop to du
 
 2. The 5.50% Origination Floor (The Buy-Down Limit)
 
-This is First Entertainment's retail pricing limit on your initial 7-year locked rate. Based on the pricing sheet Ed sent you yesterday, your zero-point par rate is 5.875%. When Ed stated, "there is a floor rate of 5.5% on the 7/1 ARM after any applicable rate discounts," he was warning you that even if you choose to pay thousands of dollars in discount points at closing to buy down your rate, First Entertainment's system will simply not allow them to originate a starting rate lower than 5.50%.
+This is Example Credit Union's retail pricing limit on your initial 7-year locked rate. Based on the pricing sheet Ed sent you yesterday, your zero-point par rate is 5.875%. When Ed stated, "there is a floor rate of 5.5% on the 7/1 ARM after any applicable rate discounts," he was warning you that even if you choose to pay thousands of dollars in discount points at closing to buy down your rate, Example Credit Union's system will simply not allow them to originate a starting rate lower than 5.50%.
 
 Ed's email also revealed two critical structural details about your quote:
 
-The Index is CMT, not SOFR: This is the most significant takeaway. First Entertainment is pricing this ARM against the 1-Year Constant Maturity Treasury (CMT) index rather than the industry-standard SOFR. Because the CMT tracks 1-year Treasury yields, this explains why your loan adjusts exactly 1 time annually (a true 7/1 ARM) rather than every 6 months like modern SOFR-based ARMs.
+The Index is CMT, not SOFR: This is the most significant takeaway. Example Credit Union is pricing this ARM against the 1-Year Constant Maturity Treasury (CMT) index rather than the industry-standard SOFR. Because the CMT tracks 1-year Treasury yields, this explains why your loan adjusts exactly 1 time annually (a true 7/1 ARM) rather than every 6 months like modern SOFR-based ARMs.
 Your Absolute Worst-Case Scenario is 10.875%: Because Ed confirmed a 5/2/5 cap structure, we can map your exact limits. Starting from your 5.875% par rate, the 5% initial cap and 5% lifetime cap are identical. This means your rate can legally shoot up to 10.875% on the very first adjustment day at year eight, and 10.875% serves as your permanent absolute ceiling for the remaining 23 years of the loan.
 
 > So in my ARM variable spec sheet I need to add a Buy-Down Limit Variable
@@ -286,7 +288,7 @@ Yes, that is absolutely the correct way to model it so you don't confuse the two
 
 I have updated your spreadsheet to reflect all of Ed's answers, corrected the Initial Floor Rate to 2.50% to match the contract terms, and added a specific line item for the Upfront Buy-Down Limit at 5.500%.
 
-First Entertainment 7/1 ARM Variables
+Example Credit Union 7/1 ARM Variables
 
 Since you now have the exact margin (2.50%), index (1-Year CMT), cap structure (5/2/5), and corrected cash-to-close figures, you have everything mathematically required to clear your 7.4% financing contingency with Connie and counter the seller on Duffy Way.
 
@@ -302,7 +304,7 @@ Monthly 1-Year CMT (Series GS1): https://fred.stlouisfed.org/series/GS1
 
 How to read the data for your loan:
 
-If you go to the Daily (DGS1) chart and see that the rate on your exact 45-day lookback date is 4.42%, First Entertainment will add your 2.50% fixed margin to that number. This means your new fully indexed mortgage rate would become 6.92% for that upcoming year (assuming it hasn't hit your absolute 10.875% lifetime cap or triggered a periodic cap limit).
+If you go to the Daily (DGS1) chart and see that the rate on your exact 45-day lookback date is 4.42%, Example Credit Union will add your 2.50% fixed margin to that number. This means your new fully indexed mortgage rate would become 6.92% for that upcoming year (assuming it hasn't hit your absolute 10.875% lifetime cap or triggered a periodic cap limit).
 
 > So unlike the SOFR there is no separate 30-day running average chart for the CMT?
 
@@ -316,6 +318,6 @@ Instead of a 30-day average, standard Fannie Mae and Freddie Mac CMT ARM contrac
 
 How the 45-Day Lookback usually works for a CMT ARM:
 
-When you reach your adjustment window in year eight, First Entertainment will count exactly 45 days backward from your adjustment date. They will then pull the most recent Weekly Average CMT published by the Federal Reserve prior to that exact lookback day. They add your 2.50% margin to that single weekly average, and that sum becomes your newly locked rate for the next 12 months.
+When you reach your adjustment window in year eight, Example Credit Union will count exactly 45 days backward from your adjustment date. They will then pull the most recent Weekly Average CMT published by the Federal Reserve prior to that exact lookback day. They add your 2.50% margin to that single weekly average, and that sum becomes your newly locked rate for the next 12 months.
 
 Before signing the final closing disclosures for Duffy Way, simply have Ed confirm whether your specific promissory note dictates the use of the Daily reading or the standard Weekly average for the index measurement.
