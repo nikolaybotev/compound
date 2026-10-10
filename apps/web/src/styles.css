@@ -38,6 +38,7 @@
   --line: #d7ded9;
   --principal: #1b7a4d;
   --interest: #c5362b;
+  --edited: #1d4ed8;
   --balance: #2a4365;
   --remaining: #d9a441;
   --sans: "Atkinson Hyperlegible", sans-serif;
@@ -406,10 +407,39 @@ select {
   font-size: 1.05rem;
 }
 
+.field select {
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 0;
+  font: inherit;
+  font-size: 1.05rem;
+  line-height: inherit;
+  height: auto;
+  padding: 0.35rem 1.5rem 0.35rem 0;
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%235c6b66' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    no-repeat right 0.2rem center;
+}
+
+.apply-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.85rem;
+}
+
+.prefill-panel .apply-row .note {
+  margin: 0;
+}
+
 input.extra {
   width: 7rem;
   text-align: right;
   padding: 0.15rem 0;
+}
+
+input.extra[data-edited="true"] {
+  color: var(--edited);
+  border-bottom-color: var(--edited);
 }
 
 .schedule-head {

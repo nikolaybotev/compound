@@ -11,8 +11,9 @@ test.afterEach(({ context }) => {
   expect(leaks.get(context) ?? []).toEqual([]);
 });
 
-test("AC2 header, month 1 only, and empty 2026 year cell", async ({ page }) => {
+test("AC2 header, month 1 only, and the 2026 year subtotal", async ({ page }) => {
   await openExample(page);
+  await expect(yearSaved(page, 2026)).toHaveText("$0.00");
   const headers = page.locator("thead th");
   await expect(headers.nth(4)).toHaveText("Extra payment");
   await expect(headers.nth(5)).toHaveText("Saved by extra");
@@ -23,7 +24,7 @@ test("AC2 header, month 1 only, and empty 2026 year cell", async ({ page }) => {
   await expect(savedByExtra(page, 1)).toHaveText("$706.94");
   await expect(page.getByRole("region", { name: "Interest saved" })).toContainText("$706.94");
   await expect(savedByExtra(page, 2)).toHaveText("$0.00");
-  await expect(page.locator("tbody[data-year='2026'] tr.year-row td").nth(5)).toHaveText("");
+  await expect(yearSaved(page, 2026)).toHaveText("$706.94");
 
   const row = page.getByRole("row", { name: /Nov 2026/ });
   await expect(row.locator("input")).toHaveCount(1);
@@ -49,12 +50,17 @@ test("AC3 first-year $100 extras", async ({ page }) => {
   await expect(savedByExtra(page, 12)).toHaveText("$648.18");
   await expect(savedByExtra(page, 13)).toHaveText("$0.00");
   await expect(page.getByRole("region", { name: "Interest saved" })).toContainText("$8,137.70");
+  await expect(yearSaved(page, 2026)).toHaveText("$1,390.60");
+  await expect(yearSaved(page, 2027)).toHaveText("$6,681.28");
+  await expect(yearSaved(page, 2028)).toHaveText("$0.00");
 });
 
 test("AC4 Apply $100 monthly through payoff", async ({ page }) => {
   await openExample(page);
   await applyMonthly(page, "100");
   await expect(savedByExtra(page, 1)).toHaveText("$585.67");
+  await expect(yearSaved(page, 2026)).toHaveText("$1,167.36");
+  await expect(yearSaved(page, 2027)).toHaveText("$6,678.37");
   await expect(page.getByRole("region", { name: "Interest saved" })).toContainText("$76,366.09");
   await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("June 2054");
   await page.getByRole("button", { name: "Expand all years" }).click();
@@ -80,6 +86,10 @@ async function applyMonthly(page: Page, amount: string) {
 
 function extra(page: Page, month: number) {
   return page.locator(`[aria-label="Extra payment for month ${month}"]`);
+}
+
+function yearSaved(page: Page, year: number) {
+  return page.locator(`tbody[data-year='${year}'] tr.year-row td`).nth(5);
 }
 
 function savedByExtra(page: Page, month: number) {
