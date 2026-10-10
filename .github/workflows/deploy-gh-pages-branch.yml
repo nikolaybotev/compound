@@ -1,6 +1,7 @@
 name: deploy-gh-pages-branch
 
 # Publishes the orphan gh-pages branch tree to GitHub Pages via Actions.
+# Live site content matches the gh-pages tip (production, prototype/, feat/).
 # No build. This workflow file lives on main only so a gh-pages commit cannot
 # change the deployer. Triggered by workflow_dispatch (including from publish
 # workflows after they push gh-pages).
