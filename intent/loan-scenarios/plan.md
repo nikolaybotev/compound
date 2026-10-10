@@ -52,7 +52,9 @@ DoD: `node --test`, `pnpm --dir apps/web test`, and `pnpm --dir apps/web test:e2
 
 ### Build notes (Phase 0)
 
-<Added only after the phase lands.>
+- `loan.ts`: `loadStored`, `saveStored`, `parseStoredSet`, `storageSetKey`, prevailing helpers, and `scenarioFigures`. `parseOpenYears` accepts JSON `null`. Malformed `applied` on a scenario object still falls back to `extras` like `loadScenario`.
+- `app.tsx`: in-memory set via `loadStored` / `saveStored` on `persist`.
+- `unit/loan.ts`: F1–F10 and storage AC1/AC2 coverage. `extras.spec.ts`: corrupt legacy reload clears `compound-amortization-v2`.
 
 ## Phase 1 — Scenario list, export, import, and the heading
 
