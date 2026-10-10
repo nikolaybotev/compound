@@ -1,9 +1,9 @@
 name: publish-gh-pages-production
 
-# After cutover, GitHub Pages serves orphan branch gh-pages. This job updates
-# only production root files (index.html and assets/). It does not build, copy,
-# update, or delete prototype/ or feat/. deploy-pages.yml still ships
-# production and prototype/ until cutover. Tags production gh-pages commits 0.6.
+# Commits production root files onto orphan gh-pages. Live traffic is published
+# by deploy-gh-pages-branch.yml (workflow_dispatch), including after each push
+# here. Does not build, copy, update, or delete prototype/ or feat/.
+# deploy-pages.yml is manual rollback only. Tags production gh-pages commits 0.6.
 
 on:
   push:
@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: gh-pages-publish
@@ -66,7 +67,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PAGES_POINT_VERSION: "0.6"
+          GH_PAGES_PUSH_MARKER: ${{ runner.temp }}/gh-pages-pushed
         run: |
           set -euo pipefail
+          rm -f "${GH_PAGES_PUSH_MARKER}"
           MSG="Production publish from main ${{ github.sha }}"
           bash main/.github/scripts/gh-pages-publish.sh production "${MSG}" "${GITHUB_WORKSPACE}/staging"
+
+      - name: Deploy gh-pages tree to GitHub Pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_PAGES_PUSH_MARKER: ${{ runner.temp }}/gh-pages-pushed
+        run: bash main/.github/scripts/dispatch-deploy-gh-pages-branch.sh

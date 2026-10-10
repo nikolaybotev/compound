@@ -206,6 +206,9 @@ while [[ "${attempt}" -le "${MAX_ATTEMPTS}" ]]; do
   push_err="$(mktemp)"
   if git push origin "${GH_PAGES_BRANCH}" 2>"${push_err}"; then
     maybe_tag_production_commit
+    if [[ -n "${GH_PAGES_PUSH_MARKER:-}" ]]; then
+      touch "${GH_PAGES_PUSH_MARKER}"
+    fi
     echo "Published ${MODE} to ${GH_PAGES_BRANCH}."
     exit 0
   fi

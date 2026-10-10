@@ -3,7 +3,8 @@ name: deploy-feature-preview
 # Publishes feat/<12-char-sha>/ builds on orphan gh-pages. Open pull requests
 # also maintain feat/<pr>/index.html redirecting to the latest sha. Closing
 # the pull request does not remove that pointer. Does not
-# rebuild production or prototype. Until gh-pages exists, exits 0.
+# rebuild production or prototype. Dispatches deploy-gh-pages-branch.yml after
+# a successful gh-pages push. Until gh-pages exists, publish exits 0.
 
 on:
   pull_request:
@@ -16,6 +17,7 @@ on:
 permissions:
   contents: write
   pull-requests: read
+  actions: write
 
 concurrency:
   group: gh-pages-publish
@@ -60,7 +62,9 @@ jobs:
       - name: Check out gh-pages publish script
         uses: actions/checkout@v4
         with:
-          sparse-checkout: .github/scripts/gh-pages-publish.sh
+          sparse-checkout: |
+            .github/scripts/gh-pages-publish.sh
+            .github/scripts/dispatch-deploy-gh-pages-branch.sh
           sparse-checkout-cone-mode: false
           path: publish-tools
 
@@ -69,11 +73,19 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_PAGES_PUSH_MARKER: ${{ runner.temp }}/gh-pages-pushed
         run: |
           set -euo pipefail
+          rm -f "${GH_PAGES_PUSH_MARKER}"
           SHORT_SHA="${HEAD_SHA:0:12}"
           MSG="Feat preview PR #${PR_NUMBER} -> ${SHORT_SHA}"
           bash publish-tools/.github/scripts/gh-pages-publish.sh feature-pr-publish "${MSG}" "${PR_NUMBER}" "${SHORT_SHA}" "${GITHUB_WORKSPACE}/apps/web/dist"
+
+      - name: Deploy gh-pages tree to GitHub Pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_PAGES_PUSH_MARKER: ${{ runner.temp }}/gh-pages-pushed
+        run: bash publish-tools/.github/scripts/dispatch-deploy-gh-pages-branch.sh
 
   preview-branch:
     if: github.event_name == 'push'
@@ -132,7 +144,9 @@ jobs:
         if: steps.open_pr.outputs.has_open_pr == 'false'
         uses: actions/checkout@v4
         with:
-          sparse-checkout: .github/scripts/gh-pages-publish.sh
+          sparse-checkout: |
+            .github/scripts/gh-pages-publish.sh
+            .github/scripts/dispatch-deploy-gh-pages-branch.sh
           sparse-checkout-cone-mode: false
           path: publish-tools
 
@@ -140,7 +154,16 @@ jobs:
         if: steps.open_pr.outputs.has_open_pr == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_PAGES_PUSH_MARKER: ${{ runner.temp }}/gh-pages-pushed
         run: |
           set -euo pipefail
+          rm -f "${GH_PAGES_PUSH_MARKER}"
           MSG="Feat preview ${SHORT_SHA}"
           bash publish-tools/.github/scripts/gh-pages-publish.sh feature-sha "${MSG}" "${SHORT_SHA}" "${GITHUB_WORKSPACE}/apps/web/dist"
+
+      - name: Deploy gh-pages tree to GitHub Pages
+        if: steps.open_pr.outputs.has_open_pr == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_PAGES_PUSH_MARKER: ${{ runner.temp }}/gh-pages-pushed
+        run: bash publish-tools/.github/scripts/dispatch-deploy-gh-pages-branch.sh
