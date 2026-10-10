@@ -13,7 +13,7 @@
 #   feature-pr-publish <commit-message> <pr-number> <12-char-sha> <staging-dir>
 #     Publishes feat/<sha>/ and replaces feat/<pr>/ with a redirect index.html.
 #   feature-pointer-remove <commit-message> <pr-number>
-#     Removes feat/<pr>/ only (sha folders stay).
+#     Removes feat/<pr>/ only (manual; not used on pull request close).
 #   production-rollback <commit-message> <prod-version-tag>
 #     Copies production root files from the tagged prod commit onto the current
 #     gh-pages tip (forward commit). Does not reset the branch; feat/ and

@@ -15,7 +15,7 @@ Pull requests that change the amortization page have no URL on the existing GitH
 
 ## Proposed outcome
 
-GitHub Pages will serve orphan branch `gh-pages`. Each feature build lands under `feat/<12-char-commit-sha>/`. Open pull requests keep `feat/<number>/index.html` redirecting to the latest sha; closing a PR removes that pointer only. Main updates only production root on `gh-pages`; `prototype/` is seed-only. Until cutover, `deploy-pages.yml` stays the live publisher with `prototype/` in the Actions artifact.
+GitHub Pages will serve orphan branch `gh-pages`. Each feature build lands under `feat/<12-char-commit-sha>/`. Open pull requests keep `feat/<number>/index.html` redirecting to the latest sha; closing a PR leaves that pointer at the last published sha. Main updates only production root on `gh-pages`; `prototype/` is seed-only. Until cutover, `deploy-pages.yml` stays the live publisher with `prototype/` in the Actions artifact.
 
 ## Affected users and systems
 
