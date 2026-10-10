@@ -14,14 +14,14 @@ test.afterEach(({ context }) => {
   expect(leaks.get(context) ?? []).toEqual([]);
 });
 
-test("AC9 a fresh visit is the fixed heading with eight columns", async ({ page }) => {
+test("AC9 a fresh visit is the fixed heading with nine columns", async ({ page }) => {
   await openFresh(page);
   expect(await headingText(page)).toBe("600K | 5% down | 7.375% fixed = $4,853 / month");
   await expect(page.locator("#product")).toHaveValue("fixed");
   await expect(page.locator("#product option:checked")).toHaveText("fixed");
   await expect(page.getByTestId("arm-label")).toHaveCount(0);
   await expect(page.locator("summary", { hasText: "ARM terms" })).toHaveCount(0);
-  await expect(page.locator("thead th")).toHaveCount(8);
+  await expect(page.locator("thead th")).toHaveCount(9);
   await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,936.85");
   await expectNoFixedNote(page);
   await expect(page.getByRole("region", { name: "Highest payment" })).toHaveCount(0);
@@ -82,6 +82,18 @@ test("AC9 the Example Credit Union 7/1 example heading, terms, and summary", asy
   );
   await expect(page.getByRole("region", { name: "Total interest paid" })).toContainText("$1,103,636.33");
   await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("October 2056");
+
+  await page.locator("summary", { hasText: "Monthly payment and closing costs" }).click();
+  const picture = page.locator("details.picture");
+  await expect(picture.locator("[data-line='principal-and-interest']")).toContainText("$3,371.77");
+  await expect(picture.locator("[data-line='total-monthly']")).toContainText("$4,288.02");
+  await expect(picture.locator("[data-line='prevailing-principal-and-interest']")).toContainText(
+    "$5,037.71",
+  );
+  await expect(picture.locator("[data-line='prevailing-monthly-total']")).toContainText("$5,953.96");
+
+  await page.locator("#product").selectOption("fixed");
+  expect(await headingText(page)).toBe("600K | 5% down | 5.875% fixed = $4,288 / month");
 });
 
 test("AC9 the structure label follows the interval", async ({ page }) => {
@@ -209,10 +221,10 @@ test("a broken stored arm never puts the page into ARM mode", async ({ page }) =
   await page.goto("/");
   expect(await headingText(page)).toBe("600K | 5% down | 5.875% fixed = $4,288 / month");
   await expect(page.locator("#product")).toHaveValue("fixed");
-  await expect(page.locator("thead th")).toHaveCount(8);
+  await expect(page.locator("thead th")).toHaveCount(9);
 });
 
-test("AC9 the ARM schedule has eleven columns with Rate, Payment, and Index", async ({ page }) => {
+test("AC9 the ARM schedule has twelve columns with Rate, Payment, and Index", async ({ page }) => {
   await openArm(page);
   const headers = page.locator("thead th");
   await expect(headers).toHaveText([
@@ -222,6 +234,7 @@ test("AC9 the ARM schedule has eleven columns with Rate, Payment, and Index", as
     "Payment",
     "Principal",
     "Interest",
+    "Prevailing extra",
     "Index",
     "Extra payment",
     "Saved by extra",
@@ -249,11 +262,12 @@ test("AC9 the ARM schedule has eleven columns with Rate, Payment, and Index", as
 
   const yearRow = page.locator("tbody[data-year='2033'] tr.year-row");
   const cells = yearRow.locator("td");
-  await expect(cells).toHaveCount(11);
+  await expect(cells).toHaveCount(12);
   await expect(cells.nth(2)).toHaveText("");
   await expect(cells.nth(3)).toHaveText("");
   await expect(cells.nth(6)).toHaveText("");
-  await expect(cells.nth(8)).toHaveText("$0.00");
+  await expect(cells.nth(7)).toHaveText("");
+  await expect(cells.nth(9)).toHaveText("$0.00");
 });
 
 test("AC10 an index at the first adjustment recomputes the path", async ({ page }) => {
@@ -284,13 +298,13 @@ test("AC10 an index at the first adjustment recomputes the path", async ({ page 
   await expect(nov).toContainText("6.92%");
 
   await page.locator("#product").selectOption("fixed");
-  await expect(page.locator("thead th")).toHaveCount(8);
+  await expect(page.locator("thead th")).toHaveCount(9);
   await expect(page.getByRole("region", { name: "Highest payment" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Total interest paid" })).toContainText("$643,835.49");
   await expect(page.getByLabel("Index for month 85")).toHaveCount(0);
 
   await page.locator("#product").selectOption("arm");
-  await expect(page.locator("thead th")).toHaveCount(11);
+  await expect(page.locator("thead th")).toHaveCount(12);
   await expect(index(page, 85)).toHaveValue("4.42");
   await expect(page.getByRole("region", { name: "Highest payment" })).toContainText("$4,978.20");
 
