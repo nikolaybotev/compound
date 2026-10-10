@@ -101,6 +101,15 @@ Files: `apps/web/src/arm.ts` (new), `apps/web/src/loan.ts`, `apps/web/src/app.ts
 5. `arm.spec.ts`, clock 2026-10-15: the AC9 heading, terms, and summary checks (fresh visit heading text `600K | 5% down | 7.375% fixed = $4,853 / month` with `fixed` selected and eight columns; selecting ARM at that rate shows `Ceiling 12.375%`; after rate `5.875`: heading text `600K | 5% down | 5.875% 7/1 ARM = $4,288 / month` with the structure label before the select, "ARM terms" open with the nine defaults, `Ceiling 10.875%`, `First adjustment November 2033 (payment 85)`, `$3,371.77`, the ARM payment note, `10.875% from November 2033`, `$5,037.71 from November 2033`, `$1,103,636.33`, `October 2056`). Existing specs that read the heading text keep passing; if one asserted the literal `% fixed = ` span, point it at the select's selected option.
 6. `AGENTS.md`: the page's ARM mode, the product select, the ARM terms defaults, the structure label, and that page ARM figures are `buildReport` with the `arm` argument.
 
+Build notes (recorded in the change that built Phase 3):
+
+- `Scenario` carries `arm: ArmDraft` and `armStored: boolean`. `armStored` is how the page tells the in-memory default (`open: false`, nothing stored) from a stored flag; `saveScenario` writes the `arm` key only when it is true. `Loan.arm` is `{ enabled, values, index }`, with `values` in thousandths and `index` as `[[month, percent]]`; `toBuildReportArm` is the only place the index becomes a `Map` of thousandths.
+- The ARM unit tests, including the `loanReport` and storage cases the plan assigns to `unit/loan.ts`, all live in `apps/web/unit/arm.ts`. `unit/loan.ts` is unchanged and still passes.
+- Stored terms are validated against the stored loan on load. An `enabled: true` object whose terms no longer fit (a floor above the ceiling, a fixed period not shorter than the term) is treated as malformed: fixed, defaults, closed. Index entries that are not reset months are dropped on load, so `buildReport` never throws on a hand-edited key.
+- The spec does not say what happens when the owner switches to ARM and the stored terms no longer fit the current loan (for example the term was shortened in fixed mode). The conservative choice: the switch is refused, the select stays on `fixed`, and the message names the field. Index entries that are not reset months are dropped on a successful switch.
+- A rate or term edit that would break the ARM terms is refused the way an invalid loan field is: the typed text stays, the last valid loan stays, and the ARM field is marked invalid with the message in the page's one `role="alert"` line.
+- Schedule columns and the index cell are Phase 4. In this phase the schedule still has eight columns in ARM mode; its Saved by extra cells already use the ARM report, because `groupByYear` receives the loan with its `arm`.
+
 DoD: `node --test`, `pnpm --dir apps/web test`, and `pnpm --dir apps/web test:e2e` exit 0. A fresh pinned load is unchanged (`$4,853`, `fixed`). The ARM steps above show `$5,037.71 from November 2033`.
 
 ## Phase 4 — Page: rate and index columns
