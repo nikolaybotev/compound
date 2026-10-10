@@ -15,10 +15,13 @@ import {
   toBuildReportArm,
   type ArmDraft,
   type LoanArm,
+  armLabel,
 } from "./arm";
 import {
   buildPicture,
   defaultPicture,
+  formatWholeDollars,
+  headingDollarsFromCents,
   parsePicture,
   percentThousandths,
   pictureFromStorage,
@@ -797,6 +800,30 @@ type FullStorageLike = Pick<Storage, "getItem" | "setItem" | "removeItem">;
 function restoreKey(storage: FullStorageLike, key: string, snapshot: string | null): void {
   if (snapshot === null) storage.removeItem(key);
   else storage.setItem(key, snapshot);
+}
+
+export function serializeStoredSet(set: StoredSet): string {
+  return JSON.stringify({
+    version: 2,
+    active: set.active,
+    scenarios: set.scenarios.map((scenario) => scenarioToStorageObject(scenario)),
+  });
+}
+
+export function scenarioLabelText(scenario: Scenario, figures: ScenarioFigures): string {
+  const dollars = formatWholeDollars(headingDollarsFromCents(figures.totalCents));
+  const thousands = dollarsToThousandsText(scenario.draft.price);
+  const parsed = parseLoan(scenario.draft);
+  if (!parsed.ok) return dollars;
+  const years = parsed.loan.years;
+  const term = years === 1 ? "1 year" : `${years} years`;
+  const rateThousandths = Math.round(parsed.loan.ratePercent * 1000);
+  const armParsed = parseArm(scenario.arm, years, rateThousandths);
+  const product =
+    scenario.arm.enabled && armParsed.ok
+      ? armLabel(armParsed.values.fixedMonths / 12, armParsed.values.adjustMonths)
+      : "fixed";
+  return `${dollars} - ${thousands}K | ${scenario.draft.down}% down | ${scenario.draft.rate}% | ${term} | ${product}`;
 }
 
 export function saveStored(storage: FullStorageLike | undefined, set: StoredSet): boolean {
