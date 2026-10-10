@@ -1,4 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { setStartMonth } from "./start-month";
 
 const origin = "http://127.0.0.1:4173";
 const leaks = new WeakMap<BrowserContext, string[]>();
@@ -101,7 +102,8 @@ test("AC8 reload keeps the edited cell, the prefill, and an open 2027", async ({
 
   await page.evaluate(() => localStorage.setItem("compound-amortization-v1", "{"));
   await page.reload();
-  await expect(page.locator("#start")).toHaveValue("2026-10");
+  await expect(page.locator("#start")).toHaveAttribute("data-value", "2026-10");
+  await expect(page.locator("#start")).toHaveText("October 2026");
   await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,936.85");
   const summary = extraSummary(page);
   await expect(summary).toHaveAccessibleName("Make extra payments");
@@ -198,7 +200,7 @@ test("AC7 the Apply sentence sits beside the button and the form select lines up
 
 async function openExample(page: Page) {
   await page.goto("/");
-  await page.locator("#start").fill("2026-10");
+  await setStartMonth(page, 2026, 10);
   await page.locator("#price").fill("570");
   await page.locator("#down").fill("0");
   await page.locator("#years").fill("30");

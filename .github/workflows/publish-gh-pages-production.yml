@@ -3,7 +3,7 @@ name: publish-gh-pages-production
 # Commits production root files onto orphan gh-pages. Live traffic is published
 # by deploy-gh-pages-branch.yml (workflow_dispatch), including after each push
 # here. Does not build, copy, update, or delete prototype/ or feat/.
-# deploy-pages.yml is manual rollback only. Tags production gh-pages commits 0.6.
+# deploy-pages.yml is manual rollback only. Tags production gh-pages commits 0.7.
 
 on:
   push:
@@ -72,7 +72,7 @@ jobs:
       - name: Publish production root to gh-pages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PAGES_POINT_VERSION: "0.6"
+          PAGES_POINT_VERSION: "0.7"
           GH_PAGES_PUSH_MARKER: ${{ runner.temp }}/gh-pages-pushed
         run: |
           set -euo pipefail
