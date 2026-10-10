@@ -15,7 +15,7 @@ Pull requests that change the amortization page have no URL on the existing GitH
 
 ## Proposed outcome
 
-GitHub Pages will serve orphan branch `gh-pages` (built site only, `.nojekyll` at root). Each open same-repo pull request commits a full build under `feat/<number>/`. Main updates only production root files on `gh-pages`; `prototype/` is copied once at cutover seed and is not republished by workflows. Preview URL `https://nikolaybotev.github.io/compound/feat/<pull-request-number>/` with per-PR storage `compound-amortization-feat-<number>-v1`. Until cutover, `deploy-pages.yml` stays the live publisher and keeps shipping `prototype/` in the Actions artifact; this change does not seed `gh-pages` or flip the Pages setting.
+GitHub Pages will serve orphan branch `gh-pages`. Each feature build lands under `feat/<12-char-commit-sha>/`. Open pull requests keep `feat/<number>/index.html` redirecting to the latest sha; closing a PR removes that pointer only. Main updates only production root on `gh-pages`; `prototype/` is seed-only. Until cutover, `deploy-pages.yml` stays the live publisher with `prototype/` in the Actions artifact.
 
 ## Affected users and systems
 

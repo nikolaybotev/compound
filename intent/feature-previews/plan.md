@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Implements | [spec.md](spec.md) Draft 4 |
-| Status | Draft 4 |
+| Implements | [spec.md](spec.md) Draft 5 |
+| Status | Draft 5 |
 | Stage | 3 · Build |
 
 Spec wins. Update this file in the same change whenever implementation departs from it.
@@ -12,44 +12,36 @@ Spec wins. Update this file in the same change whenever implementation departs f
 
 None. This pull request does **not** run cutover steps below.
 
-## Phase 1 — App storage key
-
-Files: `apps/web/src/loan.ts` (done)
-
 ## Phase 2 — gh-pages publish script
 
 Files: `.github/scripts/gh-pages-publish.sh`
 
-1. `production` — replace production root only; fast-forward retry.
-2. `feature-update` / `feature-remove` — `feat/<n>/` only; **no git tags**.
-3. `production-rollback <message> <prod-version-tag>` — reapply production root from that tag onto current tip; leave `prototype/` and `feat/` on tip unchanged; forward commit only; **no new version tag**.
-4. **Production tagging:** after a successful `production` push, annotate tag `PAGES_POINT_VERSION` on the new `gh-pages` commit when that variable is set and the tag name is not already on the remote. If the tag already exists, log that this publish stays on the existing tag, do not move the tag, and exit 0 after the branch push. A second `main` publish at the same point version stays green. The workflow reads `vars.PAGES_POINT_VERSION`. The repo currently has no git tags, no GitHub releases, and `package.json` version `0.0.0`; **do not invent a version**. The first production `gh-pages` tag waits until the point version is identified.
-5. Skip all publishes with exit 0 when `gh-pages` is not seeded.
+1. `production` — production root only; production semver tag when `PAGES_POINT_VERSION` set and tag absent on remote.
+2. `feature-sha` — `feat/<12-char-sha>/` full build only.
+3. `feature-pr-publish` — `feat/<sha>/` plus `feat/<pr>/index.html` redirect to `/compound/feat/<sha>/`.
+4. `feature-pointer-remove` — delete `feat/<pr>/` only on PR close.
+5. `production-rollback` — production root from prod tag onto current tip.
+6. Skip when `gh-pages` not seeded.
 
 ## Phase 3 — Workflows
 
-Files:
-
-- `.github/workflows/publish-gh-pages-production.yml` — passes `PAGES_POINT_VERSION` from `vars.PAGES_POINT_VERSION`; calls `production` mode only.
-- `.github/workflows/deploy-feature-preview.yml` — feat modes only; no tags.
-- `.github/workflows/deploy-pages.yml` — unchanged Actions publisher with `prototype/`.
-
-## Phase 4 — Docs
-
-Files: `AGENTS.md`, `intent/feature-previews/spec.md`
+- `deploy-feature-preview.yml` — `pull_request` (same-repo) and `push` (not `main`/`gh-pages`). Branch push skipped when an open PR uses that branch.
+- `publish-gh-pages-production.yml` — production root only.
+- `deploy-pages.yml` — unchanged Actions publisher with `prototype/`.
 
 ## Cutover (manual — not run from this PR)
 
-1. Identify the point semver version for the production `main` commit being seeded; record how the repo will track it (git tag on `main`, release, or `vars.PAGES_POINT_VERSION` at publish time).
-2. Build production from `main` and copy current live `prototype/` once into the seed tree; add `.nojekyll`.
-3. Create orphan `gh-pages`, verify files, stop in-flight Actions deploys, switch Pages source to `gh-pages` `/`, smoke-test URLs.
-4. Set `PAGES_POINT_VERSION` before the first automated production publish if the seed commit should receive that tag (or tag the seed commit manually once).
+1. Identify point semver for the seeded production `main` commit (`PAGES_POINT_VERSION` when ready).
+2. Build production from `main`; copy current live `prototype/` once; add `.nojekyll`; create orphan `gh-pages`.
+3. Verify files. **Wait for in-flight GitHub Actions Pages deploys to finish; do not cancel them.** **Do not push to `main` between that finish and switching the Pages source**, so a new `deploy-pages` run does not start in the gap.
+4. Switch Pages source to branch `gh-pages`, root `/`. Smoke-test production and `prototype/` URLs.
+5. Set `PAGES_POINT_VERSION` when the first tagged production publish should run (optional on seed).
 
-**Prototype retirement:** One `gh-pages` commit deleting `prototype/`.
+**Prototype retirement:** One commit deleting `prototype/` on `gh-pages`.
 
-**Rollback (branch source):** Run `gh-pages-publish.sh production-rollback "<message>" "<prod-version-tag>"` (for example after a bad production publish). That reapplies only production root files from the tagged prod commit onto the current tip; `prototype/` and `feat/` stay. Pages-setting rollback: switch back to GitHub Actions and run `deploy-pages.yml`.
+**Rollback:** `production-rollback` or switch Pages source back to GitHub Actions and run `deploy-pages.yml`.
 
 ### Build notes
 
-- Main `gh-pages` publish does not touch `prototype/`. `deploy-pages.yml` still ships `prototype/` until cutover.
-- Feature publish retry: reapply only `feat/<pr>/`. Production retry: reapply only production root staging.
+- Feature retry reapplies the same mode paths (`feature-sha` or `feature-pr-publish` or pointer remove).
+- PR close removes `feat/<n>/` redirect only; `feat/<sha>/` trees stay.

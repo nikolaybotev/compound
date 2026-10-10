@@ -1,22 +1,28 @@
 name: deploy-feature-preview
 
-# Publishes feat/<pull-request-number>/ on orphan gh-pages after cutover seed.
-# Does not rebuild production or prototype. Until gh-pages exists, exits 0.
+# Publishes feat/<12-char-sha>/ builds on orphan gh-pages. Open pull requests
+# also maintain feat/<pr>/index.html redirecting to the latest sha. Does not
+# rebuild production or prototype. Until gh-pages exists, exits 0.
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, closed]
+  push:
+    branches-ignore:
+      - main
+      - gh-pages
 
 permissions:
   contents: write
+  pull-requests: read
 
 concurrency:
   group: gh-pages-publish
   cancel-in-progress: false
 
 jobs:
-  preview:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+  preview-pr:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Check out pull request
@@ -45,9 +51,15 @@ jobs:
       - name: Build feature preview
         if: github.event.action != 'closed'
         env:
-          VITE_BASE: /compound/feat/${{ github.event.pull_request.number }}/
-          VITE_STORAGE_KEY: compound-amortization-feat-${{ github.event.pull_request.number }}-v1
-        run: pnpm --dir apps/web build
+          FEAT_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${FEAT_SHA:0:12}"
+          echo "SHORT_SHA=${SHORT_SHA}" >> "$GITHUB_ENV"
+          VITE_BASE="/compound/feat/${SHORT_SHA}/" \
+          VITE_STORAGE_KEY="compound-amortization-feat-${{ github.event.pull_request.number }}-v1" \
+          pnpm --dir apps/web build
+          grep -q "/compound/feat/${SHORT_SHA}/" apps/web/dist/index.html
 
       - name: Check out gh-pages publish script
         uses: actions/checkout@v4
@@ -56,19 +68,88 @@ jobs:
           sparse-checkout-cone-mode: false
           path: publish-tools
 
-      - name: Publish feat folder on gh-pages
+      - name: Publish on gh-pages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
+          SHORT_SHA="${HEAD_SHA:0:12}"
           if [ "${{ github.event.action }}" = "closed" ]; then
-            MSG="Remove feat preview for PR #${PR_NUMBER} (${HEAD_SHA})"
-            bash publish-tools/.github/scripts/gh-pages-publish.sh feature-remove "${MSG}" "${PR_NUMBER}"
+            MSG="Remove feat pointer for PR #${PR_NUMBER} (${SHORT_SHA})"
+            bash publish-tools/.github/scripts/gh-pages-publish.sh feature-pointer-remove "${MSG}" "${PR_NUMBER}"
           else
-            MSG="Feat preview PR #${PR_NUMBER} (${HEAD_SHA})"
-            bash publish-tools/.github/scripts/gh-pages-publish.sh feature-update "${MSG}" "${PR_NUMBER}" "${GITHUB_WORKSPACE}/apps/web/dist"
-            test -f apps/web/dist/index.html
-            grep -q "/compound/feat/${PR_NUMBER}/" apps/web/dist/index.html
+            MSG="Feat preview PR #${PR_NUMBER} -> ${SHORT_SHA}"
+            bash publish-tools/.github/scripts/gh-pages-publish.sh feature-pr-publish "${MSG}" "${PR_NUMBER}" "${SHORT_SHA}" "${GITHUB_WORKSPACE}/apps/web/dist"
           fi
+
+  preview-branch:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip when an open pull request uses this branch
+        id: open_pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const branch = context.ref.replace(/^refs\/heads\//, "");
+            const { data } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              head: `${context.repo.owner}:${branch}`,
+              per_page: 1,
+            });
+            core.setOutput("has_open_pr", data.length > 0 ? "true" : "false");
+
+      - name: Check out branch
+        if: steps.open_pr.outputs.has_open_pr == 'false'
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        if: steps.open_pr.outputs.has_open_pr == 'false'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 12.6.0
+
+      - name: Set up Node.js 24
+        if: steps.open_pr.outputs.has_open_pr == 'false'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        if: steps.open_pr.outputs.has_open_pr == 'false'
+        run: pnpm install --frozen-lockfile
+
+      - name: Build feature preview
+        if: steps.open_pr.outputs.has_open_pr == 'false'
+        env:
+          FULL_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          SHORT_SHA="${FULL_SHA:0:12}"
+          echo "SHORT_SHA=${SHORT_SHA}" >> "$GITHUB_ENV"
+          VITE_BASE="/compound/feat/${SHORT_SHA}/" \
+          VITE_STORAGE_KEY="compound-amortization-feat-${SHORT_SHA}-v1" \
+          pnpm --dir apps/web build
+          grep -q "/compound/feat/${SHORT_SHA}/" apps/web/dist/index.html
+
+      - name: Check out gh-pages publish script
+        if: steps.open_pr.outputs.has_open_pr == 'false'
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts/gh-pages-publish.sh
+          sparse-checkout-cone-mode: false
+          path: publish-tools
+
+      - name: Publish sha folder on gh-pages
+        if: steps.open_pr.outputs.has_open_pr == 'false'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          MSG="Feat preview ${SHORT_SHA}"
+          bash publish-tools/.github/scripts/gh-pages-publish.sh feature-sha "${MSG}" "${SHORT_SHA}" "${GITHUB_WORKSPACE}/apps/web/dist"

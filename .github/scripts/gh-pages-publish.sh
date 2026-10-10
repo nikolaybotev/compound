@@ -8,8 +8,12 @@
 #     Replaces production root files only. Tags the gh-pages commit only when
 #     PAGES_POINT_VERSION is set (point semver the repo tracks). Feature and
 #     other commits are never tagged.
-#   feature-update <commit-message> <pr-number> <staging-dir>
-#   feature-remove <commit-message> <pr-number>
+#   feature-sha <commit-message> <12-char-sha> <staging-dir>
+#     Publishes a full build under feat/<sha>/ only.
+#   feature-pr-publish <commit-message> <pr-number> <12-char-sha> <staging-dir>
+#     Publishes feat/<sha>/ and replaces feat/<pr>/ with a redirect index.html.
+#   feature-pointer-remove <commit-message> <pr-number>
+#     Removes feat/<pr>/ only (sha folders stay).
 #   production-rollback <commit-message> <prod-version-tag>
 #     Copies production root files from the tagged prod commit onto the current
 #     gh-pages tip (forward commit). Does not reset the branch; feat/ and
@@ -92,16 +96,39 @@ apply_production() {
   shopt -u dotglob nullglob
 }
 
-apply_feature_update() {
-  local pr_number="${1:?pr number}"
+apply_feature_sha() {
+  local sha_id="${1:?12-char sha}"
   local staging="${2:?staging dir with feat dist contents}"
+  mkdir -p "${WORKDIR}/feat"
+  rm -rf "${WORKDIR}/feat/${sha_id}"
+  mkdir -p "${WORKDIR}/feat/${sha_id}"
+  cp -a "${staging}/." "${WORKDIR}/feat/${sha_id}/"
+}
+
+apply_feature_pointer() {
+  local pr_number="${1:?pr number}"
+  local sha_id="${2:?12-char sha}"
+  local target="/compound/feat/${sha_id}/"
   mkdir -p "${WORKDIR}/feat"
   rm -rf "${WORKDIR}/feat/${pr_number}"
   mkdir -p "${WORKDIR}/feat/${pr_number}"
-  cp -a "${staging}/." "${WORKDIR}/feat/${pr_number}/"
+  cat >"${WORKDIR}/feat/${pr_number}/index.html" <<EOF
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="refresh" content="0; url=${target}">
+  <link rel="canonical" href="${target}">
+  <title>Feature preview redirect</title>
+</head>
+<body>
+  <p><a href="${target}">Continue to feature preview</a></p>
+</body>
+</html>
+EOF
 }
 
-apply_feature_remove() {
+apply_feature_pointer_remove() {
   local pr_number="${1:?pr number}"
   rm -rf "${WORKDIR}/feat/${pr_number}"
 }
@@ -114,11 +141,15 @@ apply_paths() {
     production-rollback)
       apply_production "${STAGING_EXTRACT}"
       ;;
-    feature-update)
-      apply_feature_update "${1:?pr}" "${2:?staging}"
+    feature-sha)
+      apply_feature_sha "${1:?sha}" "${2:?staging}"
       ;;
-    feature-remove)
-      apply_feature_remove "${1:?pr}"
+    feature-pr-publish)
+      apply_feature_sha "${2:?sha}" "${3:?staging}"
+      apply_feature_pointer "${1:?pr}" "${2:?sha}"
+      ;;
+    feature-pointer-remove)
+      apply_feature_pointer_remove "${1:?pr}"
       ;;
     *)
       echo "unknown mode: ${MODE}" >&2
