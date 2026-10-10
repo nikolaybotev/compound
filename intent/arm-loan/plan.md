@@ -43,6 +43,14 @@ Files: `amortize.js`, `amortize.d.ts`, `amortize.test.js` (new, collected by `no
 5. Update `amortize.d.ts`: the `Arm` argument type, `ArmReport`, `Adjustment`, and the optional row fields.
 6. Write `amortize.test.js` with AC1 (fixed objects unchanged with no sixth argument: deep-equal against the current reports for $570,000 / 7% / 360 with an empty map and with the first-year $100 extras (interest 813770 saved, payoff 358), $200,000 at 6% for 15 years, for 180 months, and for 13 months, and the $570,000 / 7.375% recast sample's first run; no `arm` key and no new row fields in any of them), AC2 including F13, AC3, AC4, and the library half of AC5: the four shared messages plus the library's own `Error` for a negative cap passed in code. Assert the cents and thousandths listed in spec requirement 18.
 
+Build notes (recorded in the change that built Phase 0):
+
+- The ARM walk is a separate internal function, `walkArm`, in `amortize.js`, next to the untouched fixed `walk`. `buildReport` branches on `arm !== undefined` before it touches the fixed path, so the fixed bytes cannot move (P2).
+- Step 6 asks for a deep-equal against the current reports. The six reports carry up to 360 schedule rows each, so `amortize.test.js` pins each one as the SHA-256 of `JSON.stringify(report)` captured from the code before this change, and also asserts no `arm` key and no added row fields. This is the conservative equivalent of the deep-equal.
+- A negative cap or margin, a non-positive floor, a floor above the ceiling, and a bad `fixedMonths` or `adjustMonths` throw in the library with messages that begin `ARM` and name the term (for example `ARM lifetime floor (floorThousandths) must not be above the ceiling (initial rate plus lifetime cap)`). The CLI in Phase 1 must not reword them; the library's message is the shared message for AC5.
+- The `max_payment_*` comparison is on cents, strictly greater, so floating-point noise between equal reset payments at the same rate cannot move `max_payment_month` off the first reset (F2 stays at month 85).
+- `arm: null` and a non-`Map` `indexByMonth` throw an `Error`; only `undefined` selects the fixed walk.
+
 DoD: `node --test` exits 0 with the new file collected. The FE run through `buildReport` returns `monthly_payment_cents` 337177, `arm.adjustments[0]` `{ month: 85, index_percent: null, fully_indexed_percent: null, rate_percent: 10.875, payment_cents: 503771 }`, and `interest_cents` 110363633. `buildReport(570000, 7, 360, firstYearMap, 30)` is unchanged and has no `arm` key. `amortize.js` still requires nothing.
 
 ## Phase 1 — CLI flags, index CSV, summary, and CSV
