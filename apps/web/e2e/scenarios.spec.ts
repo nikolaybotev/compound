@@ -277,8 +277,12 @@ async function headingText(page: Page): Promise<string> {
         parts.push(node.value);
       } else if (node instanceof HTMLSelectElement) {
         parts.push(node.selectedOptions[0]?.text ?? "");
+      } else if (node instanceof HTMLElement && node.classList.contains("fico-bands")) {
+        return;
+      } else if (node instanceof HTMLButtonElement && node.id === "start") {
+        parts.push(node.textContent?.trim() ?? "");
       } else if (node instanceof HTMLButtonElement) {
-        parts.push(node.textContent ?? "");
+        return;
       } else if (node.nodeType === Node.TEXT_NODE) {
         parts.push(node.textContent ?? "");
       } else {
