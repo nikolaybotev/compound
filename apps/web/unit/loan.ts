@@ -524,7 +524,7 @@ describe("loan scenarios storage and prevailing figures", () => {
     expect(figures?.totalCents).toBe(485_310);
   });
 
-  test("F4 boundary at 288 months of $1", () => {
+  test("F4 boundary at 80 percent of payoff months for $1", () => {
     const scenario = freshConventional(now);
     const applied = new Map<number, number>();
     for (let month = 1; month <= 288; month += 1) applied.set(month, 1);
@@ -559,7 +559,7 @@ describe("loan scenarios storage and prevailing figures", () => {
     expect(scenarioFigures(scenario)?.totalCents).toBe(428_802);
   });
 
-  test("F7 payoff month does not shrink the 80 percent denominator", () => {
+  test("F7 $100 every month until early payoff qualifies", () => {
     const scenario = defaultScenario(now);
     scenario.draft = {
       price: "570000",
@@ -572,6 +572,14 @@ describe("loan scenarios storage and prevailing figures", () => {
     expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(10_000);
   });
 
+  test("F7b $1,000 extra every month until early payoff qualifies", () => {
+    const scenario = freshConventional(now);
+    appliedEveryMonth(scenario, 1000, 360);
+    const figures = scenarioFigures(scenario);
+    expect(figures?.prevailingExtraCents).toBe(100_000);
+    expect(figures?.totalCents).toBe(585_310);
+  });
+
   test("F9 committed extras without applied map do not count", () => {
     const scenario = freshConventional(now);
     appliedEveryMonth(scenario, 100, 360);
@@ -580,12 +588,12 @@ describe("loan scenarios storage and prevailing figures", () => {
     expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(0);
   });
 
-  test("F10 one-month lump payoff is not prevailing extra", () => {
+  test("F10 one-month lump payoff qualifies as prevailing extra", () => {
     const scenario = freshConventional(now);
     scenario.applied = new Map([[1, 570_000]]);
-    expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(0);
+    expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(57_000_000);
     expect(scenarioFigures(scenario)?.modalPaymentCents).toBe(393_685);
-    expect(scenarioFigures(scenario)?.totalCents).toBe(485_310);
+    expect(scenarioFigures(scenario)?.totalCents).toBe(57_485_310);
   });
 
   test("F8 legacy-only load and prototype merge", () => {
