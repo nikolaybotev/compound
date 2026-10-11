@@ -174,10 +174,9 @@ test("AC8 the start month is a page-drawn picker", async ({ page }) => {
   await expect(dialog).toHaveCount(0);
   await expect(trigger).toHaveText("November 2026");
 
-  const label = page.locator("label[for='start']");
-  await label.click();
+  await page.getByRole("button", { name: "Start month" }).click();
   await expect(dialog).toBeVisible();
-  await label.click();
+  await page.getByRole("button", { name: "Start month" }).click();
   await expect(dialog).toHaveCount(0);
 
   await page.reload();

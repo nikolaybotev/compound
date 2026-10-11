@@ -76,6 +76,7 @@ export function MonthPicker({ id, value, onChange, closeSignal = 0 }: Props) {
         type="button"
         class="month-button"
         data-value={value}
+        aria-label="Start month"
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={toggle}
