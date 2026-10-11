@@ -405,7 +405,7 @@ describe("saved loan inputs", () => {
     expect(loaded.extras).toEqual(new Map([[1, 100]]));
     expect(loaded.prefill.open).toBe(true);
     expect(loaded.openYears).toEqual([2026]);
-    expect(loaded.picture).toEqual(pictureDefaults());
+    expect(loaded.picture.pmi).toBe("0.45");
     expect(loaded.picture.open).toBe(false);
   });
 

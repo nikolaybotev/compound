@@ -192,7 +192,6 @@ export function ScenarioBar({
               modalCents={figures[active]!.modalPaymentCents}
               taxCents={figures[active]!.taxCents}
               insuranceCents={figures[active]!.insuranceCents}
-              fhaMipCents={figures[active]!.fhaMipCents}
               pmiCents={figures[active]!.pmiCents}
               prevailingExtraCents={figures[active]!.prevailingExtraCents}
             />
@@ -283,7 +282,6 @@ export function ScenarioBar({
                         modalCents={figures[index]!.modalPaymentCents}
                         taxCents={figures[index]!.taxCents}
                         insuranceCents={figures[index]!.insuranceCents}
-                        fhaMipCents={figures[index]!.fhaMipCents}
                         pmiCents={figures[index]!.pmiCents}
                         prevailingExtraCents={figures[index]!.prevailingExtraCents}
                       />
