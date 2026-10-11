@@ -367,6 +367,7 @@ dd {
 
 .heading-line input,
 .heading-line select.product,
+.heading-line #fico-range,
 .heading-line .month-button {
   font-size: inherit;
 }
@@ -536,6 +537,13 @@ input.extra {
 }
 
 input.extra[data-edited="true"] {
+  color: var(--edited);
+  border-bottom-color: var(--edited);
+}
+
+#extra-monthly[data-edited="true"],
+#extra-yearly[data-edited="true"],
+#extra-yearly-month[data-edited="true"] {
   color: var(--edited);
   border-bottom-color: var(--edited);
 }

@@ -52,12 +52,13 @@ import {
 } from "./loan";
 import {
   buildPicture,
-  conventionalPmi,
   loadStoredCount,
+  ficoBand,
+  parseFicoScore,
   parsePicture,
   parseWholeCount,
   percentThousandths,
-  pmiPercentInputFromThousandths,
+  pmiDraftForLoan,
   type PictureDraft,
   type PictureInputField,
   type PictureValues,
@@ -118,7 +119,9 @@ export function App() {
   const [validText, setValidText] = useState({
     down: initial.scenario.draft.down,
     rate: initial.scenario.draft.rate,
+    fico: initial.scenario.draft.fico,
   });
+  const [ficoRangeValue, setFicoRangeValue] = useState("");
   const [loan, setLoan] = useState(initial.loan);
   const [priceText, setPriceText] = useState(() => dollarsToThousandsText(initial.scenario.draft.price));
   const [extras, setExtras] = useState(initial.scenario.extras);
@@ -161,7 +164,7 @@ export function App() {
     const picture = parsePicture(scenario.picture, pictureCountsFromDraft(scenario.picture));
     if (!picture.ok) throw new Error(picture.message);
     setDraft(scenario.draft);
-    setValidText({ down: scenario.draft.down, rate: scenario.draft.rate });
+    setValidText({ down: scenario.draft.down, rate: scenario.draft.rate, fico: scenario.draft.fico });
     setLoan(parsed.loan);
     setPriceText(dollarsToThousandsText(scenario.draft.price));
     setExtras(scenario.extras);
@@ -373,7 +376,7 @@ export function App() {
     }
     const kept = dropExtrasBeyond(extras, parsed.loan.years * 12);
     const keptApplied = dropExtrasBeyond(applied, parsed.loan.years * 12);
-    setValidText({ down: next.down, rate: next.rate });
+    setValidText({ down: next.down, rate: next.rate, fico: validText.fico });
     setLoan(parsed.loan);
     setExtras(kept);
     setApplied(keptApplied);
@@ -385,19 +388,12 @@ export function App() {
     setInvalidField(null);
     let pictureNext: typeof pictureDraft | undefined;
     if (field === "down") {
-      const downThousandths = percentThousandths(next.down.trim());
-      if (downThousandths !== null) {
-        const pmi = conventionalPmi(downThousandths);
-        pictureNext = {
-          ...pictureDraft,
-          pmi: pmiPercentInputFromThousandths(pmi.thousandths),
-        };
-        const pictureParsed = parsePicture(pictureNext, pictureCounts);
-        if (pictureParsed.ok) {
-          setPictureDraft(pictureNext);
-          setPictureSaved({ ...pictureNext, open: pictureDraft.open, closingOpen: pictureDraft.closingOpen });
-          setPictureValues(pictureParsed.values);
-        }
+      pictureNext = pmiDraftForLoan(pictureDraft, next.down, validText.fico);
+      const pictureParsed = parsePicture(pictureNext, pictureCounts);
+      if (pictureParsed.ok) {
+        setPictureDraft(pictureNext);
+        setPictureSaved({ ...pictureNext, open: pictureDraft.open, closingOpen: pictureDraft.closingOpen });
+        setPictureValues(pictureParsed.values);
       }
     }
     persist(
@@ -416,6 +412,83 @@ export function App() {
             ...(pictureNext ? { picture: { ...pictureNext, open: pictureDraft.open, closingOpen: pictureDraft.closingOpen } } : {}),
           },
     );
+  }
+
+  function updateFico(value: string) {
+    const previousScore = parseFicoScore(validText.fico) ?? 780;
+    const next = { ...draft, fico: value };
+    setDraft(next);
+    const parsed = parseFicoScore(value);
+    if (parsed === null) {
+      setError("FICO must be a whole number from 0 through 999.");
+      setInvalidField("fico");
+      return;
+    }
+    setValidText((current) => ({ ...current, fico: value }));
+    setError(null);
+    setInvalidField(null);
+    let pictureNext: typeof pictureDraft | undefined;
+    if (ficoBand(parsed) !== ficoBand(previousScore)) {
+      pictureNext = pmiDraftForLoan(pictureDraft, validText.down, value);
+      const pictureParsed = parsePicture(pictureNext, pictureCounts);
+      if (pictureParsed.ok) {
+        setPictureDraft(pictureNext);
+        setPictureSaved({
+          ...pictureNext,
+          open: pictureDraft.open,
+          closingOpen: pictureDraft.closingOpen,
+        });
+        setPictureValues(pictureParsed.values);
+      }
+    }
+    persist({
+      draft: next,
+      ...(pictureNext
+        ? {
+            picture: {
+              ...pictureNext,
+              open: pictureDraft.open,
+              closingOpen: pictureDraft.closingOpen,
+            },
+          }
+        : {}),
+    });
+  }
+
+  function chooseFicoRange(value: string) {
+    const score = Number(value);
+    const previousScore = parseFicoScore(validText.fico) ?? 780;
+    const next = { ...draft, fico: String(score) };
+    setDraft(next);
+    setValidText((current) => ({ ...current, fico: String(score) }));
+    setError(null);
+    setInvalidField(null);
+    let pictureNext: typeof pictureDraft | undefined;
+    if (ficoBand(score) !== ficoBand(previousScore)) {
+      pictureNext = pmiDraftForLoan(pictureDraft, validText.down, String(score));
+      const pictureParsed = parsePicture(pictureNext, pictureCounts);
+      if (pictureParsed.ok) {
+        setPictureDraft(pictureNext);
+        setPictureSaved({
+          ...pictureNext,
+          open: pictureDraft.open,
+          closingOpen: pictureDraft.closingOpen,
+        });
+        setPictureValues(pictureParsed.values);
+      }
+    }
+    persist({
+      draft: next,
+      ...(pictureNext
+        ? {
+            picture: {
+              ...pictureNext,
+              open: pictureDraft.open,
+              closingOpen: pictureDraft.closingOpen,
+            },
+          }
+        : {}),
+    });
   }
 
   function commitArm(next: ArmDraft) {
@@ -627,8 +700,19 @@ export function App() {
     setExtras(next);
     setApplied(next);
     setEditingMonth(null);
-    persist({ extras: next, applied: next });
+    const nextPrefill = {
+      ...prefill,
+      appliedMonthly: prefill.monthly,
+      appliedYearly: prefill.yearly,
+      appliedMonth: prefill.month,
+    };
+    setPrefill(nextPrefill);
+    persist({ extras: next, applied: next, prefill: nextPrefill });
   }
+
+  const extraMonthlyEdited = prefill.monthly !== prefill.appliedMonthly;
+  const extraYearlyEdited = prefill.yearly !== prefill.appliedYearly;
+  const extraMonthEdited = prefill.month !== prefill.appliedMonth;
 
   function commitExtra(month: number) {
     if (editingMonth !== month) return;
@@ -723,6 +807,35 @@ export function App() {
           <option value="fixed">fixed</option>
           <option value="arm">ARM</option>
         </select>
+        <span> | </span>
+        <input
+          id="fico"
+          aria-label="FICO"
+          inputMode="numeric"
+          autoComplete="off"
+          value={draft.fico}
+          aria-invalid={invalidField === "fico"}
+          style={{ width: `${Math.max(draft.fico.length, 1) + 1}ch` }}
+          onInput={(event) => updateFico(event.currentTarget.value)}
+        />
+        <span> FICO </span>
+        <select
+          id="fico-range"
+          aria-label="FICO range"
+          value={ficoRangeValue}
+          onChange={(event) => {
+            const value = event.currentTarget.value;
+            setFicoRangeValue("");
+            if (value) chooseFicoRange(value);
+          }}
+        >
+          <option value=""></option>
+          <option value="780">780+</option>
+          <option value="740">740–779</option>
+          <option value="700">700–739</option>
+          <option value="660">660–699</option>
+          <option value="620">620–659</option>
+        </select>
         <span> | starting </span>
         <MonthPicker
           id="start"
@@ -812,6 +925,7 @@ export function App() {
               label={MONTHLY_AMOUNT}
               value={prefill.monthly}
               invalid={false}
+              edited={extraMonthlyEdited}
               onInput={(value) => changePrefill({ monthly: value })}
             />
             <Field
@@ -819,12 +933,14 @@ export function App() {
               label={YEARLY_AMOUNT}
               value={prefill.yearly}
               invalid={false}
+              edited={extraYearlyEdited}
               onInput={(value) => changePrefill({ yearly: value })}
             />
             <div class="field">
               <label for="extra-yearly-month">Month of year</label>
               <select
                 id="extra-yearly-month"
+                data-edited={extraMonthEdited ? "true" : undefined}
                 value={String(prefill.month)}
                 onChange={(event) => changePrefill({ month: Number(event.currentTarget.value) })}
               >
@@ -1264,6 +1380,7 @@ function Field(props: {
   value: string;
   suffix?: string;
   invalid: boolean;
+  edited?: boolean;
   onInput: (value: string) => void;
 }) {
   return (
@@ -1276,7 +1393,9 @@ function Field(props: {
           autoComplete="off"
           value={props.value}
           aria-invalid={props.invalid}
+          data-edited={props.edited ? "true" : undefined}
           onInput={(event) => props.onInput(event.currentTarget.value)}
+          onChange={(event) => props.onInput(event.currentTarget.value)}
         />
         {props.suffix ? <span aria-hidden="true">{props.suffix}</span> : null}
       </div>

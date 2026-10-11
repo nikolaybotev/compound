@@ -23,9 +23,12 @@ import {
   formatWholeDollars,
   headingDollarsFromCents,
   loadStoredCount,
+  parseFicoScore,
   parsePicture,
   percentThousandths,
   pictureFromStorage,
+  pmiDraftForLoan,
+  ficoBand,
   type PictureDraft,
 } from "./picture";
 
@@ -80,6 +83,7 @@ export type LoanDraft = {
   years: string;
   rate: string;
   start: string;
+  fico: string;
 };
 
 export type LoanField = keyof LoanDraft | "loan";
@@ -156,6 +160,7 @@ export function defaultDraft(now = new Date()): LoanDraft {
     years: "30",
     rate: "7.375",
     start: currentStartMonth(now),
+    fico: "780",
   };
 }
 
@@ -361,6 +366,9 @@ export type Prefill = {
   yearly: string;
   month: number;
   open: boolean;
+  appliedMonthly?: string;
+  appliedYearly?: string;
+  appliedMonth?: number;
 };
 
 export type Scenario = {
@@ -375,7 +383,15 @@ export type Scenario = {
 };
 
 export function defaultPrefill(): Prefill {
-  return { monthly: "", yearly: "", month: 1, open: false };
+  return {
+    monthly: "",
+    yearly: "",
+    month: 1,
+    open: false,
+    appliedMonthly: "",
+    appliedYearly: "",
+    appliedMonth: 1,
+  };
 }
 
 export function extraInputValue(dollars: number | undefined): string {
@@ -569,11 +585,21 @@ function parsePrefill(value: unknown): Prefill | null {
   if (typeof record.monthly !== "string" || typeof record.yearly !== "string") return null;
   if (typeof record.month !== "number" || !Number.isInteger(record.month)) return null;
   if (record.month < 1 || record.month > 12 || typeof record.open !== "boolean") return null;
+  const monthly = record.monthly;
+  const yearly = record.yearly;
+  const month = record.month;
   return {
-    monthly: record.monthly,
-    yearly: record.yearly,
-    month: record.month,
+    monthly,
+    yearly,
+    month,
     open: record.open,
+    appliedMonthly:
+      typeof record.appliedMonthly === "string" ? record.appliedMonthly : monthly,
+    appliedYearly: typeof record.appliedYearly === "string" ? record.appliedYearly : yearly,
+    appliedMonth:
+      typeof record.appliedMonth === "number" && Number.isInteger(record.appliedMonth)
+        ? record.appliedMonth
+        : month,
   };
 }
 
@@ -648,7 +674,8 @@ function draftEqual(a: LoanDraft, b: LoanDraft): boolean {
     a.down === b.down &&
     a.years === b.years &&
     a.rate === b.rate &&
-    a.start === b.start
+    a.start === b.start &&
+    a.fico === b.fico
   );
 }
 
@@ -676,6 +703,10 @@ function parseScenarioRecord(record: Record<string, unknown>, now = new Date()):
     years: typeof record.years === "string" ? record.years : "",
     rate: typeof record.rate === "string" ? record.rate : "",
     start: typeof record.start === "string" ? record.start : "",
+    fico:
+      typeof record.fico === "string" && parseFicoScore(record.fico) !== null
+        ? record.fico.trim()
+        : "780",
   };
   const parsedLoan = parseLoan(draft);
   if (!parsedLoan.ok) return null;
@@ -691,7 +722,7 @@ function parseScenarioRecord(record: Record<string, unknown>, now = new Date()):
     applied: new Map(applied ?? extras),
     prefill,
     openYears,
-    picture: pictureFromStorage(record.picture, draft.down),
+    picture: pictureFromStorage(record.picture, draft.down, draft.fico),
     arm,
     armStored,
   };
@@ -704,6 +735,7 @@ function scenarioToStorageObject(scenario: Scenario): Record<string, unknown> {
     years: scenario.draft.years,
     rate: scenario.draft.rate,
     start: scenario.draft.start,
+    fico: scenario.draft.fico,
     extras: [...scenario.extras.entries()],
     applied: [...scenario.applied.entries()],
     prefill: scenario.prefill,
