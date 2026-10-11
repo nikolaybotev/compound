@@ -224,7 +224,7 @@ test("schedule has no Prevailing extra column", async ({ page }) => {
     "Interest balance",
   ]);
   await expect(page.getByRole("columnheader", { name: "Prevailing extra" })).toHaveCount(0);
-  await expect(extra(page, 1)).toHaveValue("100");
+  await expect(extra(page, 1)).toHaveValue("100.00");
   await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$100.00 PE");
 });
 

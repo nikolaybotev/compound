@@ -50,7 +50,7 @@ Two fixes on the amortization page after 0.10. The closed scenario control gains
 | AC | Check |
 |---|---|
 | AC1 | Playwright: fresh closed `aria-label` and `.scenario-trigger-text` are `1: $4,853 - 600K \| 5% down \| 7.375% \| 30 years \| fixed`. After Apply of $1,000 every month, both are `1: $5,853 - 600K \| 5% down \| 7.375% \| 30 years \| fixed`, and open row 1’s name matches. A second active scenario starts with `2: `. The confirm label does not start with a number prefix. |
-| AC2 | Playwright: fixed headers are the eight names in requirement 2, with no Prevailing extra header. After Apply of $100, month 1’s Extra payment input is `100` and the summary bar contains `$100.00 PE`. ARM headers are the eleven names, Index immediately before Extra payment, eight columns when the product is fixed. |
+| AC2 | Playwright: fixed headers are the eight names in requirement 2, with no Prevailing extra header. After Apply of $100, month 1’s Extra payment input is `100.00` and the summary bar contains `$100.00 PE`. ARM headers are the eleven names, Index immediately before Extra payment, eight columns when the product is fixed. |
 | AC3 | `node --test`, `pnpm --dir apps/web test`, and `pnpm --dir apps/web test:e2e` exit 0. `amortize.js` has no diff. Version is `0.11.0` and `PAGES_POINT_VERSION` is `0.11`. |
 
 ## 7. Design decisions
