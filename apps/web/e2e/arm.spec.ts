@@ -16,7 +16,9 @@ test.afterEach(({ context }) => {
 
 test("AC9 a fresh visit is the fixed heading with nine columns", async ({ page }) => {
   await openFresh(page);
-  expect(await headingText(page)).toBe("600K | 5% down | 7.375% fixed = $4,853 / month");
+  expect(await headingText(page)).toBe(
+    "600K | 5% down | 7.375% 30-year fixed | starting October 2026",
+  );
   await expect(page.locator("#product")).toHaveValue("fixed");
   await expect(page.locator("#product option:checked")).toHaveText("fixed");
   await expect(page.getByTestId("arm-label")).toHaveCount(0);
@@ -44,7 +46,11 @@ test("AC9 selecting ARM at the default rate shows the 12.375% ceiling", async ({
 
 test("AC9 the Example Credit Union 7/1 example heading, terms, and summary", async ({ page }) => {
   await openArm(page);
-  expect(await headingText(page)).toBe("600K | 5% down | 5.875% 7/1 ARM = $5,954 / month");
+  expect(await headingText(page)).toBe(
+    "600K | 5% down | 5.875% 30-year 7/1 ARM | starting October 2026",
+  );
+  await expect(page.locator(".heading-line")).not.toContainText("= $5,954 / month");
+  await expect(page.locator(".heading-line")).not.toContainText("= $4,288 / month");
   const heading = page.locator(".heading-line");
   const labelBox = await page.getByTestId("arm-label").boundingBox();
   const selectBox = await page.locator("#product").boundingBox();
@@ -93,7 +99,9 @@ test("AC9 the Example Credit Union 7/1 example heading, terms, and summary", asy
   await expect(picture.locator("[data-line='prevailing-monthly-total']")).toContainText("$5,953.96");
 
   await page.locator("#product").selectOption("fixed");
-  expect(await headingText(page)).toBe("600K | 5% down | 5.875% fixed = $4,288 / month");
+  expect(await headingText(page)).toBe(
+    "600K | 5% down | 5.875% 30-year fixed | starting October 2026",
+  );
 });
 
 test("AC9 the structure label follows the interval", async ({ page }) => {
@@ -156,7 +164,9 @@ test("switching to fixed and back keeps the terms and a closed disclosure stays 
   await expect(page.locator("summary", { hasText: "ARM terms" })).toHaveAttribute("aria-expanded", "false");
 
   await page.locator("#product").selectOption("fixed");
-  expect(await headingText(page)).toBe("600K | 5% down | 5.875% fixed = $4,288 / month");
+  expect(await headingText(page)).toBe(
+    "600K | 5% down | 5.875% 30-year fixed | starting October 2026",
+  );
   await expect(page.locator("summary", { hasText: "ARM terms" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Highest payment" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Total interest paid" })).toContainText("$643,835.49");
@@ -181,7 +191,11 @@ test("switching to fixed and back keeps the terms and a closed disclosure stays 
 test("a reload keeps the ARM scenario", async ({ page }) => {
   await openArm(page);
   await page.reload();
-  expect(await headingText(page)).toBe("600K | 5% down | 5.875% 7/1 ARM = $5,954 / month");
+  expect(await headingText(page)).toBe(
+    "600K | 5% down | 5.875% 30-year 7/1 ARM | starting October 2026",
+  );
+  await expect(page.locator(".heading-line")).not.toContainText("= $5,954 / month");
+  await expect(page.locator(".heading-line")).not.toContainText("= $4,288 / month");
   await expect(page.locator("summary", { hasText: "ARM terms" })).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByRole("region", { name: "Highest payment" })).toContainText(
     "$5,037.71 from November 2033",
@@ -219,7 +233,9 @@ test("a broken stored arm never puts the page into ARM mode", async ({ page }) =
   });
   await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
   await page.goto("/");
-  expect(await headingText(page)).toBe("600K | 5% down | 5.875% fixed = $4,288 / month");
+  expect(await headingText(page)).toBe(
+    "600K | 5% down | 5.875% 30-year fixed | starting October 2026",
+  );
   await expect(page.locator("#product")).toHaveValue("fixed");
   await expect(page.locator("thead th")).toHaveCount(9);
 });
@@ -412,6 +428,8 @@ async function headingText(page: Page): Promise<string> {
         parts.push(node.value);
       } else if (node instanceof HTMLSelectElement) {
         parts.push(node.selectedOptions[0]?.text ?? "");
+      } else if (node instanceof HTMLButtonElement) {
+        parts.push(node.textContent ?? "");
       } else if (node.nodeType === Node.TEXT_NODE) {
         parts.push(node.textContent ?? "");
       } else {
