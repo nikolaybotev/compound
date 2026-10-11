@@ -17,6 +17,7 @@ import {
   prepaidInterestCents365,
   prepaidInterestPerDiem365Cents,
   percentThousandths,
+  ficoRangeScore,
   pmiThousandthsForScore,
   type PictureLines,
 } from "../src/picture";
@@ -184,6 +185,11 @@ describe("AC1 PMI ladder by FICO", () => {
     expect(pmiThousandthsForScore(5_000, 600)).toBe(1990);
     expect(pmiThousandthsForScore(20_000, 600)).toBe(0);
     expect(pmiThousandthsForScore(20_000, 780)).toBe(0);
+
+    expect(ficoRangeScore(800)).toBe(780);
+    expect(ficoRangeScore(770)).toBe(740);
+    expect(ficoRangeScore(620)).toBe(620);
+    expect(ficoRangeScore(619)).toBe(620);
 
     expect(linesFor({ down: "5", picture: { ...defaultPicture(), pmi: "0.35" } }).pmiCents).toBe(16_625);
     const draft740 = defaultPicture();

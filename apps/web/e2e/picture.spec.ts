@@ -36,6 +36,12 @@ test("AC3 fresh Conventional taxes disclosure", async ({ page }) => {
   );
   await expect(picture.locator("[data-line='insurance']")).toContainText("$175.00");
   await expect(picture.locator("[data-line='pmi']")).toContainText("$166.25");
+  await expect(picture.locator("[data-line='subtotal']")).toContainText("Subtotal");
+  await expect(picture.locator("[data-line='subtotal']")).toContainText("$916.25");
+  const lines = await picture.locator("tbody tr").evaluateAll((rows) =>
+    rows.map((row) => row.getAttribute("data-line")),
+  );
+  expect(lines.at(-1)).toBe("subtotal");
   await expect(picture.locator("#picture-pmi")).toHaveValue("0.35");
   await expect(picture.locator("[data-line='pmi']")).not.toContainText("between");
   await expect(page.locator(".loan-type")).toHaveCount(0);
@@ -81,6 +87,7 @@ test("AC4 down payment clears PMI", async ({ page }) => {
   await expect(page.getByRole("region", { name: "Loan amount" })).toContainText("$480,000.00");
   await expect(page.locator("[data-line='pmi']")).toContainText("$0.00");
   await expect(page.locator("#picture-pmi")).toHaveValue("0");
+  await expect(page.locator("[data-line='subtotal']")).toContainText("$750.00");
 });
 
 test("AC10 closing costs at 20% down with 360 and 365 basis", async ({ page }) => {
@@ -182,19 +189,19 @@ test("AC11 FICO range and PMI ladder", async ({ page }) => {
   await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
   await page.goto("/");
   await page.locator("summary", { hasText: "Taxes and Insurance" }).click();
-  await page.getByRole("button", { name: "740–779", pressed: false }).click();
-  await expect(page.locator("#fico-score")).toHaveText("740");
-  expect(await headingText(page)).toContain("740 FICO");
-  expect(await headingText(page)).not.toContain("740–779");
+  await page.locator("#fico").selectOption("740");
+  await expect(page.locator("#fico option:checked")).toHaveText("740–779");
+  expect(await headingText(page)).toContain("740–779");
+  expect(await headingText(page)).not.toContain("FICO");
   await expect(page.locator("#picture-pmi")).toHaveValue("0.53");
 
-  await page.getByRole("button", { name: "780+", pressed: false }).click();
+  await page.locator("#fico").selectOption("780");
   await expect(page.locator("#picture-pmi")).toHaveValue("0.35");
 
-  await page.getByRole("button", { name: "620–659", pressed: false }).click();
+  await page.locator("#fico").selectOption("620");
   await expect(page.locator("#picture-pmi")).toHaveValue("1.42");
 
-  await page.getByRole("button", { name: "740–779", pressed: false }).click();
+  await page.locator("#fico").selectOption("740");
   await page.locator("#picture-pmi").fill("0.5");
   await page.evaluate(() => {
     const legacyKey = "compound-amortization-v1";
@@ -210,9 +217,10 @@ test("AC11 FICO range and PMI ladder", async ({ page }) => {
     }
   });
   await page.reload();
-  await expect(page.locator("#fico-score")).toHaveText("770");
+  await expect(page.locator("#fico")).toHaveValue("740");
+  await expect(page.locator("#fico option:checked")).toHaveText("740–779");
   await expect(page.locator("#picture-pmi")).toHaveValue("0.5");
-  await page.getByRole("button", { name: "740–779" }).click();
+  await page.locator("#fico").selectOption("740");
   await expect(page.locator("#picture-pmi")).toHaveValue("0.5");
 
   await page.locator("#down").fill("6");
@@ -227,8 +235,6 @@ async function headingText(page: Page): Promise<string> {
         parts.push(node.value);
       } else if (node instanceof HTMLSelectElement) {
         parts.push(node.selectedOptions[0]?.text ?? "");
-      } else if (node instanceof HTMLElement && node.classList.contains("fico-bands")) {
-        return;
       } else if (node instanceof HTMLButtonElement && node.id === "start") {
         parts.push(node.textContent?.trim() ?? "");
       } else if (node.nodeType === Node.TEXT_NODE) {

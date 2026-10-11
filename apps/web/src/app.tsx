@@ -51,9 +51,11 @@ import {
   yearsAndMonths,
 } from "./loan";
 import {
+  FICO_RANGES,
   buildPicture,
   loadStoredCount,
   ficoBand,
+  ficoRangeScore,
   parseFicoScore,
   parsePicture,
   parseWholeCount,
@@ -63,7 +65,6 @@ import {
   type PictureInputField,
   type PictureValues,
 } from "./picture";
-import { FicoBands } from "./fico-bands";
 import { PrevailingBar } from "./prevailing-bar";
 import { Schedule } from "./schedule";
 import { dollarsToCents } from "../../../amortize.js";
@@ -766,12 +767,18 @@ export function App() {
           <option value="arm">ARM</option>
         </select>
         <span> | </span>
-        <span id="fico-score">{validText.fico}</span>
-        <span> FICO </span>
-        <FicoBands
-          score={parseFicoScore(validText.fico) ?? 780}
-          onChoose={chooseFicoBand}
-        />
+        <select
+          id="fico"
+          aria-label="FICO range"
+          value={String(ficoRangeScore(parseFicoScore(validText.fico) ?? 780))}
+          onChange={(event) => chooseFicoBand(Number(event.currentTarget.value))}
+        >
+          {FICO_RANGES.map((range) => (
+            <option key={range.score} value={String(range.score)}>
+              {range.label}
+            </option>
+          ))}
+        </select>
         <span> | starting </span>
         <MonthPicker
           id="start"
@@ -924,6 +931,11 @@ export function App() {
                   onInput={(value) => updatePicture("pmi", value)}
                 />
               }
+            />
+            <MoneyRow
+              line="subtotal"
+              label="Subtotal"
+              amount={lines.taxCents + lines.insuranceCents + lines.pmiCents}
             />
           </tbody>
         </table>
