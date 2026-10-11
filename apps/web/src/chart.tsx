@@ -199,7 +199,7 @@ export function Chart({ bars }: Props) {
             visibility: position ? "visible" : "hidden",
           }}
         >
-          <h2>{indicated.dateLabel}</h2>
+          <h2>{`${indicated.month}: ${indicated.dateLabel}`}</h2>
           <ul class="legend-list">
             <li>
               <PiggyBank class="icon" />
@@ -256,7 +256,10 @@ function BarIcons({ bar, count }: { bar: ChartBar; count: number }) {
   return (
     <>
       <PiggyBank class="icon bar-icon" style={{ left, top: `${principalCenter * 100}%` }} />
-      <HoodedFigure class="icon bar-icon" style={{ left, top: `${interestCenter * 100}%` }} />
+      <HoodedFigure
+        class="icon bar-icon bar-icon--hood"
+        style={{ left, top: `${interestCenter * 100}%` }}
+      />
     </>
   );
 }
