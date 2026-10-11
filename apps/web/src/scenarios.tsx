@@ -175,29 +175,100 @@ export function ScenarioBar({
   return (
     <div class="scenario-row">
       <div class="scenario-actions">
-        <button
-          id="scenario"
-          ref={triggerRef}
-          type="button"
-          class="scenario-trigger"
-          aria-haspopup="dialog"
-          aria-expanded={listOpen}
-          aria-label={labels[active]}
-          onClick={toggleList}
-        >
-          <span class="scenario-trigger-text">{labels[active]}</span>
-          {figures[active] ? (
-            <PrevailingBar
-              variant="dropdown"
-              modalCents={figures[active]!.modalPaymentCents}
-              taxCents={figures[active]!.taxCents}
-              insuranceCents={figures[active]!.insuranceCents}
-              pmiCents={figures[active]!.pmiCents}
-              prevailingExtraCents={figures[active]!.prevailingExtraCents}
-            />
+        <div class="scenario-picker">
+          <button
+            id="scenario"
+            ref={triggerRef}
+            type="button"
+            class="scenario-trigger"
+            aria-haspopup="dialog"
+            aria-expanded={listOpen}
+            aria-label={labels[active]}
+            onClick={toggleList}
+          >
+            <span class="scenario-trigger-text">{labels[active]}</span>
+            {figures[active] ? (
+              <PrevailingBar
+                variant="dropdown"
+                modalCents={figures[active]!.modalPaymentCents}
+                taxCents={figures[active]!.taxCents}
+                insuranceCents={figures[active]!.insuranceCents}
+                pmiCents={figures[active]!.pmiCents}
+                prevailingExtraCents={figures[active]!.prevailingExtraCents}
+              />
+            ) : null}
+            <ChevronDown />
+          </button>
+          {listOpen ? (
+            <div
+              ref={listRef}
+              class="scenario-dialog"
+              role="dialog"
+              aria-label="Loan scenarios"
+              inert={confirmIndex !== null ? true : undefined}
+              onKeyDown={onListKeyDown}
+            >
+              <ul class="scenario-list">
+                {labels.map((label, index) => {
+                  const numbered = `${index + 1}: ${label}`;
+                  return (
+                    <li key={index} class="scenario-list-item">
+                      <button
+                        type="button"
+                        class="scenario-row-button"
+                        ref={(node) => {
+                          if (node) rowButtonsRef.current[index] = node;
+                        }}
+                        aria-label={numbered}
+                        aria-current={index === active ? "true" : undefined}
+                        onClick={() => choose(index)}
+                      >
+                        <span class="scenario-row-text">{numbered}</span>
+                        {figures[index] ? (
+                          <PrevailingBar
+                            variant="dropdown"
+                            modalCents={figures[index]!.modalPaymentCents}
+                            taxCents={figures[index]!.taxCents}
+                            insuranceCents={figures[index]!.insuranceCents}
+                            pmiCents={figures[index]!.pmiCents}
+                            prevailingExtraCents={figures[index]!.prevailingExtraCents}
+                          />
+                        ) : null}
+                      </button>
+                      {labels.length > 1 && index !== active ? (
+                        <button
+                          type="button"
+                          class="scenario-trash"
+                          aria-label={`Remove scenario ${index + 1}`}
+                          tabIndex={-1}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setConfirmIndex(index);
+                          }}
+                        >
+                          <TrashIcon />
+                        </button>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+              <button
+                type="button"
+                class="scenario-new"
+                aria-label="New scenario"
+                tabIndex={confirmIndex !== null ? -1 : undefined}
+                onClick={() => {
+                  onNew();
+                  setListOpen(false);
+                  triggerRef.current?.focus();
+                }}
+              >
+                +
+              </button>
+            </div>
           ) : null}
-          <ChevronDown />
-        </button>
+        </div>
         <div class="scenario-menu" ref={menuRef}>
           <button
             ref={menuButtonRef}
@@ -250,75 +321,6 @@ export function ScenarioBar({
       </div>
       {saveError ? (
         <p class="scenario-save-error" role="alert">Could not save this loan.</p>
-      ) : null}
-      {listOpen ? (
-        <div
-          ref={listRef}
-          class="scenario-dialog"
-          role="dialog"
-          aria-label="Loan scenarios"
-          inert={confirmIndex !== null ? true : undefined}
-          onKeyDown={onListKeyDown}
-        >
-          <ul class="scenario-list">
-            {labels.map((label, index) => {
-              const numbered = `${index + 1}: ${label}`;
-              return (
-                <li key={index} class="scenario-list-item">
-                  <button
-                    type="button"
-                    class="scenario-row-button"
-                    ref={(node) => {
-                      if (node) rowButtonsRef.current[index] = node;
-                    }}
-                    aria-label={numbered}
-                    aria-current={index === active ? "true" : undefined}
-                    onClick={() => choose(index)}
-                  >
-                    <span class="scenario-row-text">{numbered}</span>
-                    {figures[index] ? (
-                      <PrevailingBar
-                        variant="dropdown"
-                        modalCents={figures[index]!.modalPaymentCents}
-                        taxCents={figures[index]!.taxCents}
-                        insuranceCents={figures[index]!.insuranceCents}
-                        pmiCents={figures[index]!.pmiCents}
-                        prevailingExtraCents={figures[index]!.prevailingExtraCents}
-                      />
-                    ) : null}
-                  </button>
-                  {labels.length > 1 && index !== active ? (
-                    <button
-                      type="button"
-                      class="scenario-trash"
-                      aria-label={`Remove scenario ${index + 1}`}
-                      tabIndex={-1}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setConfirmIndex(index);
-                      }}
-                    >
-                      <TrashIcon />
-                    </button>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-          <button
-            type="button"
-            class="scenario-new"
-            aria-label="New scenario"
-            tabIndex={confirmIndex !== null ? -1 : undefined}
-            onClick={() => {
-              onNew();
-              setListOpen(false);
-              triggerRef.current?.focus();
-            }}
-          >
-            +
-          </button>
-        </div>
       ) : null}
       {confirmIndex !== null ? (
         <div
