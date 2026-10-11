@@ -17,6 +17,7 @@ import {
   prepaidInterestCents365,
   prepaidInterestPerDiem365Cents,
   percentThousandths,
+  pmiThousandthsForScore,
   type PictureLines,
 } from "../src/picture";
 
@@ -172,6 +173,22 @@ describe("AC2 prepaid interest and storage loads", () => {
     expect(parseWholeCount("999")).toBe(999);
     expect(parseWholeCount("1000")).toBeNull();
     expect(parseWholeCount("1.5")).toBeNull();
+  });
+});
+
+describe("AC1 PMI ladder by FICO", () => {
+  test("thousandths and fresh-loan PMI cents", () => {
+    expect(pmiThousandthsForScore(5_000, 780)).toBe(350);
+    expect(pmiThousandthsForScore(10_000, 780)).toBe(200);
+    expect(pmiThousandthsForScore(5_000, 740)).toBe(530);
+    expect(pmiThousandthsForScore(5_000, 600)).toBe(1990);
+    expect(pmiThousandthsForScore(20_000, 600)).toBe(0);
+    expect(pmiThousandthsForScore(20_000, 780)).toBe(0);
+
+    expect(linesFor({ down: "5", picture: { ...defaultPicture(), pmi: "0.35" } }).pmiCents).toBe(16_625);
+    const draft740 = defaultPicture();
+    draft740.pmi = "0.53";
+    expect(linesFor({ down: "5", picture: draft740 }).pmiCents).toBe(25_175);
   });
 });
 

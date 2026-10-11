@@ -178,6 +178,58 @@ test("AC6 a saved version-1 loan keeps its payment and shows thousands", async (
   await expect(page.locator("#picture-recording")).toHaveValue("800");
 });
 
+test("AC11 FICO range and PMI ladder", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
+  await page.goto("/");
+  await page.locator("summary", { hasText: "Taxes and Insurance" }).click();
+  await page.locator("#fico-range").selectOption("740");
+  await expect(page.locator("#fico")).toHaveValue("740");
+  await expect(page.locator("#fico-range")).toHaveValue("");
+  expect(await headingText(page)).toContain("740 FICO");
+  expect(await headingText(page)).not.toContain("740–779");
+  await expect(page.locator("#picture-pmi")).toHaveValue("0.53");
+
+  await page.locator("#fico").fill("800");
+  await expect(page.locator("#picture-pmi")).toHaveValue("0.35");
+  await expect(page.locator("#fico-range")).toHaveValue("");
+
+  await page.locator("#fico").fill("600");
+  await expect(page.locator("#picture-pmi")).toHaveValue("1.99");
+
+  await page.locator("#fico").fill("740");
+  await page.locator("#picture-pmi").fill("0.5");
+  await page.locator("#fico").fill("770");
+  await expect(page.locator("#picture-pmi")).toHaveValue("0.5");
+  await page.locator("#fico-range").selectOption("740");
+  await expect(page.locator("#picture-pmi")).toHaveValue("0.5");
+
+  await page.locator("#down").fill("6");
+  await expect(page.locator("#picture-pmi")).toHaveValue("0.53");
+});
+
+async function headingText(page: Page): Promise<string> {
+  return page.locator(".heading-line").evaluate((element) => {
+    const parts: string[] = [];
+    const walk = (node: Node) => {
+      if (node instanceof HTMLInputElement) {
+        parts.push(node.value);
+      } else if (node instanceof HTMLSelectElement) {
+        if (node.id === "fico-range") return;
+        parts.push(node.selectedOptions[0]?.text ?? "");
+      } else if (node instanceof HTMLButtonElement && node.id === "start") {
+        parts.push(node.textContent?.trim() ?? "");
+      } else if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent?.replace(/\s+/g, " ") ?? "";
+        if (text.trim()) parts.push(text);
+      } else {
+        node.childNodes.forEach(walk);
+      }
+    };
+    element.childNodes.forEach(walk);
+    return parts.join("").replace(/\s+/g, " ").trim();
+  });
+}
+
 async function openExample(page: Page) {
   await page.goto("/");
   await setStartMonth(page, 2026, 10);
