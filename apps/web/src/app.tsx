@@ -63,6 +63,7 @@ import {
   type PictureInputField,
   type PictureValues,
 } from "./picture";
+import { FicoBands } from "./fico-bands";
 import { PrevailingBar } from "./prevailing-bar";
 import { Schedule } from "./schedule";
 import { dollarsToCents } from "../../../amortize.js";
@@ -121,7 +122,6 @@ export function App() {
     rate: initial.scenario.draft.rate,
     fico: initial.scenario.draft.fico,
   });
-  const [ficoRangeValue, setFicoRangeValue] = useState("");
   const [loan, setLoan] = useState(initial.loan);
   const [priceText, setPriceText] = useState(() => dollarsToThousandsText(initial.scenario.draft.price));
   const [extras, setExtras] = useState(initial.scenario.extras);
@@ -414,49 +414,7 @@ export function App() {
     );
   }
 
-  function updateFico(value: string) {
-    const previousScore = parseFicoScore(validText.fico) ?? 780;
-    const next = { ...draft, fico: value };
-    setDraft(next);
-    const parsed = parseFicoScore(value);
-    if (parsed === null) {
-      setError("FICO must be a whole number from 0 through 999.");
-      setInvalidField("fico");
-      return;
-    }
-    setValidText((current) => ({ ...current, fico: value }));
-    setError(null);
-    setInvalidField(null);
-    let pictureNext: typeof pictureDraft | undefined;
-    if (ficoBand(parsed) !== ficoBand(previousScore)) {
-      pictureNext = pmiDraftForLoan(pictureDraft, validText.down, value);
-      const pictureParsed = parsePicture(pictureNext, pictureCounts);
-      if (pictureParsed.ok) {
-        setPictureDraft(pictureNext);
-        setPictureSaved({
-          ...pictureNext,
-          open: pictureDraft.open,
-          closingOpen: pictureDraft.closingOpen,
-        });
-        setPictureValues(pictureParsed.values);
-      }
-    }
-    persist({
-      draft: next,
-      ...(pictureNext
-        ? {
-            picture: {
-              ...pictureNext,
-              open: pictureDraft.open,
-              closingOpen: pictureDraft.closingOpen,
-            },
-          }
-        : {}),
-    });
-  }
-
-  function chooseFicoRange(value: string) {
-    const score = Number(value);
+  function chooseFicoBand(score: number) {
     const previousScore = parseFicoScore(validText.fico) ?? 780;
     const next = { ...draft, fico: String(score) };
     setDraft(next);
@@ -808,34 +766,12 @@ export function App() {
           <option value="arm">ARM</option>
         </select>
         <span> | </span>
-        <input
-          id="fico"
-          aria-label="FICO"
-          inputMode="numeric"
-          autoComplete="off"
-          value={draft.fico}
-          aria-invalid={invalidField === "fico"}
-          style={{ width: `${Math.max(draft.fico.length, 1) + 1}ch` }}
-          onInput={(event) => updateFico(event.currentTarget.value)}
-        />
+        <span id="fico-score">{validText.fico}</span>
         <span> FICO </span>
-        <select
-          id="fico-range"
-          aria-label="FICO range"
-          value={ficoRangeValue}
-          onChange={(event) => {
-            const value = event.currentTarget.value;
-            setFicoRangeValue("");
-            if (value) chooseFicoRange(value);
-          }}
-        >
-          <option value=""></option>
-          <option value="780">780+</option>
-          <option value="740">740–779</option>
-          <option value="700">700–739</option>
-          <option value="660">660–699</option>
-          <option value="620">620–659</option>
-        </select>
+        <FicoBands
+          score={parseFicoScore(validText.fico) ?? 780}
+          onChoose={chooseFicoBand}
+        />
         <span> | starting </span>
         <MonthPicker
           id="start"
@@ -848,6 +784,91 @@ export function App() {
         <p class="error" role="alert">
           {error}
         </p>
+      ) : null}
+      {armOn && armParsed.ok ? (
+        <Disclosure className="arm" title="ARM terms" open={armSaved.open} onToggle={setArmOpen}>
+          <div class="inputs">
+            <Field
+              id="arm-fixed-years"
+              label={ARM_FIELD_LABELS.fixedYears}
+              value={armDraft.fixedYears}
+              suffix="years"
+              invalid={invalidField === "fixedYears"}
+              onInput={(value) => updateArm("fixedYears", value)}
+            />
+            <Field
+              id="arm-adjust-months"
+              label={ARM_FIELD_LABELS.adjustMonths}
+              value={armDraft.adjustMonths}
+              suffix="months"
+              invalid={invalidField === "adjustMonths"}
+              onInput={(value) => updateArm("adjustMonths", value)}
+            />
+            <Field
+              id="arm-margin"
+              label={ARM_FIELD_LABELS.margin}
+              value={armDraft.margin}
+              suffix="%"
+              invalid={invalidField === "margin"}
+              onInput={(value) => updateArm("margin", value)}
+            />
+            <Field
+              id="arm-initial-cap"
+              label={ARM_FIELD_LABELS.initialCap}
+              value={armDraft.initialCap}
+              suffix="%"
+              invalid={invalidField === "initialCap"}
+              onInput={(value) => updateArm("initialCap", value)}
+            />
+            <Field
+              id="arm-periodic-cap"
+              label={ARM_FIELD_LABELS.periodicCap}
+              value={armDraft.periodicCap}
+              suffix="%"
+              invalid={invalidField === "periodicCap"}
+              onInput={(value) => updateArm("periodicCap", value)}
+            />
+            <Field
+              id="arm-lifetime-cap"
+              label={ARM_FIELD_LABELS.lifetimeCap}
+              value={armDraft.lifetimeCap}
+              suffix="%"
+              invalid={invalidField === "lifetimeCap"}
+              onInput={(value) => updateArm("lifetimeCap", value)}
+            />
+            <Field
+              id="arm-floor"
+              label={ARM_FIELD_LABELS.floor}
+              value={armDraft.floor}
+              suffix="%"
+              invalid={invalidField === "floor"}
+              onInput={(value) => updateArm("floor", value)}
+            />
+            <Field
+              id="arm-initial-floor"
+              label={ARM_FIELD_LABELS.initialFloor}
+              value={armDraft.initialFloor}
+              suffix="%"
+              invalid={invalidField === "initialFloor"}
+              onInput={(value) => updateArm("initialFloor", value)}
+            />
+          </div>
+          <label class="arm-check" for="arm-round-eighth">
+            <input
+              id="arm-round-eighth"
+              type="checkbox"
+              checked={armSaved.roundEighth}
+              onChange={(event) => setRoundEighth(event.currentTarget.checked)}
+            />
+            Round to nearest 1/8 point
+          </label>
+          <p class="arm-computed" data-line="arm-ceiling">
+            {`Ceiling ${formatPercentThousandths(rateThousandths + armParsed.values.lifetimeCapThousandths)}%`}
+          </p>
+          <p class="arm-computed" data-line="arm-first-adjustment">
+            {`First adjustment ${armDateLabel(loan, armParsed.values.fixedMonths + 1)} (payment ${armParsed.values.fixedMonths + 1})`}
+          </p>
+        </Disclosure>
       ) : null}
       <Disclosure
         className="picture"
@@ -1033,91 +1054,6 @@ export function App() {
           </div>
         </dl>
       </section>
-      {armOn && armParsed.ok ? (
-        <Disclosure className="arm" title="ARM terms" open={armSaved.open} onToggle={setArmOpen}>
-          <div class="inputs">
-            <Field
-              id="arm-fixed-years"
-              label={ARM_FIELD_LABELS.fixedYears}
-              value={armDraft.fixedYears}
-              suffix="years"
-              invalid={invalidField === "fixedYears"}
-              onInput={(value) => updateArm("fixedYears", value)}
-            />
-            <Field
-              id="arm-adjust-months"
-              label={ARM_FIELD_LABELS.adjustMonths}
-              value={armDraft.adjustMonths}
-              suffix="months"
-              invalid={invalidField === "adjustMonths"}
-              onInput={(value) => updateArm("adjustMonths", value)}
-            />
-            <Field
-              id="arm-margin"
-              label={ARM_FIELD_LABELS.margin}
-              value={armDraft.margin}
-              suffix="%"
-              invalid={invalidField === "margin"}
-              onInput={(value) => updateArm("margin", value)}
-            />
-            <Field
-              id="arm-initial-cap"
-              label={ARM_FIELD_LABELS.initialCap}
-              value={armDraft.initialCap}
-              suffix="%"
-              invalid={invalidField === "initialCap"}
-              onInput={(value) => updateArm("initialCap", value)}
-            />
-            <Field
-              id="arm-periodic-cap"
-              label={ARM_FIELD_LABELS.periodicCap}
-              value={armDraft.periodicCap}
-              suffix="%"
-              invalid={invalidField === "periodicCap"}
-              onInput={(value) => updateArm("periodicCap", value)}
-            />
-            <Field
-              id="arm-lifetime-cap"
-              label={ARM_FIELD_LABELS.lifetimeCap}
-              value={armDraft.lifetimeCap}
-              suffix="%"
-              invalid={invalidField === "lifetimeCap"}
-              onInput={(value) => updateArm("lifetimeCap", value)}
-            />
-            <Field
-              id="arm-floor"
-              label={ARM_FIELD_LABELS.floor}
-              value={armDraft.floor}
-              suffix="%"
-              invalid={invalidField === "floor"}
-              onInput={(value) => updateArm("floor", value)}
-            />
-            <Field
-              id="arm-initial-floor"
-              label={ARM_FIELD_LABELS.initialFloor}
-              value={armDraft.initialFloor}
-              suffix="%"
-              invalid={invalidField === "initialFloor"}
-              onInput={(value) => updateArm("initialFloor", value)}
-            />
-          </div>
-          <label class="arm-check" for="arm-round-eighth">
-            <input
-              id="arm-round-eighth"
-              type="checkbox"
-              checked={armSaved.roundEighth}
-              onChange={(event) => setRoundEighth(event.currentTarget.checked)}
-            />
-            Round to nearest 1/8 point
-          </label>
-          <p class="arm-computed" data-line="arm-ceiling">
-            {`Ceiling ${formatPercentThousandths(rateThousandths + armParsed.values.lifetimeCapThousandths)}%`}
-          </p>
-          <p class="arm-computed" data-line="arm-first-adjustment">
-            {`First adjustment ${armDateLabel(loan, armParsed.values.fixedMonths + 1)} (payment ${armParsed.values.fixedMonths + 1})`}
-          </p>
-        </Disclosure>
-      ) : null}
       <Chart bars={bars} />
       <Disclosure
         className="picture-closing"
