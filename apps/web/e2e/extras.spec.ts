@@ -127,6 +127,18 @@ test("AC9 extra form fields show edited blue before Apply", async ({ page }) => 
   await expect(monthly).not.toHaveCSS("color", "rgb(29, 78, 216)");
   await monthly.fill("50");
   await expect(monthly).not.toHaveCSS("color", "rgb(29, 78, 216)");
+
+  const month = page.locator("#extra-yearly-month");
+  const yearly = page.locator("#extra-yearly");
+  await expect(month).not.toHaveAttribute("data-edited", "true");
+  await expect(month).toHaveCSS("color", await yearly.evaluate((el) => getComputedStyle(el).color));
+  await expect(month).toHaveCSS("color", "rgb(23, 33, 31)");
+  await month.selectOption("2");
+  await expect(month).toHaveAttribute("data-edited", "true");
+  await expect(month).toHaveCSS("color", "rgb(29, 78, 216)");
+  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(month).not.toHaveAttribute("data-edited", "true");
+  await expect(month).toHaveCSS("color", "rgb(23, 33, 31)");
 });
 
 test("AC13 an invalid extra cell and an invalid Apply leave the column", async ({ page }) => {

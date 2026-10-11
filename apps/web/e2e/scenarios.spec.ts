@@ -28,7 +28,7 @@ test("AC3 fresh visit label, heading, and single row without trash", async ({ pa
   );
   await expect(page.locator("#price")).toHaveValue("600");
   expect(await headingText(page)).toBe(
-    "600K | 5% down | 7.375% 30-year fixed | 780 FICO | starting October 2026",
+    "600K | 5% down | 7.375% 30-year fixed | 780+ | starting October 2026",
   );
   await expect(page.locator("span.complete-payment")).toHaveCount(0);
   await expect(page.locator(".prevailing-bar--heading")).toHaveCount(0);
@@ -277,8 +277,6 @@ async function headingText(page: Page): Promise<string> {
         parts.push(node.value);
       } else if (node instanceof HTMLSelectElement) {
         parts.push(node.selectedOptions[0]?.text ?? "");
-      } else if (node instanceof HTMLElement && node.classList.contains("fico-bands")) {
-        return;
       } else if (node instanceof HTMLButtonElement && node.id === "start") {
         parts.push(node.textContent?.trim() ?? "");
       } else if (node instanceof HTMLButtonElement) {
