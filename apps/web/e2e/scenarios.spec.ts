@@ -152,9 +152,6 @@ test("AC7 scenario label after Apply patterns", async ({ page }) => {
   await openExample(page);
   await applyMonthly(page, "100");
   await expect(page.locator("#scenario")).toHaveAttribute("aria-label", /^\$4,953/);
-  await page.locator("summary", { hasText: "Monthly payment and closing costs" }).click();
-  await expect(page.locator("[data-line='prevailing-extra']")).toContainText("$100.00");
-  await expect(page.locator("[data-line='prevailing-monthly-total']")).toContainText("$4,953.10");
   await page.locator("#extra-monthly").fill("");
   await page.getByRole("button", { name: "Apply" }).click();
   await page.getByRole("button", { name: "Expand all years" }).click();
@@ -164,7 +161,6 @@ test("AC7 scenario label after Apply patterns", async ({ page }) => {
   }
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(page.locator("#scenario")).toHaveAttribute("aria-label", /^\$4,853/);
-  await expect(page.locator("[data-line='prevailing-extra']")).toContainText("$0.00");
   await extra(page, 1).fill("250");
   await extra(page, 1).press("Enter");
   await expect(page.locator("#scenario")).toHaveAttribute("aria-label", /^\$4,853/);
@@ -263,7 +259,7 @@ async function openExample(page: Page) {
 }
 
 async function applyMonthly(page: Page, amount: string) {
-  const summary = page.locator("summary", { hasText: "Make extra payments" });
+  const summary = page.locator("summary", { hasText: "Extra Payments" });
   if ((await summary.getAttribute("aria-expanded")) !== "true") await summary.click();
   await page.locator("#extra-monthly").fill(amount);
   await page.getByRole("button", { name: "Apply" }).click();

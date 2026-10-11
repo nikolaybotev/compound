@@ -4,7 +4,6 @@ type Props = {
   modalCents: number;
   taxCents: number;
   insuranceCents: number;
-  fhaMipCents: number;
   pmiCents: number;
   prevailingExtraCents: number;
   variant: "heading" | "dropdown" | "summary";
@@ -14,12 +13,11 @@ export function PrevailingBar({
   modalCents,
   taxCents,
   insuranceCents,
-  fhaMipCents,
   pmiCents,
   prevailingExtraCents,
   variant,
 }: Props) {
-  const tiCents = taxCents + insuranceCents + fhaMipCents + pmiCents;
+  const tiCents = taxCents + insuranceCents + pmiCents;
   const segments = [
     { className: "prevailing-pi", cents: modalCents, label: "PI" },
     { className: "prevailing-ti", cents: tiCents, label: "TI" },
