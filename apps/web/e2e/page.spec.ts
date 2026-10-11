@@ -111,7 +111,7 @@ test("AC11 pinned clock loads October 2026 and an invalid price keeps the loan",
 test("AC7 prevailing extra raises Monthly payment on the fresh loan", async ({ page }) => {
   await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
   await page.goto("/");
-  await page.locator("summary", { hasText: "Make extra payments" }).click();
+  await page.locator("summary", { hasText: "Extra Payments" }).click();
   await page.locator("#extra-monthly").fill("1000");
   await page.getByRole("button", { name: "Apply" }).click();
   const monthly = page.getByRole("region", { name: "Monthly payment" });

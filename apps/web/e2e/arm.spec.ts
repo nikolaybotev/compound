@@ -89,15 +89,6 @@ test("AC9 the Example Credit Union 7/1 example heading, terms, and summary", asy
   await expect(page.getByRole("region", { name: "Total interest paid" })).toContainText("$1,103,636.33");
   await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("October 2056");
 
-  await page.locator("summary", { hasText: "Monthly payment and closing costs" }).click();
-  const picture = page.locator("details.picture");
-  await expect(picture.locator("[data-line='principal-and-interest']")).toContainText("$3,371.77");
-  await expect(picture.locator("[data-line='total-monthly']")).toContainText("$4,288.02");
-  await expect(picture.locator("[data-line='prevailing-principal-and-interest']")).toContainText(
-    "$5,037.71",
-  );
-  await expect(picture.locator("[data-line='prevailing-monthly-total']")).toContainText("$5,953.96");
-
   await page.locator("#product").selectOption("fixed");
   expect(await headingText(page)).toBe(
     "600K | 5% down | 5.875% 30-year fixed | starting October 2026",
@@ -363,7 +354,7 @@ test("Apply replaces only the extra column and leaves the index", async ({ page 
   await openArm(page);
   await openYear(page, 2033);
   await setIndex(page, 85, "4.42");
-  await page.locator("summary", { hasText: "Make extra payments" }).click();
+  await page.locator("summary", { hasText: "Extra Payments" }).click();
   await page.locator("#extra-monthly").fill("100");
   await page.getByRole("button", { name: "Apply" }).click();
   await expect(index(page, 85)).toHaveValue("4.42");
@@ -383,6 +374,31 @@ test("a term change drops index entries that are no longer adjustment months", a
   await page.locator("#arm-fixed-years").fill("7");
   await openYear(page, 2033);
   await expect(index(page, 85)).toHaveValue("");
+});
+
+test("AC14 ARM order, summary, and no picture principal row", async ({ page }) => {
+  await openArm(page);
+  const mainOrder = await page.locator("main").evaluate((main) => {
+    const tags: string[] = [];
+    for (const child of main.children) {
+      if (child.matches("details.arm")) tags.push("ARM terms");
+      if (child.matches("details.picture")) tags.push("Taxes and Insurance");
+      if (child.matches("section.summary")) tags.push("Summary");
+      if (child.matches(".chart")) tags.push("Chart");
+    }
+    return tags;
+  });
+  expect(mainOrder.indexOf("Taxes and Insurance")).toBeLessThan(mainOrder.indexOf("Summary"));
+  expect(mainOrder.indexOf("Summary")).toBeLessThan(mainOrder.indexOf("ARM terms"));
+  expect(mainOrder.indexOf("ARM terms")).toBeLessThan(mainOrder.indexOf("Chart"));
+
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$5,953.96");
+  await expect(page.getByText(ARM_NOTE)).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Highest rate" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Highest payment" })).toBeVisible();
+
+  await page.locator("summary", { hasText: "Taxes and Insurance" }).click();
+  await expect(page.locator("[data-line='principal-and-interest']")).toHaveCount(0);
 });
 
 async function expectNoFixedNote(page: Page) {

@@ -5,10 +5,28 @@ import {
   buildPicture,
   conventionalPmi,
   defaultPicture,
+  pmiPercentInputFromThousandths,
+  loadStoredCount,
+  loadStoredInterestBasis,
   parsePicture,
+  parseWholeCount,
   percentOfCents,
+  pictureFromStorage,
+  prepaidInterestCents,
+  prepaidInterestCents360,
+  prepaidInterestCents365,
+  prepaidInterestPerDiem365Cents,
+  percentThousandths,
   type PictureLines,
 } from "../src/picture";
+
+function countsFromDraft(draft: ReturnType<typeof defaultPicture>) {
+  return {
+    insuranceMonths: loadStoredCount(draft.insuranceMonths, 12),
+    taxMonths: loadStoredCount(draft.taxMonths, 4),
+    interestDays: loadStoredCount(draft.interestDays, 15),
+  };
+}
 
 function linesFor(draft: {
   price?: string;
@@ -23,13 +41,21 @@ function linesFor(draft: {
   const rate = draft.rate ?? "7.375";
   const parsed = parseLoan({ price, down, years, rate, start: "2026-10" });
   if (!parsed.ok) throw new Error("loan must parse");
-  const picture = parsePicture(draft.picture ?? defaultPicture());
+  let pictureDraft = draft.picture ?? defaultPicture();
+  if (draft.down !== undefined && draft.picture === undefined) {
+    const downTh = percentThousandths(down);
+    if (downTh !== null) {
+      const pmi = conventionalPmi(downTh);
+      pictureDraft = { ...pictureDraft, pmi: pmiPercentInputFromThousandths(pmi.thousandths) };
+    }
+  }
+  const picture = parsePicture(pictureDraft, countsFromDraft(pictureDraft));
   if (!picture.ok) throw new Error("picture must parse");
   return buildPicture(parsed.loan, rate, down, picture.values);
 }
 
 describe("default Conventional picture", () => {
-  test("AC1 cents match the sheet and buildReport", () => {
+  test("fresh loan cents match the sheet and buildReport", () => {
     const lines = linesFor({});
     const payment = buildReport(570000, 7.375, 360, new Map()).monthly_payment_cents;
     expect(lines.baseCents).toBe(57_000_000);
@@ -38,8 +64,6 @@ describe("default Conventional picture", () => {
     expect(lines.principalAndInterestCents).toBe(payment);
     expect(lines.taxCents).toBe(57_500);
     expect(lines.insuranceCents).toBe(17_500);
-    expect(lines.fhaMipCents).toBe(0);
-    expect(lines.fhaMipRateText).toBe("0%");
     expect(lines.pmiCents).toBe(16_625);
     expect(lines.pmiRateText).toBe("0.35%");
     expect(lines.totalMonthlyCents).toBe(485_310);
@@ -61,22 +85,10 @@ describe("default Conventional picture", () => {
     expect(percentOfCents(39_999_900, 3500)).toBe(downPaymentCents(39_999_900, 3500));
     expect(percentOfCents(57_000_000, 1750)).toBe(997_500);
   });
-
-  test("upfront MIP 1.75% finances 997500 cents on the default base", () => {
-    const picture = defaultPicture();
-    picture.upfrontMip = "1.75";
-    const lines = linesFor({ picture });
-    expect(lines.baseCents).toBe(57_000_000);
-    expect(lines.upfrontMipCents).toBe(997_500);
-    expect(lines.financedCents).toBe(57_997_500);
-    expect(lines.principalAndInterestCents).toBe(
-      buildReport(579975, 7.375, 360, new Map()).monthly_payment_cents,
-    );
-  });
 });
 
 describe("PMI brackets", () => {
-  test("AC2 thousandths cuts and rate text have no bracket sentence", () => {
+  test("thousandths cuts and rate text have no bracket sentence", () => {
     expect(conventionalPmi(20_000)).toEqual({ thousandths: 0, text: "0%" });
     expect(conventionalPmi(19_999)).toEqual({ thousandths: 200, text: "0.2%" });
     expect(conventionalPmi(10_000)).toEqual({ thousandths: 200, text: "0.2%" });
@@ -106,11 +118,68 @@ describe("PMI brackets", () => {
   });
 });
 
+describe("AC2 prepaid interest and storage loads", () => {
+  test("360 and 365 charges on reference loans", () => {
+    const fresh = linesFor({});
+    expect(fresh.prepaidInterestCents).toBe(175_156);
+    expect(prepaidInterestCents360(57_000_000, 7375, 15)).toBe(175_156);
+
+    const rate75 = 7500;
+    const base570 = 57_000_000;
+    expect(prepaidInterestPerDiem365Cents(base570, rate75)).toBe(11_712);
+    expect(prepaidInterestCents365(base570, rate75, 15)).toBe(175_680);
+    expect(prepaidInterestCents360(base570, rate75, 15)).toBe(178_125);
+
+    const twenty = linesFor({ down: "20" });
+    expect(twenty.prepaidInterestCents).toBe(147_500);
+    expect(twenty.closingCents).toBe(1_917_500);
+    expect(twenty.cashToCloseCents).toBe(13_917_500);
+
+    const picture365 = defaultPicture();
+    picture365.interestBasis = "365";
+    const parsed365 = parsePicture(picture365, countsFromDraft(picture365));
+    if (!parsed365.ok) throw new Error("picture");
+    const loanParsed = parseLoan({ price: "600000", down: "20", years: "30", rate: "7.375", start: "2026-10" });
+    if (!loanParsed.ok) throw new Error("loan");
+    const lines365 = buildPicture(loanParsed.loan, "7.375", "20", parsed365.values);
+    expect(lines365.prepaidInterestCents).toBe(145_485);
+
+    expect(prepaidInterestCents(57_000_000, 7375, 0, "360")).toBe(0);
+    expect(prepaidInterestCents(57_000_000, 7375, 0, "365")).toBe(0);
+  });
+
+  test("stored basis and count fields load with defaults", () => {
+    expect(loadStoredInterestBasis(undefined)).toBe("360");
+    expect(loadStoredInterestBasis("360")).toBe("360");
+    expect(loadStoredInterestBasis("365")).toBe("365");
+    expect(loadStoredInterestBasis("366")).toBe("360");
+
+    expect(loadStoredCount("1000", 15)).toBe(15);
+    expect(loadStoredCount("1.5", 15)).toBe(15);
+    expect(loadStoredCount("-1", 12)).toBe(12);
+    expect(loadStoredCount("15.5", 4)).toBe(4);
+    expect(loadStoredCount("abc", 4)).toBe(4);
+    expect(loadStoredCount("", 15)).toBe(15);
+
+    const fromStorage = pictureFromStorage({ interestDays: "1000", insuranceMonths: "-1", taxMonths: "abc" });
+    expect(fromStorage.interestDays).toBe("15");
+    expect(fromStorage.insuranceMonths).toBe("12");
+    expect(fromStorage.taxMonths).toBe("4");
+  });
+
+  test("parseWholeCount accepts 0 through 999 only", () => {
+    expect(parseWholeCount("0")).toBe(0);
+    expect(parseWholeCount("999")).toBe(999);
+    expect(parseWholeCount("1000")).toBeNull();
+    expect(parseWholeCount("1.5")).toBeNull();
+  });
+});
+
 describe("picture inputs", () => {
   test("an empty field is invalid and does not use the extra-payment empty rule", () => {
     const picture = defaultPicture();
     picture.processing = "";
-    const parsed = parsePicture(picture);
+    const parsed = parsePicture(picture, countsFromDraft(picture));
     expect(parsed.ok).toBe(false);
     if (parsed.ok) return;
     expect(parsed.field).toBe("processing");
