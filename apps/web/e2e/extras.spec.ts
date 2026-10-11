@@ -12,10 +12,10 @@ test.afterEach(({ context }) => {
   expect(leaks.get(context) ?? []).toEqual([]);
 });
 
-test("AC15 a fresh visit keeps Make extra payments collapsed", async ({ page }) => {
+test("AC15 a fresh visit keeps Extra Payments collapsed", async ({ page }) => {
   await page.goto("/");
   const summary = extraSummary(page);
-  await expect(summary).toHaveAccessibleName("Make extra payments");
+  await expect(summary).toHaveAccessibleName("Extra Payments");
   await expect(summary).toHaveAttribute("aria-expanded", "false");
   await expect(page.locator("#extra-monthly")).toHaveValue("");
   await expect(page.locator("#extra-yearly")).toHaveValue("");
@@ -109,7 +109,7 @@ test("AC8 reload keeps the edited cell, the prefill, and an open 2027", async ({
   await expect(page.locator("#start")).toHaveText("October 2026");
   await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$4,853.10");
   const summary = extraSummary(page);
-  await expect(summary).toHaveAccessibleName("Make extra payments");
+  await expect(summary).toHaveAccessibleName("Extra Payments");
   await expect(summary).toHaveAttribute("aria-expanded", "false");
   await expect(page.locator("#extra-monthly")).toHaveValue("");
   await expect(page.locator("#extra-yearly")).toHaveValue("");
@@ -212,7 +212,7 @@ async function openExample(page: Page) {
 }
 
 function extraSummary(page: Page) {
-  return page.locator("summary", { hasText: "Make extra payments" });
+  return page.locator("summary", { hasText: "Extra Payments" });
 }
 
 async function openPrefill(page: Page) {

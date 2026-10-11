@@ -79,7 +79,7 @@ async function openExample(page: Page) {
 }
 
 async function applyMonthly(page: Page, amount: string) {
-  const summary = page.locator("summary", { hasText: "Make extra payments" });
+  const summary = page.locator("summary", { hasText: "Extra Payments" });
   if ((await summary.getAttribute("aria-expanded")) !== "true") await summary.click();
   await page.locator("#extra-monthly").fill(amount);
   await page.getByRole("button", { name: "Apply" }).click();

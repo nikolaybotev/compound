@@ -25,56 +25,61 @@ function centsToDollars(cents: number): number {
   return negative ? -dollars : dollars;
 }
 
-export const PICTURE_PERCENT_FIELDS = [
-  "tax",
-  "insurance",
-  "upfrontMip",
-  "origination",
-  "title",
-] as const;
+export const PICTURE_PERCENT_FIELDS = ["tax", "insurance", "pmi", "origination", "title"] as const;
 
-export const PICTURE_DOLLAR_FIELDS = ["processing", "appraisal", "recording"] as const;
+export const PICTURE_DOLLAR_FIELDS = ["processing", "appraisal", "recording", "cushion"] as const;
+
+export const PICTURE_COUNT_FIELDS = ["insuranceMonths", "taxMonths", "interestDays"] as const;
 
 export type PicturePercentField = (typeof PICTURE_PERCENT_FIELDS)[number];
 export type PictureDollarField = (typeof PICTURE_DOLLAR_FIELDS)[number];
-export type PictureInputField = PicturePercentField | PictureDollarField;
+export type PictureCountField = (typeof PICTURE_COUNT_FIELDS)[number];
+export type PictureInputField = PicturePercentField | PictureDollarField | PictureCountField;
 
 export type PictureDraft = {
   tax: string;
   insurance: string;
-  upfrontMip: string;
+  pmi: string;
   origination: string;
   title: string;
   processing: string;
   appraisal: string;
   recording: string;
+  insuranceMonths: string;
+  taxMonths: string;
+  interestDays: string;
+  interestBasis: string;
+  cushion: string;
   open: boolean;
+  closingOpen: boolean;
 };
 
 export type PictureValues = {
   taxThousandths: number;
   insuranceThousandths: number;
-  upfrontMipThousandths: number;
+  pmiThousandths: number;
   originationThousandths: number;
   titleThousandths: number;
   processingCents: number;
   appraisalCents: number;
   recordingCents: number;
+  insuranceMonths: number;
+  taxMonths: number;
+  interestDays: number;
+  interestBasis: "360" | "365";
+  cushionCents: number;
 };
 
 export type PictureLines = {
   priceCents: number;
   downCents: number;
   baseCents: number;
-  upfrontMipCents: number;
   financedCents: number;
   principalAndInterestCents: number;
   taxCents: number;
   insuranceCents: number;
-  fhaMipCents: number;
-  fhaMipRateText: "0%";
   pmiCents: number;
-  pmiRateText: PmiRateText;
+  pmiRateText: string;
   totalMonthlyCents: number;
   headingDollars: number;
   originationCents: number;
@@ -99,7 +104,7 @@ export type PictureParseResult =
 const PERCENT_LABELS: Record<PicturePercentField, string> = {
   tax: "Property tax",
   insurance: "Home insurance",
-  upfrontMip: "FHA upfront MIP",
+  pmi: "Conventional PMI",
   origination: "Lender origination",
   title: "Title and escrow",
 };
@@ -108,19 +113,32 @@ const DOLLAR_LABELS: Record<PictureDollarField, string> = {
   processing: "Lender processing fee",
   appraisal: "Conventional appraisal",
   recording: "Recording and taxes",
+  cushion: "Escrow cushion",
+};
+
+const COUNT_LABELS: Record<PictureCountField, string> = {
+  insuranceMonths: "Prepaid home insurance months",
+  taxMonths: "Prepaid property tax months",
+  interestDays: "Prepaid interest days",
 };
 
 export function defaultPicture(): PictureDraft {
   return {
     tax: "1.15",
     insurance: "0.35",
-    upfrontMip: "0",
+    pmi: "0.35",
     origination: "1",
     title: "0.75",
     processing: "1200",
     appraisal: "500",
     recording: "800",
+    insuranceMonths: "12",
+    taxMonths: "4",
+    interestDays: "15",
+    interestBasis: "360",
+    cushion: "1500",
     open: false,
+    closingOpen: false,
   };
 }
 
@@ -129,8 +147,12 @@ export function pictureFieldMessage(field: PictureInputField): string {
     const name = PERCENT_LABELS[field as PicturePercentField];
     return `${name} must be a percent greater than or equal to zero and less than 100, with at most three decimal places.`;
   }
-  const name = DOLLAR_LABELS[field as PictureDollarField];
-  return `${name} must be a dollar amount greater than or equal to zero, with at most two decimal places.`;
+  if (field in DOLLAR_LABELS) {
+    const name = DOLLAR_LABELS[field as PictureDollarField];
+    return `${name} must be a dollar amount greater than or equal to zero, with at most two decimal places.`;
+  }
+  const name = COUNT_LABELS[field as PictureCountField];
+  return `${name} must be a whole number from 0 through 999.`;
 }
 
 function parsePicturePercent(text: string): number | null {
@@ -152,12 +174,49 @@ function parsePictureDollars(text: string): number | null {
   return cents;
 }
 
-export function parsePicture(draft: PictureDraft): PictureParseResult {
+export function parseWholeCount(text: string): number | null {
+  const trimmed = text.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const value = Number(trimmed);
+  if (!Number.isSafeInteger(value) || value < 0 || value > 999) return null;
+  return value;
+}
+
+export function loadStoredCount(value: unknown, fallback: number): number {
+  if (typeof value !== "string") return fallback;
+  const parsed = parseWholeCount(value);
+  return parsed === null ? fallback : parsed;
+}
+
+export function loadStoredInterestBasis(value: unknown): "360" | "365" {
+  return value === "365" ? "365" : "360";
+}
+
+export function pmiPercentInputFromThousandths(thousandths: number): string {
+  if (thousandths === 0) return "0";
+  const whole = Math.floor(thousandths / 1000);
+  const frac = thousandths % 1000;
+  if (frac === 0) return String(whole);
+  const fracText = String(frac).padStart(3, "0").replace(/0+$/, "");
+  return whole === 0 ? `0.${fracText}` : `${whole}.${fracText}`;
+}
+
+export function pmiRateTextFromThousandths(thousandths: number): string {
+  return `${pmiPercentInputFromThousandths(thousandths)}%`;
+}
+
+export type PictureCounts = {
+  insuranceMonths: number;
+  taxMonths: number;
+  interestDays: number;
+};
+
+export function parsePicture(draft: PictureDraft, counts: PictureCounts): PictureParseResult {
   const values = {} as PictureValues;
   const percentKeys = {
     tax: "taxThousandths",
     insurance: "insuranceThousandths",
-    upfrontMip: "upfrontMipThousandths",
+    pmi: "pmiThousandths",
     origination: "originationThousandths",
     title: "titleThousandths",
   } as const;
@@ -172,6 +231,7 @@ export function parsePicture(draft: PictureDraft): PictureParseResult {
     processing: "processingCents",
     appraisal: "appraisalCents",
     recording: "recordingCents",
+    cushion: "cushionCents",
   } as const;
   for (const field of PICTURE_DOLLAR_FIELDS) {
     const cents = parsePictureDollars(draft[field]);
@@ -180,6 +240,10 @@ export function parsePicture(draft: PictureDraft): PictureParseResult {
     }
     values[dollarKeys[field]] = cents;
   }
+  values.insuranceMonths = counts.insuranceMonths;
+  values.taxMonths = counts.taxMonths;
+  values.interestDays = counts.interestDays;
+  values.interestBasis = loadStoredInterestBasis(draft.interestBasis);
   return { ok: true, values };
 }
 
@@ -189,10 +253,10 @@ function storedText(value: unknown, accept: (text: string) => boolean, fallback:
   return accept(trimmed) ? trimmed : fallback;
 }
 
-export function pictureFromStorage(value: unknown): PictureDraft {
+export function pictureFromStorage(value: unknown, downText?: string): PictureDraft {
   const fallback = defaultPicture();
-  if (value === undefined) return fallback;
-  if (!value || typeof value !== "object" || Array.isArray(value)) return fallback;
+  if (value === undefined) return pmiDraftForDown(fallback, downText);
+  if (!value || typeof value !== "object" || Array.isArray(value)) return ensurePmiOnDraft(fallback, downText);
   const record = value as Record<string, unknown>;
   const draft = defaultPicture();
   for (const field of PICTURE_PERCENT_FIELDS) {
@@ -201,8 +265,31 @@ export function pictureFromStorage(value: unknown): PictureDraft {
   for (const field of PICTURE_DOLLAR_FIELDS) {
     draft[field] = storedText(record[field], (text) => parsePictureDollars(text) !== null, fallback[field]);
   }
+  draft.insuranceMonths = String(loadStoredCount(record.insuranceMonths, 12));
+  draft.taxMonths = String(loadStoredCount(record.taxMonths, 4));
+  draft.interestDays = String(loadStoredCount(record.interestDays, 15));
+  draft.interestBasis = loadStoredInterestBasis(record.interestBasis);
+  draft.cushion = storedText(record.cushion, (text) => parsePictureDollars(text) !== null, fallback.cushion);
   draft.open = typeof record.open === "boolean" ? record.open : false;
+  draft.closingOpen = typeof record.closingOpen === "boolean" ? record.closingOpen : false;
+  if (record.pmi === undefined) {
+    return pmiDraftForDown(draft, downText);
+  }
+  if (parsePicturePercent(draft.pmi) === null) {
+    return ensurePmiOnDraft(draft, downText);
+  }
   return draft;
+}
+
+export function pmiDraftForDown(draft: PictureDraft, downText?: string): PictureDraft {
+  const downThousandths = downText === undefined ? null : percentThousandths(downText.trim());
+  const pmi = conventionalPmi(downThousandths ?? 5_000);
+  return { ...draft, pmi: pmiPercentInputFromThousandths(pmi.thousandths) };
+}
+
+export function ensurePmiOnDraft(draft: PictureDraft, downText?: string): PictureDraft {
+  if (parsePicturePercent(draft.pmi) !== null) return draft;
+  return pmiDraftForDown(draft, downText);
 }
 
 // Half up, same integer division as downPaymentCents: remainder * 2 >= divisor rounds away from zero.
@@ -249,13 +336,47 @@ export function formatWholeDollars(dollars: number): string {
   return `${negative ? "-" : ""}$${grouped}`;
 }
 
-function prepaidInterestCents(baseCents: number, rateThousandths: number): number {
+export function prepaidInterestCents360(
+  baseCents: number,
+  rateThousandths: number,
+  days: number,
+): number {
+  if (!Number.isSafeInteger(baseCents) || !Number.isSafeInteger(rateThousandths) || !Number.isSafeInteger(days)) {
+    throw new Error("picture amount is too large");
+  }
+  if (days === 0) return 0;
+  const numerator = baseCents * rateThousandths * days;
+  if (!Number.isSafeInteger(numerator)) throw new Error("picture amount is too large");
+  return halfUpQuotient(numerator, 100_000 * 360);
+}
+
+export function prepaidInterestPerDiem365Cents(baseCents: number, rateThousandths: number): number {
   if (!Number.isSafeInteger(baseCents) || !Number.isSafeInteger(rateThousandths)) {
     throw new Error("picture amount is too large");
   }
-  const numerator = baseCents * rateThousandths * 15;
+  const numerator = baseCents * rateThousandths;
   if (!Number.isSafeInteger(numerator)) throw new Error("picture amount is too large");
-  return halfUpQuotient(numerator, 100_000 * 360);
+  return halfUpQuotient(numerator, 100_000 * 365);
+}
+
+export function prepaidInterestCents365(
+  baseCents: number,
+  rateThousandths: number,
+  days: number,
+): number {
+  if (days === 0) return 0;
+  return prepaidInterestPerDiem365Cents(baseCents, rateThousandths) * days;
+}
+
+export function prepaidInterestCents(
+  baseCents: number,
+  rateThousandths: number,
+  days: number,
+  basis: "360" | "365",
+): number {
+  return basis === "365"
+    ? prepaidInterestCents365(baseCents, rateThousandths, days)
+    : prepaidInterestCents360(baseCents, rateThousandths, days);
 }
 
 export function buildPicture(
@@ -272,9 +393,7 @@ export function buildPicture(
   const priceCents = loan.priceCents;
   const baseCents = loan.loanCents;
   const downCents = priceCents - baseCents;
-  const upfrontMipCents = percentOfCents(baseCents, values.upfrontMipThousandths);
-  const financedCents = baseCents + upfrontMipCents;
-  if (!Number.isSafeInteger(financedCents)) throw new Error("picture amount is too large");
+  const financedCents = baseCents;
   const principalAndInterestCents = buildReport(
     centsToDollars(financedCents),
     loan.ratePercent,
@@ -283,18 +402,19 @@ export function buildPicture(
   ).monthly_payment_cents;
   const taxCents = percentOfCents(priceCents, values.taxThousandths, 12);
   const insuranceCents = percentOfCents(priceCents, values.insuranceThousandths, 12);
-  const fha = conventionalFha();
-  const fhaMipCents = percentOfCents(financedCents, fha.thousandths, 12);
-  const pmi = conventionalPmi(downThousandths);
-  const pmiCents = percentOfCents(financedCents, pmi.thousandths, 12);
-  const totalMonthlyCents =
-    principalAndInterestCents + taxCents + insuranceCents + fhaMipCents + pmiCents;
+  const pmiCents = percentOfCents(financedCents, values.pmiThousandths, 12);
+  const totalMonthlyCents = principalAndInterestCents + taxCents + insuranceCents + pmiCents;
   const originationCents = percentOfCents(baseCents, values.originationThousandths);
   const titleCents = percentOfCents(priceCents, values.titleThousandths);
-  const prepaidInsurance = insuranceCents * 12;
-  const prepaidInterest = prepaidInterestCents(baseCents, rateThousandths);
-  const prepaidTax = taxCents * 4;
-  const cushionCents = (taxCents + insuranceCents + fhaMipCents) * 2;
+  const prepaidInsurance = insuranceCents * values.insuranceMonths;
+  const prepaidInterest = prepaidInterestCents(
+    baseCents,
+    rateThousandths,
+    values.interestDays,
+    values.interestBasis,
+  );
+  const prepaidTax = taxCents * values.taxMonths;
+  const cushionCents = values.cushionCents;
   const closingCents =
     originationCents +
     values.processingCents +
@@ -309,15 +429,12 @@ export function buildPicture(
     priceCents,
     downCents,
     baseCents,
-    upfrontMipCents,
     financedCents,
     principalAndInterestCents,
     taxCents,
     insuranceCents,
-    fhaMipCents,
-    fhaMipRateText: fha.text,
     pmiCents,
-    pmiRateText: pmi.text,
+    pmiRateText: pmiRateTextFromThousandths(values.pmiThousandths),
     totalMonthlyCents,
     headingDollars: headingDollarsFromCents(totalMonthlyCents),
     originationCents,
@@ -332,8 +449,4 @@ export function buildPicture(
     closingCents,
     cashToCloseCents: downCents + closingCents,
   };
-}
-
-function conventionalFha(): { thousandths: 0; text: "0%" } {
-  return { thousandths: 0, text: "0%" };
 }

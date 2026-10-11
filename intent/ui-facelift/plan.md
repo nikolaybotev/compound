@@ -77,6 +77,8 @@ Files: `apps/web/src/app.tsx`, `apps/web/src/picture.ts`, `apps/web/src/loan.ts`
 
 DoD: the same three commands exit 0. On the 20% down loan, closing costs are `$19,175.00` and cash to close is `$139,175.00` at 360, and choosing 365 changes prepaid interest to `$1,454.85` and cash to close to `$139,154.85`. The basis select is on that row. The PMI input has `%` beside it. On the 7/1 loan, Taxes and Insurance is directly under the heading and ARM terms sit between the summary and the chart.
 
+Implementation note: the extra-payments disclosure title is `Extra Payments`, not `Make extra payments`, matching requirement 1 and AC4. A version-1 loan with no stored `picture` gets PMI from the down-payment ladder (for example `0.45` at 0% down), not the static `defaultPicture().pmi`.
+
 ## Phase 3 — FICO, PMI, form color, and version 0.8
 
 Files: `apps/web/src/app.tsx`, `apps/web/src/picture.ts`, `apps/web/src/loan.ts`, `apps/web/src/styles.css`, `apps/web/unit/picture.ts`, `apps/web/unit/loan.ts`, `apps/web/e2e/picture.spec.ts`, `apps/web/e2e/extras.spec.ts`, `apps/web/e2e/arm.spec.ts`, `apps/web/package.json`, `.github/workflows/publish-gh-pages-production.yml`, `AGENTS.md`, `REVIEW.md`

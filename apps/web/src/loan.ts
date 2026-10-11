@@ -22,6 +22,7 @@ import {
   defaultPicture,
   formatWholeDollars,
   headingDollarsFromCents,
+  loadStoredCount,
   parsePicture,
   percentThousandths,
   pictureFromStorage,
@@ -625,13 +626,19 @@ function pictureDraftEqual(a: PictureDraft, b: PictureDraft): boolean {
   return (
     a.tax === b.tax &&
     a.insurance === b.insurance &&
-    a.upfrontMip === b.upfrontMip &&
+    a.pmi === b.pmi &&
     a.origination === b.origination &&
     a.title === b.title &&
     a.processing === b.processing &&
     a.appraisal === b.appraisal &&
     a.recording === b.recording &&
-    a.open === b.open
+    a.insuranceMonths === b.insuranceMonths &&
+    a.taxMonths === b.taxMonths &&
+    a.interestDays === b.interestDays &&
+    a.interestBasis === b.interestBasis &&
+    a.cushion === b.cushion &&
+    a.open === b.open &&
+    a.closingOpen === b.closingOpen
   );
 }
 
@@ -684,7 +691,7 @@ function parseScenarioRecord(record: Record<string, unknown>, now = new Date()):
     applied: new Map(applied ?? extras),
     prefill,
     openYears,
-    picture: pictureFromStorage(record.picture),
+    picture: pictureFromStorage(record.picture, draft.down),
     arm,
     armStored,
   };
@@ -898,11 +905,10 @@ export function prevailingTotalCents(
   modalPaymentCents: number,
   taxCents: number,
   insuranceCents: number,
-  fhaMipCents: number,
   pmiCents: number,
   prevailingExtraCents: number,
 ): number {
-  return modalPaymentCents + taxCents + insuranceCents + fhaMipCents + pmiCents + prevailingExtraCents;
+  return modalPaymentCents + taxCents + insuranceCents + pmiCents + prevailingExtraCents;
 }
 
 export type ScenarioFigures = {
@@ -910,7 +916,6 @@ export type ScenarioFigures = {
   prevailingExtraCents: number;
   taxCents: number;
   insuranceCents: number;
-  fhaMipCents: number;
   pmiCents: number;
   totalCents: number;
 };
@@ -918,7 +923,11 @@ export type ScenarioFigures = {
 export function scenarioFigures(scenario: Scenario): ScenarioFigures | null {
   const parsedLoan = parseLoan(scenario.draft);
   if (!parsedLoan.ok) return null;
-  const pictureParsed = parsePicture(scenario.picture);
+  const pictureParsed = parsePicture(scenario.picture, {
+    insuranceMonths: loadStoredCount(scenario.picture.insuranceMonths, 12),
+    taxMonths: loadStoredCount(scenario.picture.taxMonths, 4),
+    interestDays: loadStoredCount(scenario.picture.interestDays, 15),
+  });
   if (!pictureParsed.ok) return null;
   const rateThousandths = Math.round(parsedLoan.loan.ratePercent * 1000);
   const armParsed = parseArm(scenario.arm, parsedLoan.loan.years, rateThousandths);
@@ -942,20 +951,12 @@ export function scenarioFigures(scenario: Scenario): ScenarioFigures | null {
   );
   const modal = modalPaymentCents(prevailingReport);
   const extra = prevailingExtraCents(prevailingReport);
-  const total = prevailingTotalCents(
-    modal,
-    lines.taxCents,
-    lines.insuranceCents,
-    lines.fhaMipCents,
-    lines.pmiCents,
-    extra,
-  );
+  const total = prevailingTotalCents(modal, lines.taxCents, lines.insuranceCents, lines.pmiCents, extra);
   return {
     modalPaymentCents: modal,
     prevailingExtraCents: extra,
     taxCents: lines.taxCents,
     insuranceCents: lines.insuranceCents,
-    fhaMipCents: lines.fhaMipCents,
     pmiCents: lines.pmiCents,
     totalCents: total,
   };

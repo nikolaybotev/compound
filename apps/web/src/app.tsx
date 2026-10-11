@@ -52,7 +52,13 @@ import {
 } from "./loan";
 import {
   buildPicture,
+  conventionalPmi,
+  loadStoredCount,
   parsePicture,
+  parseWholeCount,
+  percentThousandths,
+  pmiPercentInputFromThousandths,
+  type PictureDraft,
   type PictureInputField,
   type PictureValues,
 } from "./picture";
@@ -64,6 +70,28 @@ const MONTHLY_AMOUNT = "Additional amount to monthly payment";
 const YEARLY_AMOUNT = "Additional yearly payment";
 const PROPERTY_TAX_NOTE = "Nashua: 1.683%; Brentwood: 1.32%.";
 
+type PictureCounts = {
+  insuranceMonths: number;
+  taxMonths: number;
+  interestDays: number;
+};
+
+function pictureCountsFromValues(values: PictureValues): PictureCounts {
+  return {
+    insuranceMonths: values.insuranceMonths,
+    taxMonths: values.taxMonths,
+    interestDays: values.interestDays,
+  };
+}
+
+function pictureCountsFromDraft(draft: PictureDraft): PictureCounts {
+  return {
+    insuranceMonths: loadStoredCount(draft.insuranceMonths, 12),
+    taxMonths: loadStoredCount(draft.taxMonths, 4),
+    interestDays: loadStoredCount(draft.interestDays, 15),
+  };
+}
+
 function readInitial(): {
   stored: StoredSet;
   scenario: Scenario;
@@ -74,7 +102,7 @@ function readInitial(): {
   const scenario = stored.scenarios[stored.active];
   const parsed = parseLoan(scenario.draft);
   if (!parsed.ok) throw new Error(parsed.message);
-  const picture = parsePicture(scenario.picture);
+  const picture = parsePicture(scenario.picture, pictureCountsFromDraft(scenario.picture));
   if (!picture.ok) throw new Error(picture.message);
   return { stored, scenario, loan: parsed.loan, pictureValues: picture.values };
 }
@@ -99,6 +127,7 @@ export function App() {
   const [pictureDraft, setPictureDraft] = useState(initial.scenario.picture);
   const [pictureSaved, setPictureSaved] = useState(initial.scenario.picture);
   const [pictureValues, setPictureValues] = useState(initial.pictureValues);
+  const [pictureCounts, setPictureCounts] = useState(() => pictureCountsFromValues(initial.pictureValues));
   const [error, setError] = useState<string | null>(null);
   const [invalidField, setInvalidField] = useState<string | null>(null);
   const [pictureError, setPictureError] = useState<string | null>(null);
@@ -129,7 +158,7 @@ export function App() {
   function reseedFromScenario(scenario: Scenario) {
     const parsed = parseLoan(scenario.draft);
     if (!parsed.ok) throw new Error(parsed.message);
-    const picture = parsePicture(scenario.picture);
+    const picture = parsePicture(scenario.picture, pictureCountsFromDraft(scenario.picture));
     if (!picture.ok) throw new Error(picture.message);
     setDraft(scenario.draft);
     setValidText({ down: scenario.draft.down, rate: scenario.draft.rate });
@@ -141,6 +170,7 @@ export function App() {
     setPictureDraft(scenario.picture);
     setPictureSaved(scenario.picture);
     setPictureValues(picture.values);
+    setPictureCounts(pictureCountsFromValues(picture.values));
     setOpenYears(
       scenario.openYears
         ? new Set(scenario.openYears)
@@ -353,10 +383,38 @@ export function App() {
     }
     setError(null);
     setInvalidField(null);
+    let pictureNext: typeof pictureDraft | undefined;
+    if (field === "down") {
+      const downThousandths = percentThousandths(next.down.trim());
+      if (downThousandths !== null) {
+        const pmi = conventionalPmi(downThousandths);
+        pictureNext = {
+          ...pictureDraft,
+          pmi: pmiPercentInputFromThousandths(pmi.thousandths),
+        };
+        const pictureParsed = parsePicture(pictureNext, pictureCounts);
+        if (pictureParsed.ok) {
+          setPictureDraft(pictureNext);
+          setPictureSaved({ ...pictureNext, open: pictureDraft.open, closingOpen: pictureDraft.closingOpen });
+          setPictureValues(pictureParsed.values);
+        }
+      }
+    }
     persist(
       nextArm === armSaved
-        ? { draft: next, extras: kept, applied: keptApplied }
-        : { draft: next, extras: kept, applied: keptApplied, arm: nextArm },
+        ? {
+            draft: next,
+            extras: kept,
+            applied: keptApplied,
+            ...(pictureNext ? { picture: { ...pictureNext, open: pictureDraft.open, closingOpen: pictureDraft.closingOpen } } : {}),
+          }
+        : {
+            draft: next,
+            extras: kept,
+            applied: keptApplied,
+            arm: nextArm,
+            ...(pictureNext ? { picture: { ...pictureNext, open: pictureDraft.open, closingOpen: pictureDraft.closingOpen } } : {}),
+          },
     );
   }
 
@@ -495,24 +553,51 @@ export function App() {
   function updatePicture(field: PictureInputField, value: string) {
     const next = { ...pictureDraft, [field]: value };
     setPictureDraft(next);
-    const parsed = parsePicture(next);
+    let counts = pictureCounts;
+    if (field === "insuranceMonths" || field === "taxMonths" || field === "interestDays") {
+      const parsedCount = parseWholeCount(value);
+      if (parsedCount !== null) {
+        counts = { ...counts, [field]: parsedCount };
+        setPictureCounts(counts);
+      }
+    }
+    const parsed = parsePicture(next, counts);
     if (!parsed.ok) {
       setPictureError(parsed.message);
       setPictureInvalid(parsed.field);
       return;
     }
-    const saved = { ...next, open: pictureDraft.open };
+    const saved = { ...next, open: pictureDraft.open, closingOpen: pictureDraft.closingOpen };
     setPictureValues(parsed.values);
+    setPictureCounts(pictureCountsFromValues(parsed.values));
     setPictureSaved(saved);
     setPictureError(null);
     setPictureInvalid(null);
     persist({ picture: saved });
   }
 
-  function setPictureOpen(open: boolean) {
+  function updatePictureBasis(value: string) {
+    const next = { ...pictureDraft, interestBasis: value };
+    setPictureDraft(next);
+    const parsed = parsePicture(next, pictureCounts);
+    if (!parsed.ok) return;
+    const saved = { ...next, open: pictureDraft.open, closingOpen: pictureDraft.closingOpen };
+    setPictureValues(parsed.values);
+    setPictureSaved(saved);
+    persist({ picture: saved });
+  }
+
+  function setTaxesOpen(open: boolean) {
     const saved = { ...pictureSaved, open };
     setPictureSaved(saved);
     setPictureDraft({ ...pictureDraft, open });
+    persist({ picture: saved });
+  }
+
+  function setClosingOpen(open: boolean) {
+    const saved = { ...pictureSaved, closingOpen: open };
+    setPictureSaved(saved);
+    setPictureDraft({ ...pictureDraft, closingOpen: open });
     persist({ picture: saved });
   }
 
@@ -646,6 +731,192 @@ export function App() {
           onChange={(value) => update("start", value)}
         />
       </p>
+      {error ? (
+        <p class="error" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <Disclosure
+        className="picture"
+        title="Taxes and Insurance"
+        open={pictureDraft.open}
+        onToggle={setTaxesOpen}
+      >
+        <table class="picture-table">
+          <tbody>
+            <MoneyRow
+              line="property-tax"
+              label="Property tax"
+              note={PROPERTY_TAX_NOTE}
+              amount={lines.taxCents}
+              rate={
+                <PictureInput
+                  id="picture-tax"
+                  label="Property tax"
+                  value={pictureDraft.tax}
+                  invalid={pictureInvalid === "tax"}
+                  suffix="%"
+                  onInput={(value) => updatePicture("tax", value)}
+                />
+              }
+            />
+            <MoneyRow
+              line="insurance"
+              label="Home insurance"
+              amount={lines.insuranceCents}
+              rate={
+                <PictureInput
+                  id="picture-insurance"
+                  label="Home insurance"
+                  value={pictureDraft.insurance}
+                  invalid={pictureInvalid === "insurance"}
+                  suffix="%"
+                  onInput={(value) => updatePicture("insurance", value)}
+                />
+              }
+            />
+            <MoneyRow
+              line="pmi"
+              label="Conventional PMI"
+              amount={lines.pmiCents}
+              rate={
+                <PictureInput
+                  id="picture-pmi"
+                  label="Conventional PMI"
+                  value={pictureDraft.pmi}
+                  invalid={pictureInvalid === "pmi"}
+                  suffix="%"
+                  alignEnd
+                  onInput={(value) => updatePicture("pmi", value)}
+                />
+              }
+            />
+          </tbody>
+        </table>
+        {pictureError ? (
+          <p class="error" role="alert">
+            {pictureError}
+          </p>
+        ) : null}
+      </Disclosure>
+      <Disclosure
+        className="prefill"
+        title="Extra Payments"
+        open={prefill.open}
+        onToggle={(open) => changePrefill({ open })}
+      >
+        <div class="prefill-panel">
+          <div class="inputs">
+            <Field
+              id="extra-monthly"
+              label={MONTHLY_AMOUNT}
+              value={prefill.monthly}
+              invalid={false}
+              onInput={(value) => changePrefill({ monthly: value })}
+            />
+            <Field
+              id="extra-yearly"
+              label={YEARLY_AMOUNT}
+              value={prefill.yearly}
+              invalid={false}
+              onInput={(value) => changePrefill({ yearly: value })}
+            />
+            <div class="field">
+              <label for="extra-yearly-month">Month of year</label>
+              <select
+                id="extra-yearly-month"
+                value={String(prefill.month)}
+                onChange={(event) => changePrefill({ month: Number(event.currentTarget.value) })}
+              >
+                {MONTH_NAMES.map((name, index) => (
+                  <option key={name} value={index + 1}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div class="apply-row">
+            <button type="button" onClick={applyPrefill}>
+              Apply
+            </button>
+            <p class="note">Apply rewrites all extra-payment column values.</p>
+          </div>
+          {applyError ? (
+            <p class="error" role="alert">
+              {applyError}
+            </p>
+          ) : null}
+        </div>
+      </Disclosure>
+      <section class="summary" aria-label="Loan summary">
+        <div class="payment-block" role="region" aria-label="Monthly payment">
+          <h2>Monthly payment</h2>
+          <div class="summary-payment-line">
+            <p class="money payment">
+              {activeFigures ? formatMoney(activeFigures.totalCents) : formatMoney(report.monthly_payment_cents)}
+            </p>
+            {activeFigures ? (
+              <PrevailingBar
+                variant="summary"
+                modalCents={activeFigures.modalPaymentCents}
+                taxCents={activeFigures.taxCents}
+                insuranceCents={activeFigures.insuranceCents}
+                pmiCents={activeFigures.pmiCents}
+                prevailingExtraCents={activeFigures.prevailingExtraCents}
+              />
+            ) : null}
+          </div>
+        </div>
+        <dl>
+          <div role="region" aria-label="Loan amount">
+            <dt>Loan amount</dt>
+            <dd class="money">{formatMoney(report.amount_cents)}</dd>
+          </div>
+          <div role="region" aria-label="Total interest paid">
+            <dt>Total interest paid</dt>
+            <dd class="money">{formatMoney(report.interest_cents)}</dd>
+          </div>
+          <div role="region" aria-label="Total cost of loan">
+            <dt>Total cost of loan</dt>
+            <dd class="money">{formatMoney(report.amount_cents + report.interest_cents)}</dd>
+          </div>
+          <div role="region" aria-label="Payoff date">
+            <dt>Payoff date</dt>
+            <dd class="money">
+              {`${longDate(payoff.year, payoff.month)} (${yearsAndMonths(report.payoff_month)})`}
+            </dd>
+          </div>
+          {report.arm ? (
+            <div role="region" aria-label="Highest rate">
+              <dt>Highest rate</dt>
+              <dd class="money">
+                {`${report.arm.max_rate_percent}% from ${armDateLabel(loan, report.arm.max_rate_month)}`}
+              </dd>
+            </div>
+          ) : null}
+          {report.arm ? (
+            <div role="region" aria-label="Highest payment">
+              <dt>Highest payment</dt>
+              <dd class="money">
+                {`${formatMoney(report.arm.max_payment_cents)} from ${armDateLabel(loan, report.arm.max_payment_month)}`}
+              </dd>
+            </div>
+          ) : null}
+          <div role="region" aria-label="Extra principal paid">
+            <dt>Extra principal paid</dt>
+            <dd class="money">{formatMoney(report.extra_applied_cents)}</dd>
+          </div>
+          <div role="region" aria-label="Interest saved">
+            <dt>Interest saved</dt>
+            <dd class="money">{formatMoney(report.interest_saved_cents)}</dd>
+          </div>
+          <div role="region" aria-label="Months saved">
+            <dt>Months saved</dt>
+            <dd class="money">{monthsSavedText(report.months_saved)}</dd>
+          </div>
+        </dl>
+      </section>
       {armOn && armParsed.ok ? (
         <Disclosure className="arm" title="ARM terms" open={armSaved.open} onToggle={setArmOpen}>
           <div class="inputs">
@@ -731,228 +1002,15 @@ export function App() {
           </p>
         </Disclosure>
       ) : null}
-      {error ? (
-        <p class="error" role="alert">
-          {error}
-        </p>
-      ) : null}
-      <section class="summary" aria-label="Loan summary">
-        <div class="payment-block" role="region" aria-label="Monthly payment">
-          <h2>Monthly payment</h2>
-          <div class="summary-payment-line">
-            <p class="money payment">
-              {activeFigures ? formatMoney(activeFigures.totalCents) : formatMoney(report.monthly_payment_cents)}
-            </p>
-            {activeFigures ? (
-              <PrevailingBar
-                variant="summary"
-                modalCents={activeFigures.modalPaymentCents}
-                taxCents={activeFigures.taxCents}
-                insuranceCents={activeFigures.insuranceCents}
-                fhaMipCents={activeFigures.fhaMipCents}
-                pmiCents={activeFigures.pmiCents}
-                prevailingExtraCents={activeFigures.prevailingExtraCents}
-              />
-            ) : null}
-          </div>
-        </div>
-        <dl>
-          <div role="region" aria-label="Loan amount">
-            <dt>Loan amount</dt>
-            <dd class="money">{formatMoney(report.amount_cents)}</dd>
-          </div>
-          <div role="region" aria-label="Total interest paid">
-            <dt>Total interest paid</dt>
-            <dd class="money">{formatMoney(report.interest_cents)}</dd>
-          </div>
-          <div role="region" aria-label="Total cost of loan">
-            <dt>Total cost of loan</dt>
-            <dd class="money">{formatMoney(report.amount_cents + report.interest_cents)}</dd>
-          </div>
-          <div role="region" aria-label="Payoff date">
-            <dt>Payoff date</dt>
-            <dd class="money">
-              {`${longDate(payoff.year, payoff.month)} (${yearsAndMonths(report.payoff_month)})`}
-            </dd>
-          </div>
-          {report.arm ? (
-            <div role="region" aria-label="Highest rate">
-              <dt>Highest rate</dt>
-              <dd class="money">
-                {`${report.arm.max_rate_percent}% from ${armDateLabel(loan, report.arm.max_rate_month)}`}
-              </dd>
-            </div>
-          ) : null}
-          {report.arm ? (
-            <div role="region" aria-label="Highest payment">
-              <dt>Highest payment</dt>
-              <dd class="money">
-                {`${formatMoney(report.arm.max_payment_cents)} from ${armDateLabel(loan, report.arm.max_payment_month)}`}
-              </dd>
-            </div>
-          ) : null}
-          <div role="region" aria-label="Extra principal paid">
-            <dt>Extra principal paid</dt>
-            <dd class="money">{formatMoney(report.extra_applied_cents)}</dd>
-          </div>
-          <div role="region" aria-label="Interest saved">
-            <dt>Interest saved</dt>
-            <dd class="money">{formatMoney(report.interest_saved_cents)}</dd>
-          </div>
-          <div role="region" aria-label="Months saved">
-            <dt>Months saved</dt>
-            <dd class="money">{monthsSavedText(report.months_saved)}</dd>
-          </div>
-        </dl>
-      </section>
       <Chart bars={bars} />
       <Disclosure
-        className="prefill"
-        title="Make extra payments"
-        open={prefill.open}
-        onToggle={(open) => changePrefill({ open })}
+        className="picture-closing"
+        title="Closing Costs"
+        open={pictureDraft.closingOpen}
+        onToggle={setClosingOpen}
       >
-        <div class="prefill-panel">
-          <div class="inputs">
-            <Field
-              id="extra-monthly"
-              label={MONTHLY_AMOUNT}
-              value={prefill.monthly}
-              invalid={false}
-              onInput={(value) => changePrefill({ monthly: value })}
-            />
-            <Field
-              id="extra-yearly"
-              label={YEARLY_AMOUNT}
-              value={prefill.yearly}
-              invalid={false}
-              onInput={(value) => changePrefill({ yearly: value })}
-            />
-            <div class="field">
-              <label for="extra-yearly-month">Month of year</label>
-              <select
-                id="extra-yearly-month"
-                value={String(prefill.month)}
-                onChange={(event) => changePrefill({ month: Number(event.currentTarget.value) })}
-              >
-                {MONTH_NAMES.map((name, index) => (
-                  <option key={name} value={index + 1}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div class="apply-row">
-            <button type="button" onClick={applyPrefill}>
-              Apply
-            </button>
-            <p class="note">Apply rewrites all extra-payment column values.</p>
-          </div>
-          {applyError ? (
-            <p class="error" role="alert">
-              {applyError}
-            </p>
-          ) : null}
-        </div>
-      </Disclosure>
-      <Disclosure
-        className="picture"
-        title="Monthly payment and closing costs"
-        open={pictureDraft.open}
-        onToggle={setPictureOpen}
-      >
-        <p class="loan-type">Conventional</p>
         <table class="picture-table">
           <tbody>
-            <MoneyRow line="purchase-price" label="Purchase price" amount={lines.priceCents} />
-            <MoneyRow line="down-payment" label="Down payment" amount={lines.downCents} />
-            <MoneyRow line="base-loan" label="Base loan amount" amount={lines.baseCents} />
-            <MoneyRow
-              line="upfront-mip"
-              label="Upfront MIP"
-              amount={lines.upfrontMipCents}
-              rate={
-                <PictureInput
-                  id="picture-upfront"
-                  label="FHA upfront MIP"
-                  value={pictureDraft.upfrontMip}
-                  invalid={pictureInvalid === "upfrontMip"}
-                  onInput={(value) => updatePicture("upfrontMip", value)}
-                />
-              }
-            />
-            <MoneyRow
-              line="financed"
-              label="Total loan amount financed"
-              amount={lines.financedCents}
-            />
-            <MoneyRow
-              line="principal-and-interest"
-              label="Principal and interest"
-              amount={lines.principalAndInterestCents}
-            />
-            <MoneyRow
-              line="property-tax"
-              label="Property tax"
-              note={PROPERTY_TAX_NOTE}
-              amount={lines.taxCents}
-              rate={
-                <PictureInput
-                  id="picture-tax"
-                  label="Property tax"
-                  value={pictureDraft.tax}
-                  invalid={pictureInvalid === "tax"}
-                  onInput={(value) => updatePicture("tax", value)}
-                />
-              }
-            />
-            <MoneyRow
-              line="insurance"
-              label="Home insurance"
-              amount={lines.insuranceCents}
-              rate={
-                <PictureInput
-                  id="picture-insurance"
-                  label="Home insurance"
-                  value={pictureDraft.insurance}
-                  invalid={pictureInvalid === "insurance"}
-                  onInput={(value) => updatePicture("insurance", value)}
-                />
-              }
-            />
-            <MoneyRow
-              line="fha-mip"
-              label="FHA MIP"
-              amount={lines.fhaMipCents}
-              rate={<span>{lines.fhaMipRateText}</span>}
-            />
-            <MoneyRow
-              line="pmi"
-              label="Conventional PMI (Private Mortgage Insurance)"
-              amount={lines.pmiCents}
-              rate={<span>{lines.pmiRateText}</span>}
-            />
-            <MoneyRow line="total-monthly" label="Total monthly payment" amount={lines.totalMonthlyCents} />
-            {activeFigures ? (
-              <>
-                <MoneyRow
-                  line="prevailing-principal-and-interest"
-                  label="Prevailing principal and interest"
-                  amount={activeFigures.modalPaymentCents}
-                />
-                <MoneyRow
-                  line="prevailing-extra"
-                  label="Prevailing extra"
-                  amount={activeFigures.prevailingExtraCents}
-                />
-                <MoneyRow
-                  line="prevailing-monthly-total"
-                  label="Prevailing monthly total"
-                  amount={activeFigures.totalCents}
-                />
-              </>
-            ) : null}
             <MoneyRow
               line="origination"
               label="Lender origination fee"
@@ -963,6 +1021,7 @@ export function App() {
                   label="Lender origination"
                   value={pictureDraft.origination}
                   invalid={pictureInvalid === "origination"}
+                  suffix="%"
                   onInput={(value) => updatePicture("origination", value)}
                 />
               }
@@ -977,6 +1036,7 @@ export function App() {
                   label="Lender processing fee"
                   value={pictureDraft.processing}
                   invalid={pictureInvalid === "processing"}
+                  prefix="$"
                   onInput={(value) => updatePicture("processing", value)}
                 />
               }
@@ -991,6 +1051,7 @@ export function App() {
                   label="Conventional appraisal"
                   value={pictureDraft.appraisal}
                   invalid={pictureInvalid === "appraisal"}
+                  prefix="$"
                   onInput={(value) => updatePicture("appraisal", value)}
                 />
               }
@@ -1005,6 +1066,7 @@ export function App() {
                   label="Title and escrow"
                   value={pictureDraft.title}
                   invalid={pictureInvalid === "title"}
+                  suffix="%"
                   onInput={(value) => updatePicture("title", value)}
                 />
               }
@@ -1019,6 +1081,7 @@ export function App() {
                   label="Recording and taxes"
                   value={pictureDraft.recording}
                   invalid={pictureInvalid === "recording"}
+                  prefix="$"
                   onInput={(value) => updatePicture("recording", value)}
                 />
               }
@@ -1027,10 +1090,70 @@ export function App() {
               line="prepaid-insurance"
               label="Prepaid home insurance"
               amount={lines.prepaidInsuranceCents}
+              rate={
+                <PictureInput
+                  id="picture-insurance-months"
+                  label="Prepaid home insurance months"
+                  value={pictureDraft.insuranceMonths}
+                  invalid={pictureInvalid === "insuranceMonths"}
+                  onInput={(value) => updatePicture("insuranceMonths", value)}
+                />
+              }
             />
-            <MoneyRow line="prepaid-interest" label="Prepaid interest" amount={lines.prepaidInterestCents} />
-            <MoneyRow line="prepaid-tax" label="Prepaid property taxes" amount={lines.prepaidTaxCents} />
-            <MoneyRow line="cushion" label="Escrow cushion" amount={lines.cushionCents} />
+            <MoneyRow
+              line="prepaid-interest"
+              label="Prepaid interest"
+              amount={lines.prepaidInterestCents}
+              rate={
+                <span class="picture-interest-row">
+                  <PictureInput
+                    id="picture-interest-days"
+                    label="Prepaid interest days"
+                    value={pictureDraft.interestDays}
+                    invalid={pictureInvalid === "interestDays"}
+                    onInput={(value) => updatePicture("interestDays", value)}
+                  />
+                  <select
+                    id="picture-interest-basis"
+                    aria-label="Interest day-count basis"
+                    value={pictureDraft.interestBasis}
+                    onChange={(event) => updatePictureBasis(event.currentTarget.value)}
+                  >
+                    <option value="360">360</option>
+                    <option value="365">365</option>
+                  </select>
+                </span>
+              }
+            />
+            <MoneyRow
+              line="prepaid-tax"
+              label="Prepaid property taxes"
+              amount={lines.prepaidTaxCents}
+              rate={
+                <PictureInput
+                  id="picture-tax-months"
+                  label="Prepaid property tax months"
+                  value={pictureDraft.taxMonths}
+                  invalid={pictureInvalid === "taxMonths"}
+                  onInput={(value) => updatePicture("taxMonths", value)}
+                />
+              }
+            />
+            <MoneyRow
+              line="cushion"
+              label="Escrow cushion"
+              amount={lines.cushionCents}
+              rate={
+                <PictureInput
+                  id="picture-cushion"
+                  label="Escrow cushion"
+                  value={pictureDraft.cushion}
+                  invalid={pictureInvalid === "cushion"}
+                  prefix="$"
+                  onInput={(value) => updatePicture("cushion", value)}
+                />
+              }
+            />
             <MoneyRow line="closing" label="Total closing costs" amount={lines.closingCents} />
             <MoneyRow line="cash-to-close" label="Total cash to close" amount={lines.cashToCloseCents} />
           </tbody>
@@ -1111,19 +1234,27 @@ function PictureInput(props: {
   label: string;
   value: string;
   invalid: boolean;
+  prefix?: string;
+  suffix?: string;
+  alignEnd?: boolean;
   onInput: (value: string) => void;
 }) {
+  const wrapClass = props.alignEnd ? "picture-input-wrap picture-input-wrap--end" : "picture-input-wrap";
   return (
-    <input
-      id={props.id}
-      class="picture-input"
-      aria-label={props.label}
-      inputMode="decimal"
-      autoComplete="off"
-      value={props.value}
-      aria-invalid={props.invalid}
-      onInput={(event) => props.onInput(event.currentTarget.value)}
-    />
+    <span class={wrapClass}>
+      {props.prefix ? <span class="picture-affix">{props.prefix}</span> : null}
+      <input
+        id={props.id}
+        class="picture-input"
+        aria-label={props.label}
+        inputMode="decimal"
+        autoComplete="off"
+        value={props.value}
+        aria-invalid={props.invalid}
+        onInput={(event) => props.onInput(event.currentTarget.value)}
+      />
+      {props.suffix ? <span class="picture-affix">{props.suffix}</span> : null}
+    </span>
   );
 }
 
