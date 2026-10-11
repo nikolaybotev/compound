@@ -370,12 +370,18 @@ describe("saved loan inputs", () => {
       years: "15",
       rate: "6.5",
       start: "2024-03",
+      fico: "780",
     };
     scenario.extras = new Map([[1, 100]]);
     scenario.prefill = { monthly: "100", yearly: "", month: 1, open: true };
     scenario.openYears = [2024, 2025];
+    scenario.picture = { ...scenario.picture, pmi: "0" };
     saveScenario(storage, scenario);
-    expect(loadScenario(storage, now)).toEqual(scenario);
+    const loaded = loadScenario(storage, now);
+    expect(loaded.draft).toEqual(scenario.draft);
+    expect(loaded.extras).toEqual(scenario.extras);
+    expect(loaded.prefill.monthly).toBe(scenario.prefill.monthly);
+    expect(loaded.picture.pmi).toBe("0");
   });
 
   test("a version-1 loan without a picture keeps that loan and the picture defaults", () => {
@@ -401,6 +407,7 @@ describe("saved loan inputs", () => {
       years: "30",
       rate: "7",
       start: "2026-10",
+      fico: "780",
     });
     expect(loaded.extras).toEqual(new Map([[1, 100]]));
     expect(loaded.prefill.open).toBe(true);

@@ -253,10 +253,12 @@ function storedText(value: unknown, accept: (text: string) => boolean, fallback:
   return accept(trimmed) ? trimmed : fallback;
 }
 
-export function pictureFromStorage(value: unknown, downText?: string): PictureDraft {
+export function pictureFromStorage(value: unknown, downText?: string, ficoText?: string): PictureDraft {
   const fallback = defaultPicture();
-  if (value === undefined) return pmiDraftForDown(fallback, downText);
-  if (!value || typeof value !== "object" || Array.isArray(value)) return ensurePmiOnDraft(fallback, downText);
+  if (value === undefined) return pmiDraftForLoan(fallback, downText, ficoText);
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return ensurePmiOnDraft(fallback, downText, ficoText);
+  }
   const record = value as Record<string, unknown>;
   const draft = defaultPicture();
   for (const field of PICTURE_PERCENT_FIELDS) {
@@ -273,23 +275,24 @@ export function pictureFromStorage(value: unknown, downText?: string): PictureDr
   draft.open = typeof record.open === "boolean" ? record.open : false;
   draft.closingOpen = typeof record.closingOpen === "boolean" ? record.closingOpen : false;
   if (record.pmi === undefined) {
-    return pmiDraftForDown(draft, downText);
+    return pmiDraftForLoan(draft, downText, ficoText);
   }
   if (parsePicturePercent(draft.pmi) === null) {
-    return ensurePmiOnDraft(draft, downText);
+    return ensurePmiOnDraft(draft, downText, ficoText);
   }
   return draft;
 }
 
-export function pmiDraftForDown(draft: PictureDraft, downText?: string): PictureDraft {
+export function pmiDraftForLoan(draft: PictureDraft, downText?: string, ficoText?: string): PictureDraft {
   const downThousandths = downText === undefined ? null : percentThousandths(downText.trim());
-  const pmi = conventionalPmi(downThousandths ?? 5_000);
-  return { ...draft, pmi: pmiPercentInputFromThousandths(pmi.thousandths) };
+  const fico = ficoText === undefined ? 780 : parseFicoScore(ficoText) ?? 780;
+  const thousandths = pmiThousandthsForScore(downThousandths ?? 5_000, fico);
+  return { ...draft, pmi: pmiPercentInputFromThousandths(thousandths) };
 }
 
-export function ensurePmiOnDraft(draft: PictureDraft, downText?: string): PictureDraft {
+export function ensurePmiOnDraft(draft: PictureDraft, downText?: string, ficoText?: string): PictureDraft {
   if (parsePicturePercent(draft.pmi) !== null) return draft;
-  return pmiDraftForDown(draft, downText);
+  return pmiDraftForLoan(draft, downText, ficoText);
 }
 
 // Half up, same integer division as downPaymentCents: remainder * 2 >= divisor rounds away from zero.
@@ -315,10 +318,44 @@ export function percentOfCents(cents: number, thousandths: number, parts = 1): n
 }
 
 export function conventionalPmi(downThousandths: number): { thousandths: number; text: PmiRateText } {
-  if (downThousandths >= 20_000) return { thousandths: 0, text: "0%" };
-  if (downThousandths >= 10_000) return { thousandths: 200, text: "0.2%" };
-  if (downThousandths >= 5_000) return { thousandths: 350, text: "0.35%" };
-  return { thousandths: 450, text: "0.45%" };
+  const thousandths = pmiThousandthsForScore(downThousandths, 780);
+  return { thousandths, text: pmiRateTextFromThousandths(thousandths) as PmiRateText };
+}
+
+export function parseFicoScore(text: string): number | null {
+  const trimmed = text.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const value = Number(trimmed);
+  if (!Number.isSafeInteger(value) || value < 0 || value > 999) return null;
+  return value;
+}
+
+export function ficoBand(score: number): string {
+  if (score >= 780) return "780+";
+  if (score >= 740) return "740-779";
+  if (score >= 700) return "700-739";
+  if (score >= 660) return "660-699";
+  if (score >= 620) return "620-659";
+  return "below620";
+}
+
+const ARCH_PMI: Record<string, [number, number, number]> = {
+  "740-779": [380, 530, 700],
+  "700-739": [550, 780, 990],
+  "660-699": [900, 1280, 1540],
+  "620-659": [940, 1420, 1860],
+  below620: [1320, 1990, 2600],
+};
+
+export function pmiThousandthsForScore(downThousandths: number, fico: number): number {
+  if (downThousandths >= 20_000) return 0;
+  const rungIndex = downThousandths >= 10_000 ? 0 : downThousandths >= 5_000 ? 1 : 2;
+  if (fico >= 780) {
+    return [200, 350, 450][rungIndex];
+  }
+  const band = ficoBand(fico);
+  const row = ARCH_PMI[band];
+  return row[rungIndex];
 }
 
 export function headingDollarsFromCents(cents: number): number {

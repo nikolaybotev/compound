@@ -299,7 +299,15 @@ describe("ARM storage", () => {
       expect(loaded.armStored).toBe(false);
       expect(loaded.draft.rate).toBe("5.875");
       expect([...loaded.extras.entries()]).toEqual([[3, 25]]);
-      expect(loaded.prefill).toEqual({ monthly: "10", yearly: "", month: 4, open: true });
+      expect(loaded.prefill).toEqual({
+        monthly: "10",
+        yearly: "",
+        month: 4,
+        open: true,
+        appliedMonthly: "10",
+        appliedYearly: "",
+        appliedMonth: 4,
+      });
       expect(loaded.picture.tax).toBe("1.5");
       expect(loaded.openYears).toEqual([2027]);
     }

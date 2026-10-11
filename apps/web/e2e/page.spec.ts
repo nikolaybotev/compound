@@ -84,6 +84,19 @@ test("AC9 built JavaScript does not name bankrate", async () => {
   }
 });
 
+test("AC3 fresh heading with FICO and heading control size", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
+  await page.goto("/");
+  expect(await headingText(page)).toBe(
+    "600K | 5% down | 7.375% 30-year fixed | 780 FICO | starting October 2026",
+  );
+  expect(await headingText(page)).not.toContain("780+");
+  await expect(page.locator("#fico-range")).toHaveValue("");
+  const ficoSize = await page.locator("#fico").evaluate((el) => getComputedStyle(el).fontSize);
+  const lineSize = await page.locator(".heading-line").evaluate((el) => getComputedStyle(el).fontSize);
+  expect(ficoSize).toBe(lineSize);
+});
+
 test("AC11 pinned clock loads October 2026 and an invalid price keeps the loan", async ({ page }) => {
   await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
   await page.goto("/");
@@ -295,6 +308,28 @@ async function openExample(page: Page) {
 
 async function scrollChartToTop(page: Page) {
   await page.getByTestId("chart").evaluate((element) => element.scrollIntoView());
+}
+
+async function headingText(page: Page): Promise<string> {
+  return page.locator(".heading-line").evaluate((element) => {
+    const parts: string[] = [];
+    const walk = (node: Node) => {
+      if (node instanceof HTMLInputElement) {
+        parts.push(node.value);
+      } else if (node instanceof HTMLSelectElement) {
+        if (node.id !== "fico-range") parts.push(node.options[node.selectedIndex]?.text ?? "");
+      } else if (node instanceof HTMLButtonElement && node.id === "start") {
+        parts.push(node.textContent?.trim() ?? "");
+      } else if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent?.replace(/\s+/g, " ") ?? "";
+        if (text.trim()) parts.push(text);
+      } else {
+        node.childNodes.forEach(walk);
+      }
+    };
+    element.childNodes.forEach(walk);
+    return parts.join("").replace(/\s+/g, " ").trim();
+  });
 }
 
 async function indicateMonth(page: Page, month: number) {

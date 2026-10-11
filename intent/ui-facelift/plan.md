@@ -79,6 +79,8 @@ DoD: the same three commands exit 0. On the 20% down loan, closing costs are `$1
 
 Implementation note: the extra-payments disclosure title is `Extra Payments`, not `Make extra payments`, matching requirement 1 and AC4. A version-1 loan with no stored `picture` gets PMI from the down-payment ladder (for example `0.45` at 0% down), not the static `defaultPicture().pmi`.
 
+Phase 3 stores extra-form Apply snapshots in `prefill.appliedMonthly`, `appliedYearly`, and `appliedMonth`; dirty state compares against those frozen values, not the live field on each keystroke.
+
 ## Phase 3 — FICO, PMI, form color, and version 0.8
 
 Files: `apps/web/src/app.tsx`, `apps/web/src/picture.ts`, `apps/web/src/loan.ts`, `apps/web/src/styles.css`, `apps/web/unit/picture.ts`, `apps/web/unit/loan.ts`, `apps/web/e2e/picture.spec.ts`, `apps/web/e2e/extras.spec.ts`, `apps/web/e2e/arm.spec.ts`, `apps/web/package.json`, `.github/workflows/publish-gh-pages-production.yml`, `AGENTS.md`, `REVIEW.md`
