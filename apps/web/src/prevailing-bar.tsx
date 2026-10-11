@@ -46,13 +46,12 @@ export function PrevailingBar({
           {segments.map((segment) => (
             <div
               key={segment.label}
-              class="summary-prevailing-column"
+              class={`summary-prevailing-segment ${segment.className}`}
               style={{ flexGrow: segment.cents }}
             >
-              <span class={`summary-prevailing-tag ${segment.className}`}>
+              <span class="summary-prevailing-amount">
                 {formatMoney(segment.cents)} {segment.label}
               </span>
-              <span class={`prevailing-segment ${segment.className}`} />
             </div>
           ))}
         </div>

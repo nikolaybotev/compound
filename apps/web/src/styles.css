@@ -210,6 +210,7 @@ input[aria-invalid="true"] {
 .summary-prevailing {
   flex: 1 1 12rem;
   min-width: 10rem;
+  overflow: visible;
 }
 
 .summary-prevailing-track {
@@ -217,49 +218,35 @@ input[aria-invalid="true"] {
   flex-direction: row;
   column-gap: 1px;
   width: 100%;
+  min-height: 1.85rem;
+  align-items: stretch;
   background: var(--paper);
+  overflow: visible;
 }
 
-.summary-prevailing-column {
+.summary-prevailing-segment {
+  position: relative;
   flex-basis: 0;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
+  min-height: 1.85rem;
 }
 
-.summary-prevailing-tag {
-  display: block;
-  width: fit-content;
-  max-width: 100%;
-  padding: 0.1rem 0.35rem;
+.summary-prevailing-amount {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 0.4rem;
+  background: inherit;
+  color: #fff;
   font-family: var(--mono);
   font-size: 0.85rem;
   font-weight: 500;
-  line-height: 1.25;
+  line-height: 1;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.summary-prevailing-tag.prevailing-pi {
-  color: var(--prevailing-pi);
-  background: rgb(27 122 77 / 12%);
-}
-
-.summary-prevailing-tag.prevailing-ti {
-  color: var(--prevailing-ti);
-  background: rgb(42 67 101 / 12%);
-}
-
-.summary-prevailing-tag.prevailing-pe {
-  color: var(--prevailing-pe);
-  background: rgb(138 98 24 / 12%);
-}
-
-.summary-prevailing-column .prevailing-segment {
-  height: 0.5rem;
-  width: 100%;
 }
 
 .note {
@@ -388,40 +375,9 @@ dd {
 
 .heading-line input,
 .heading-line select.product,
-.heading-line .fico-band,
+.heading-line select#fico,
 .heading-line .month-button {
   font-size: inherit;
-}
-
-.fico-bands {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.15rem;
-  vertical-align: baseline;
-}
-
-.fico-band {
-  font: inherit;
-  font-family: var(--mono);
-  font-weight: 500;
-  padding: 0.05rem 0.35rem;
-  border: 1px solid var(--line);
-  border-radius: 2px;
-  background: var(--card);
-  color: inherit;
-  cursor: pointer;
-  line-height: 1.25;
-}
-
-.fico-band[aria-pressed="true"] {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--card);
-}
-
-.fico-band[aria-pressed="true"]::before {
-  content: "✓ ";
 }
 
 .heading-line input {
@@ -486,6 +442,12 @@ dd {
 .picture-table th {
   text-align: left;
   white-space: normal;
+}
+
+.picture-table tr[data-line="subtotal"] th,
+.picture-table tr[data-line="subtotal"] td {
+  color: var(--ink);
+  font-weight: 500;
 }
 
 .picture-note {
@@ -562,6 +524,7 @@ select {
   appearance: none;
   -webkit-appearance: none;
   border-radius: 0;
+  color: var(--ink);
   font: inherit;
   font-size: 1.05rem;
   line-height: inherit;
@@ -697,7 +660,8 @@ td {
   }
 }
 
-.heading-line select.product {
+.heading-line select.product,
+.heading-line select#fico {
   width: auto;
   padding: 0 0.15rem;
   border-bottom: 1px dotted var(--muted);
