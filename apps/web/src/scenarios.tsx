@@ -172,6 +172,8 @@ export function ScenarioBar({
     menuButtonRef.current?.focus();
   }
 
+  const closedLabel = numberedScenarioLabel(active, labels[active] ?? "");
+
   return (
     <div class="scenario-row">
       <div class="scenario-actions">
@@ -183,10 +185,10 @@ export function ScenarioBar({
             class="scenario-trigger"
             aria-haspopup="dialog"
             aria-expanded={listOpen}
-            aria-label={labels[active]}
+            aria-label={closedLabel}
             onClick={toggleList}
           >
-            <span class="scenario-trigger-text">{labels[active]}</span>
+            <span class="scenario-trigger-text">{closedLabel}</span>
             {figures[active] ? (
               <PrevailingBar
                 variant="dropdown"
@@ -210,7 +212,7 @@ export function ScenarioBar({
             >
               <ul class="scenario-list">
                 {labels.map((label, index) => {
-                  const numbered = `${index + 1}: ${label}`;
+                  const numbered = numberedScenarioLabel(index, label);
                   return (
                     <li key={index} class="scenario-list-item">
                       <button
@@ -360,6 +362,10 @@ export function ScenarioBar({
       ) : null}
     </div>
   );
+}
+
+function numberedScenarioLabel(index: number, label: string): string {
+  return `${index + 1}: ${label}`;
 }
 
 function ChevronDown() {
