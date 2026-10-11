@@ -444,9 +444,36 @@ dd {
   font-weight: 400;
 }
 
+.picture-input-wrap {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.15rem;
+}
+
+.picture-input-wrap--end {
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.picture-affix {
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 0.9rem;
+}
+
+.picture-interest-row {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
 .picture-input {
   width: 6.5rem;
   text-align: right;
+}
+
+.picture-input-wrap--end .picture-input {
+  width: 5rem;
 }
 
 .prefill {
