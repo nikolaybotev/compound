@@ -2,7 +2,6 @@ import { extraInputValue, formatMoney, indexInputValue, type ScheduleYear } from
 
 type Props = {
   years: ScheduleYear[];
-  prevailingExtraCents: number;
   openYears: Set<number>;
   editingMonth: number | null;
   editingValue: string;
@@ -19,7 +18,6 @@ type Props = {
 
 export function Schedule({
   years,
-  prevailingExtraCents,
   openYears,
   editingMonth,
   editingValue,
@@ -52,7 +50,6 @@ export function Schedule({
               {arm ? <th scope="col">Payment</th> : null}
               <th scope="col">Principal</th>
               <th scope="col">Interest</th>
-              <th scope="col">Prevailing extra</th>
               {arm ? <th scope="col">Index</th> : null}
               <th scope="col">Extra payment</th>
               <th scope="col">Saved by extra</th>
@@ -82,7 +79,6 @@ export function Schedule({
                   {arm ? <td /> : null}
                   <td class="money">{formatMoney(year.principalCents)}</td>
                   <td class="money">{formatMoney(year.interestCents)}</td>
-                  <td />
                   {arm ? <td /> : null}
                   <td class="money">{formatMoney(year.extraCents)}</td>
                   <td class="money">{formatMoney(year.savedByExtraCents)}</td>
@@ -106,7 +102,6 @@ export function Schedule({
                         ) : null}
                         <td class="money">{formatMoney(row.principalCents)}</td>
                         <td class="money">{formatMoney(row.interestCents)}</td>
-                        <td class="money">{formatMoney(prevailingExtraCents)}</td>
                         {arm ? (
                           <td>
                             {row.isReset ? (
