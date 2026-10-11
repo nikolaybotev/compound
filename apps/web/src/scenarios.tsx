@@ -30,15 +30,20 @@ export function ScenarioBar({
   onImport,
 }: Props) {
   const [listOpen, setListOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [confirmIndex, setConfirmIndex] = useState<number | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const confirmRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const rowButtonsRef = useRef<HTMLButtonElement[]>([]);
+  const exportItemRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     setListOpen(false);
+    setMenuOpen(false);
     setConfirmIndex(null);
   }, [dialogReset]);
 
@@ -105,9 +110,39 @@ export function ScenarioBar({
     };
   }, [listOpen, confirmIndex]);
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    exportItemRef.current?.focus();
+    const onDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (menuRef.current?.contains(target)) return;
+      if (menuButtonRef.current?.contains(target)) return;
+      setMenuOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuOpen]);
+
   function toggleList() {
     if (confirmIndex !== null) return;
+    setMenuOpen(false);
     setListOpen(!listOpen);
+  }
+
+  function toggleMenu() {
+    setListOpen(false);
+    setMenuOpen(!menuOpen);
   }
 
   function choose(index: number) {
@@ -131,6 +166,12 @@ export function ScenarioBar({
     next?.focus();
   }
 
+  function closeMenuAfter(action: () => void) {
+    action();
+    setMenuOpen(false);
+    menuButtonRef.current?.focus();
+  }
+
   return (
     <div class="scenario-row">
       <div class="scenario-actions">
@@ -144,23 +185,52 @@ export function ScenarioBar({
           aria-label={labels[active]}
           onClick={toggleList}
         >
-        <span class="scenario-trigger-text">{labels[active]}</span>
-        {figures[active] ? (
-          <PrevailingBar
-            variant="dropdown"
-            modalCents={figures[active]!.modalPaymentCents}
-            taxCents={figures[active]!.taxCents}
-            insuranceCents={figures[active]!.insuranceCents}
-            fhaMipCents={figures[active]!.fhaMipCents}
-            pmiCents={figures[active]!.pmiCents}
-            prevailingExtraCents={figures[active]!.prevailingExtraCents}
-          />
-        ) : null}
-      </button>
-        <button type="button" class="scenario-action" onClick={onExport}>Export</button>
-        <button type="button" class="scenario-action" onClick={() => fileRef.current?.click()}>
-          Import
+          <span class="scenario-trigger-text">{labels[active]}</span>
+          {figures[active] ? (
+            <PrevailingBar
+              variant="dropdown"
+              modalCents={figures[active]!.modalPaymentCents}
+              taxCents={figures[active]!.taxCents}
+              insuranceCents={figures[active]!.insuranceCents}
+              fhaMipCents={figures[active]!.fhaMipCents}
+              pmiCents={figures[active]!.pmiCents}
+              prevailingExtraCents={figures[active]!.prevailingExtraCents}
+            />
+          ) : null}
+          <ChevronDown />
         </button>
+        <div class="scenario-menu" ref={menuRef}>
+          <button
+            ref={menuButtonRef}
+            type="button"
+            class="scenario-menu-button"
+            aria-label="Export and import"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onClick={toggleMenu}
+          >
+            <DotsIcon />
+          </button>
+          {menuOpen ? (
+            <div class="scenario-menu-panel" role="menu">
+              <button
+                ref={exportItemRef}
+                type="button"
+                role="menuitem"
+                onClick={() => closeMenuAfter(onExport)}
+              >
+                Export
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => closeMenuAfter(() => fileRef.current?.click())}
+              >
+                Import
+              </button>
+            </div>
+          ) : null}
+        </div>
         <input
           ref={fileRef}
           type="file"
@@ -169,7 +239,10 @@ export function ScenarioBar({
           onChange={(event) => {
             const file = event.currentTarget.files?.[0];
             event.currentTarget.value = "";
-            if (file) onImport(file);
+            if (file) {
+              onImport(file);
+              setMenuOpen(false);
+            }
           }}
         />
         {importError ? (
@@ -189,47 +262,50 @@ export function ScenarioBar({
           onKeyDown={onListKeyDown}
         >
           <ul class="scenario-list">
-            {labels.map((label, index) => (
-              <li key={index} class="scenario-list-item">
-                <button
-                  type="button"
-                  class="scenario-row-button"
-                  ref={(node) => {
-                    if (node) rowButtonsRef.current[index] = node;
-                  }}
-                  aria-label={label}
-                  aria-current={index === active ? "true" : undefined}
-                  onClick={() => choose(index)}
-                >
-                  <span class="scenario-row-text">{label}</span>
-                  {figures[index] ? (
-                    <PrevailingBar
-                      variant="dropdown"
-                      modalCents={figures[index]!.modalPaymentCents}
-                      taxCents={figures[index]!.taxCents}
-                      insuranceCents={figures[index]!.insuranceCents}
-                      fhaMipCents={figures[index]!.fhaMipCents}
-                      pmiCents={figures[index]!.pmiCents}
-                      prevailingExtraCents={figures[index]!.prevailingExtraCents}
-                    />
-                  ) : null}
-                </button>
-                {labels.length > 1 ? (
+            {labels.map((label, index) => {
+              const numbered = `${index + 1}: ${label}`;
+              return (
+                <li key={index} class="scenario-list-item">
                   <button
                     type="button"
-                    class="scenario-trash"
-                    aria-label={`Remove scenario ${index + 1}`}
-                    tabIndex={confirmIndex !== null ? -1 : undefined}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setConfirmIndex(index);
+                    class="scenario-row-button"
+                    ref={(node) => {
+                      if (node) rowButtonsRef.current[index] = node;
                     }}
+                    aria-label={numbered}
+                    aria-current={index === active ? "true" : undefined}
+                    onClick={() => choose(index)}
                   >
-                    <TrashIcon />
+                    <span class="scenario-row-text">{numbered}</span>
+                    {figures[index] ? (
+                      <PrevailingBar
+                        variant="dropdown"
+                        modalCents={figures[index]!.modalPaymentCents}
+                        taxCents={figures[index]!.taxCents}
+                        insuranceCents={figures[index]!.insuranceCents}
+                        fhaMipCents={figures[index]!.fhaMipCents}
+                        pmiCents={figures[index]!.pmiCents}
+                        prevailingExtraCents={figures[index]!.prevailingExtraCents}
+                      />
+                    ) : null}
                   </button>
-                ) : null}
-              </li>
-            ))}
+                  {labels.length > 1 && index !== active ? (
+                    <button
+                      type="button"
+                      class="scenario-trash"
+                      aria-label={`Remove scenario ${index + 1}`}
+                      tabIndex={-1}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setConfirmIndex(index);
+                      }}
+                    >
+                      <TrashIcon />
+                    </button>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
           <button
             type="button"
@@ -254,9 +330,8 @@ export function ScenarioBar({
           aria-modal="true"
           aria-label={`Remove scenario ${confirmIndex + 1}?`}
         >
-          <p>
-            Remove scenario {confirmIndex + 1}? {labels[confirmIndex]}
-          </p>
+          <p>Remove scenario {confirmIndex + 1}?</p>
+          <p class="scenario-confirm-label">{labels[confirmIndex]}</p>
           <div class="scenario-confirm-actions">
             <button
               type="button"
@@ -284,6 +359,24 @@ export function ScenarioBar({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function ChevronDown() {
+  return (
+    <svg class="scenario-trigger-chevron" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+      <path fill="currentColor" d="M7 10l5 5 5-5H7z" />
+    </svg>
+  );
+}
+
+function DotsIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+      <circle cx="5" cy="12" r="2" fill="currentColor" />
+      <circle cx="12" cy="12" r="2" fill="currentColor" />
+      <circle cx="19" cy="12" r="2" fill="currentColor" />
+    </svg>
   );
 }
 

@@ -15,33 +15,31 @@ test.afterEach(({ context }) => {
 test("AC3 fresh visit label, heading, and single row without trash", async ({ page }) => {
   await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
   await page.goto("/");
+  const title = page.locator("h1");
+  await expect(title).toContainText("Compound");
+  await expect(title).toContainText("A mortgage amortization calculator");
+  const titleBox = await title.boundingBox();
+  const scenarioBox = await page.locator("#scenario").boundingBox();
+  expect(titleBox && scenarioBox).toBeTruthy();
+  expect(titleBox!.y).toBeLessThan(scenarioBox!.y);
   await expect(page.locator("#scenario")).toHaveAttribute(
     "aria-label",
     "$4,853 - 600K | 5% down | 7.375% | 30 years | fixed",
   );
   await expect(page.locator("#price")).toHaveValue("600");
-  expect(await headingText(page)).toBe("600K | 5% down | 7.375% fixed = $4,853 / month");
-  await expect(page.getByLabel("Prevailing monthly payment")).toHaveText("$4,853");
-  const payment = page.locator("span.complete-payment");
-  const bar = page.locator(".prevailing-bar--heading");
-  await expect(bar).toHaveAttribute(
-    "aria-label",
-    "Principal and interest $3,936.85, taxes and insurance $916.25, prevailing extra $0.00",
+  expect(await headingText(page)).toBe(
+    "600K | 5% down | 7.375% 30-year fixed | starting October 2026",
   );
-  await expect(payment.locator(".prevailing-bar")).toHaveCount(0);
-  await expect(bar).toHaveCSS("column-gap", "1px");
-  const segments = bar.locator(".prevailing-segment");
-  await expect(segments).toHaveCount(2);
-  await expect(segments.nth(0)).toHaveCSS("background-color", "rgb(27, 122, 77)");
-  await expect(segments.nth(1)).toHaveCSS("background-color", "rgb(42, 67, 101)");
-  await expect(bar.locator(".prevailing-pe")).toHaveCount(0);
-  const legend = page.locator(".prevailing-legend");
-  await expect(legend).toHaveText(/PI.*TI.*PE/);
-  await expect(page.locator(".heading-line").locator(".prevailing-legend")).toHaveCount(0);
-  await page.locator("summary", { hasText: "Monthly payment and closing costs" }).click();
-  await expect(page.locator("[data-line='prevailing-principal-and-interest']")).toContainText("$3,936.85");
-  await expect(page.locator("[data-line='prevailing-extra']")).toContainText("$0.00");
-  await expect(page.locator("[data-line='prevailing-monthly-total']")).toContainText("$4,853.10");
+  await expect(page.locator("span.complete-payment")).toHaveCount(0);
+  await expect(page.locator(".prevailing-bar--heading")).toHaveCount(0);
+  await expect(page.locator(".prevailing-legend")).toHaveCount(0);
+  const trigger = page.locator(".scenario-trigger");
+  await expect(trigger.locator(".prevailing-bar--dropdown")).toHaveCount(1);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const triggerWidth = await trigger.evaluate((element) => element.getBoundingClientRect().width);
+  expect(triggerWidth).toBeGreaterThan(28 * 16);
+  await expect(page.getByRole("button", { name: "Export and import" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export", exact: true })).toHaveCount(0);
   await expect(page.locator(".scenario-trash")).toHaveCount(0);
 });
 
@@ -56,6 +54,7 @@ test("AC4 New scenario, switch, reload, and outside close", async ({ page }) => 
   );
   await expect(page.locator("#start")).toHaveAttribute("data-value", "2026-10");
   await page.locator("#scenario").click();
+  await expect(page.locator(".scenario-row-button").nth(1)).toContainText(/^2: /);
   await expect(page.locator(".scenario-row-button[aria-current='true']")).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await page.locator(".scenario-row-button").first().click();
@@ -114,46 +113,48 @@ test("AC6 export, import, bad files, and error clearing", async ({ page }) => {
   await page.locator("#scenario").click();
   await page.getByRole("button", { name: "New scenario" }).click();
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export" }).click();
+  await page.getByRole("button", { name: "Export and import" }).click();
+  await page.getByRole("menuitem", { name: "Export" }).click();
   const file = await downloadPromise;
   expect(file.suggestedFilename()).toBe("compound-loan-scenarios.json");
   const path = await file.path();
   expect(path).toBeTruthy();
   await page.locator("#price").fill("700");
   await page.locator("#price").blur();
-  await page.getByRole("button", { name: "Import" }).click();
+  await page.getByRole("button", { name: "Export and import" }).click();
+  await page.getByRole("menuitem", { name: "Import" }).click();
   await page.locator('input[type="file"]').setInputFiles(path!);
   await expect(page.locator("#price")).toHaveValue("600");
   await page.reload();
   await expect(page.locator("#scenario")).toHaveAttribute("aria-label", /600K/);
-  await page.getByRole("button", { name: "Import" }).click();
+  await page.getByRole("button", { name: "Export and import" }).click();
+  await page.getByRole("menuitem", { name: "Import" }).click();
   await page.locator('input[type="file"]').setInputFiles({
     name: "bad.json",
     mimeType: "application/json",
     buffer: Buffer.from("{"),
   });
   await expect(page.getByText("This file is not a saved set of loan scenarios.")).toBeVisible();
-  await page.getByRole("button", { name: "Import" }).click();
+  await page.getByRole("button", { name: "Export and import" }).click();
+  await page.getByRole("menuitem", { name: "Import" }).click();
   await page.locator('input[type="file"]').setInputFiles({
     name: "bad.json",
     mimeType: "application/json",
     buffer: Buffer.from("{"),
   });
+  await page.getByRole("button", { name: "Export and import" }).click();
+  await page.getByRole("menuitem", { name: "Import" }).click();
   await page.locator('input[type="file"]').setInputFiles(path!);
   await expect(page.getByText("This file is not a saved set of loan scenarios.")).toHaveCount(0);
 });
 
-test("AC7 prevailing heading after Apply patterns", async ({ page }) => {
+test("AC7 scenario label after Apply patterns", async ({ page }) => {
   await openExample(page);
   await applyMonthly(page, "100");
-  await expect(page.getByLabel("Prevailing monthly payment")).toHaveText("$4,953");
   await expect(page.locator("#scenario")).toHaveAttribute("aria-label", /^\$4,953/);
   await page.locator("summary", { hasText: "Monthly payment and closing costs" }).click();
   await expect(page.locator("[data-line='prevailing-extra']")).toContainText("$100.00");
   await expect(page.locator("[data-line='prevailing-monthly-total']")).toContainText("$4,953.10");
-  const gold = page.locator(".prevailing-bar--heading .prevailing-pe");
-  await expect(gold).toHaveCSS("background-color", "rgb(138, 98, 24)");
-  await expect(gold).toHaveCSS("flex-grow", "10000");
   await page.locator("#extra-monthly").fill("");
   await page.getByRole("button", { name: "Apply" }).click();
   await page.getByRole("button", { name: "Expand all years" }).click();
@@ -162,12 +163,11 @@ test("AC7 prevailing heading after Apply patterns", async ({ page }) => {
     await extra(page, month).press("Enter");
   }
   await page.getByRole("button", { name: "Apply" }).click();
-  await expect(page.getByLabel("Prevailing monthly payment")).toHaveText("$4,853");
+  await expect(page.locator("#scenario")).toHaveAttribute("aria-label", /^\$4,853/);
   await expect(page.locator("[data-line='prevailing-extra']")).toContainText("$0.00");
-  await expect(page.locator(".prevailing-bar--heading .prevailing-pe")).toHaveCount(0);
   await extra(page, 1).fill("250");
   await extra(page, 1).press("Enter");
-  await expect(page.getByLabel("Prevailing monthly payment")).toHaveText("$4,853");
+  await expect(page.locator("#scenario")).toHaveAttribute("aria-label", /^\$4,853/);
 });
 
 test("AC10 version-1 legacy loads and writes v2 on edit", async ({ page }) => {
@@ -281,6 +281,8 @@ async function headingText(page: Page): Promise<string> {
         parts.push(node.value);
       } else if (node instanceof HTMLSelectElement) {
         parts.push(node.selectedOptions[0]?.text ?? "");
+      } else if (node instanceof HTMLButtonElement) {
+        parts.push(node.textContent ?? "");
       } else if (node.nodeType === Node.TEXT_NODE) {
         parts.push(node.textContent ?? "");
       } else {

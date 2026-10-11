@@ -52,13 +52,10 @@ import {
 } from "./loan";
 import {
   buildPicture,
-  formatWholeDollars,
-  headingDollarsFromCents,
   parsePicture,
   type PictureInputField,
   type PictureValues,
 } from "./picture";
-import { PrevailingBar } from "./prevailing-bar";
 import { Schedule } from "./schedule";
 import { dollarsToCents } from "../../../amortize.js";
 
@@ -282,9 +279,6 @@ export function App() {
     () => scenarioFigures(loanSet.scenarios[loanSet.active]),
     [loanSet],
   );
-  const prevailingHeadingDollars = activeFigures
-    ? formatWholeDollars(headingDollarsFromCents(activeFigures.totalCents))
-    : formatWholeDollars(lines.headingDollars);
   const rateThousandths = Math.round(loan.ratePercent * 1000);
   const armParsed = useMemo(
     () => parseArm(armSaved, loan.years, rateThousandths),
@@ -564,6 +558,10 @@ export function App() {
 
   return (
     <main class="column">
+      <h1>
+        Compound
+        <span class="title-tagline">A mortgage amortization calculator</span>
+      </h1>
       <ScenarioBar
         labels={scenarioLabels}
         figures={scenarioRows.map((row) => row.figures)}
@@ -577,7 +575,6 @@ export function App() {
         onExport={exportScenarios}
         onImport={importScenarios}
       />
-      <h1>Amortization</h1>
       <p class="heading-line">
         <input
           id="price"
@@ -613,6 +610,17 @@ export function App() {
           onInput={(event) => update("rate", event.currentTarget.value)}
         />
         <span>% </span>
+        <input
+          id="years"
+          aria-label="Term"
+          inputMode="numeric"
+          autoComplete="off"
+          value={draft.years}
+          aria-invalid={invalidField === "years"}
+          style={{ width: `${Math.max(draft.years.length, 1) + 1}ch` }}
+          onInput={(event) => update("years", event.currentTarget.value)}
+        />
+        <span>-year </span>
         {armOn && armParsed.ok ? (
           <span class="arm-label" data-testid="arm-label">
             {armLabel(armParsed.values.fixedMonths / 12, armParsed.values.adjustMonths)}
@@ -629,49 +637,14 @@ export function App() {
           <option value="fixed">fixed</option>
           <option value="arm">ARM</option>
         </select>
-        <span> = </span>
-        <span class="complete-payment" aria-label="Prevailing monthly payment">
-          {prevailingHeadingDollars}
-        </span>
-        {activeFigures ? (
-          <PrevailingBar
-            variant="heading"
-            modalCents={activeFigures.modalPaymentCents}
-            taxCents={activeFigures.taxCents}
-            insuranceCents={activeFigures.insuranceCents}
-            fhaMipCents={activeFigures.fhaMipCents}
-            pmiCents={activeFigures.pmiCents}
-            prevailingExtraCents={activeFigures.prevailingExtraCents}
-          />
-        ) : null}
-        <span> / month</span>
-      </p>
-      {activeFigures ? (
-        <p class="prevailing-legend">
-          <span class="prevailing-legend-pi">PI</span>
-          <span class="prevailing-legend-ti">TI</span>
-          <span class="prevailing-legend-pe">PE</span>
-        </p>
-      ) : null}
-      <div class="inputs">
-        <Field
-          id="years"
-          label="Term"
-          value={draft.years}
-          suffix="years"
-          invalid={invalidField === "years"}
-          onInput={(value) => update("years", value)}
+        <span> | starting </span>
+        <MonthPicker
+          id="start"
+          value={draft.start}
+          closeSignal={startPickerClose}
+          onChange={(value) => update("start", value)}
         />
-        <div class="field">
-          <label for="start">Start month</label>
-          <MonthPicker
-            id="start"
-            value={draft.start}
-            closeSignal={startPickerClose}
-            onChange={(value) => update("start", value)}
-          />
-        </div>
-      </div>
+      </p>
       {armOn && armParsed.ok ? (
         <Disclosure className="arm" title="ARM terms" open={armSaved.open} onToggle={setArmOpen}>
           <div class="inputs">
