@@ -388,9 +388,9 @@ test("AC14 ARM order, summary, and no picture principal row", async ({ page }) =
     }
     return tags;
   });
+  expect(mainOrder.indexOf("ARM terms")).toBeLessThan(mainOrder.indexOf("Taxes and Insurance"));
   expect(mainOrder.indexOf("Taxes and Insurance")).toBeLessThan(mainOrder.indexOf("Summary"));
-  expect(mainOrder.indexOf("Summary")).toBeLessThan(mainOrder.indexOf("ARM terms"));
-  expect(mainOrder.indexOf("ARM terms")).toBeLessThan(mainOrder.indexOf("Chart"));
+  expect(mainOrder.indexOf("Summary")).toBeLessThan(mainOrder.indexOf("Chart"));
 
   await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$5,953.96");
   await expect(page.getByText(ARM_NOTE)).toHaveCount(0);
@@ -443,8 +443,9 @@ async function headingText(page: Page): Promise<string> {
       if (node instanceof HTMLInputElement) {
         parts.push(node.value);
       } else if (node instanceof HTMLSelectElement) {
-        if (node.id === "fico-range") return;
         parts.push(node.selectedOptions[0]?.text ?? "");
+      } else if (node instanceof HTMLElement && node.classList.contains("fico-bands")) {
+        return;
       } else if (node instanceof HTMLButtonElement) {
         parts.push(node.textContent ?? "");
       } else if (node.nodeType === Node.TEXT_NODE) {

@@ -38,26 +38,24 @@ export function PrevailingBar({
       .join(", ");
     return (
       <div class="summary-prevailing">
-        <div class="summary-prevailing-labels" aria-hidden="true">
-          {segments.map((segment) => (
-            <span key={segment.label} class={`summary-prevailing-tag ${segment.className}`}>
-              {formatMoney(segment.cents)} {segment.label}
-            </span>
-          ))}
-        </div>
-        <span
-          class="prevailing-bar prevailing-bar--summary"
+        <div
+          class="summary-prevailing-track"
           role="img"
           aria-label={ariaLabel}
         >
           {segments.map((segment) => (
-            <span
-              key={segment.className}
-              class={`prevailing-segment ${segment.className}`}
+            <div
+              key={segment.label}
+              class="summary-prevailing-column"
               style={{ flexGrow: segment.cents }}
-            />
+            >
+              <span class={`summary-prevailing-tag ${segment.className}`}>
+                {formatMoney(segment.cents)} {segment.label}
+              </span>
+              <span class={`prevailing-segment ${segment.className}`} />
+            </div>
           ))}
-        </span>
+        </div>
       </div>
     );
   }

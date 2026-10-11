@@ -91,8 +91,7 @@ test("AC3 fresh heading with FICO and heading control size", async ({ page }) =>
     "600K | 5% down | 7.375% 30-year fixed | 780 FICO | starting October 2026",
   );
   expect(await headingText(page)).not.toContain("780+");
-  await expect(page.locator("#fico-range")).toHaveValue("");
-  const ficoSize = await page.locator("#fico").evaluate((el) => getComputedStyle(el).fontSize);
+  const ficoSize = await page.locator(".fico-band").first().evaluate((el) => getComputedStyle(el).fontSize);
   const lineSize = await page.locator(".heading-line").evaluate((el) => getComputedStyle(el).fontSize);
   expect(ficoSize).toBe(lineSize);
 });
@@ -109,7 +108,7 @@ test("AC11 pinned clock loads October 2026 and an invalid price keeps the loan",
   const monthly = page.getByRole("region", { name: "Monthly payment" });
   await expect(monthly).toContainText("$3,936.85 PI");
   await expect(monthly).toContainText("$916.25 TI");
-  await expect(monthly.locator(".summary-prevailing-tag")).toHaveCount(2);
+  await expect(monthly.locator(".summary-prevailing-column")).toHaveCount(2);
   await expect(page.locator("[data-bar]")).toHaveCount(360);
 
   const price = page.locator("#price");
@@ -317,7 +316,9 @@ async function headingText(page: Page): Promise<string> {
       if (node instanceof HTMLInputElement) {
         parts.push(node.value);
       } else if (node instanceof HTMLSelectElement) {
-        if (node.id !== "fico-range") parts.push(node.options[node.selectedIndex]?.text ?? "");
+        parts.push(node.options[node.selectedIndex]?.text ?? "");
+      } else if (node instanceof HTMLElement && node.classList.contains("fico-bands")) {
+        return;
       } else if (node instanceof HTMLButtonElement && node.id === "start") {
         parts.push(node.textContent?.trim() ?? "");
       } else if (node.nodeType === Node.TEXT_NODE) {

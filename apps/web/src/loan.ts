@@ -696,6 +696,13 @@ function scenariosDiffer(legacy: Scenario, active: Scenario): boolean {
   return false;
 }
 
+function normalizeStoredFico(text: string): string {
+  const parsed = parseFicoScore(text);
+  if (parsed === null) return "780";
+  if (parsed < 620) return "620";
+  return String(parsed);
+}
+
 function parseScenarioRecord(record: Record<string, unknown>, now = new Date()): Scenario | null {
   const draft: LoanDraft = {
     price: typeof record.price === "string" ? record.price : "",
@@ -703,10 +710,11 @@ function parseScenarioRecord(record: Record<string, unknown>, now = new Date()):
     years: typeof record.years === "string" ? record.years : "",
     rate: typeof record.rate === "string" ? record.rate : "",
     start: typeof record.start === "string" ? record.start : "",
-    fico:
+    fico: normalizeStoredFico(
       typeof record.fico === "string" && parseFicoScore(record.fico) !== null
         ? record.fico.trim()
         : "780",
+    ),
   };
   const parsedLoan = parseLoan(draft);
   if (!parsedLoan.ok) return null;
