@@ -56,6 +56,7 @@ import {
   type PictureInputField,
   type PictureValues,
 } from "./picture";
+import { PrevailingBar } from "./prevailing-bar";
 import { Schedule } from "./schedule";
 import { dollarsToCents } from "../../../amortize.js";
 
@@ -738,12 +739,22 @@ export function App() {
       <section class="summary" aria-label="Loan summary">
         <div class="payment-block" role="region" aria-label="Monthly payment">
           <h2>Monthly payment</h2>
-          <p class="money payment">{formatMoney(report.monthly_payment_cents)}</p>
-          {report.arm ? (
-            <p class="note">
-              Initial payment. The extra payment is on top of this amount, and the payment resets at each adjustment.
+          <div class="summary-payment-line">
+            <p class="money payment">
+              {activeFigures ? formatMoney(activeFigures.totalCents) : formatMoney(report.monthly_payment_cents)}
             </p>
-          ) : null}
+            {activeFigures ? (
+              <PrevailingBar
+                variant="summary"
+                modalCents={activeFigures.modalPaymentCents}
+                taxCents={activeFigures.taxCents}
+                insuranceCents={activeFigures.insuranceCents}
+                fhaMipCents={activeFigures.fhaMipCents}
+                pmiCents={activeFigures.pmiCents}
+                prevailingExtraCents={activeFigures.prevailingExtraCents}
+              />
+            ) : null}
+          </div>
         </div>
         <dl>
           <div role="region" aria-label="Loan amount">
@@ -780,24 +791,18 @@ export function App() {
               </dd>
             </div>
           ) : null}
-          {extras.size > 0 ? (
-            <div role="region" aria-label="Extra principal paid">
-              <dt>Extra principal paid</dt>
-              <dd class="money">{formatMoney(report.extra_applied_cents)}</dd>
-            </div>
-          ) : null}
-          {extras.size > 0 ? (
-            <div role="region" aria-label="Interest saved">
-              <dt>Interest saved</dt>
-              <dd class="money">{formatMoney(report.interest_saved_cents)}</dd>
-            </div>
-          ) : null}
-          {extras.size > 0 ? (
-            <div role="region" aria-label="Months saved">
-              <dt>Months saved</dt>
-              <dd class="money">{monthsSavedText(report.months_saved)}</dd>
-            </div>
-          ) : null}
+          <div role="region" aria-label="Extra principal paid">
+            <dt>Extra principal paid</dt>
+            <dd class="money">{formatMoney(report.extra_applied_cents)}</dd>
+          </div>
+          <div role="region" aria-label="Interest saved">
+            <dt>Interest saved</dt>
+            <dd class="money">{formatMoney(report.interest_saved_cents)}</dd>
+          </div>
+          <div role="region" aria-label="Months saved">
+            <dt>Months saved</dt>
+            <dd class="money">{monthsSavedText(report.months_saved)}</dd>
+          </div>
         </dl>
       </section>
       <Chart bars={bars} />
