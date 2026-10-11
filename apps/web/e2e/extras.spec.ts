@@ -116,6 +116,19 @@ test("AC8 reload keeps the edited cell, the prefill, and an open 2027", async ({
   await expect(page.locator("#extra-yearly-month")).toHaveValue("1");
 });
 
+test("AC9 extra form fields show edited blue before Apply", async ({ page }) => {
+  await page.goto("/");
+  await openPrefill(page);
+  const monthly = page.locator("#extra-monthly");
+  await monthly.fill("50");
+  await expect.poll(async () => monthly.getAttribute("data-edited")).toBe("true");
+  await expect(monthly).toHaveCSS("color", "rgb(29, 78, 216)");
+  await page.getByRole("button", { name: "Apply" }).click();
+  await expect(monthly).not.toHaveCSS("color", "rgb(29, 78, 216)");
+  await monthly.fill("50");
+  await expect(monthly).not.toHaveCSS("color", "rgb(29, 78, 216)");
+});
+
 test("AC13 an invalid extra cell and an invalid Apply leave the column", async ({ page }) => {
   await openExample(page);
   await applyMonthly(page, "100");

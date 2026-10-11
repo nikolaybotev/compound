@@ -28,7 +28,7 @@ test("AC3 fresh visit label, heading, and single row without trash", async ({ pa
   );
   await expect(page.locator("#price")).toHaveValue("600");
   expect(await headingText(page)).toBe(
-    "600K | 5% down | 7.375% 30-year fixed | starting October 2026",
+    "600K | 5% down | 7.375% 30-year fixed | 780 FICO | starting October 2026",
   );
   await expect(page.locator("span.complete-payment")).toHaveCount(0);
   await expect(page.locator(".prevailing-bar--heading")).toHaveCount(0);
