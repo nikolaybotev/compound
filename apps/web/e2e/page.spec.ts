@@ -88,12 +88,17 @@ test("AC3 fresh heading with FICO and heading control size", async ({ page }) =>
   await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
   await page.goto("/");
   expect(await headingText(page)).toBe(
-    "600K | 5% down | 7.375% 30-year fixed | 780 FICO | starting October 2026",
+    "600K | 5% down | 7.375% 30-year fixed | 780+ | starting October 2026",
   );
-  expect(await headingText(page)).not.toContain("780+");
-  const ficoSize = await page.locator(".fico-band").first().evaluate((el) => getComputedStyle(el).fontSize);
+  expect(await headingText(page)).not.toContain("FICO");
+  await expect(page.locator("#fico")).toHaveValue("780");
+  await expect(page.locator("#fico option:checked")).toHaveText("780+");
+  await expect(page.locator("#fico-score")).toHaveCount(0);
+  await expect(page.locator(".fico-bands")).toHaveCount(0);
+  const ficoSize = await page.locator("#fico").evaluate((el) => getComputedStyle(el).fontSize);
   const lineSize = await page.locator(".heading-line").evaluate((el) => getComputedStyle(el).fontSize);
   expect(ficoSize).toBe(lineSize);
+  await expect(page.locator("#fico")).not.toHaveCSS("appearance", "none");
 });
 
 test("AC11 pinned clock loads October 2026 and an invalid price keeps the loan", async ({ page }) => {
@@ -108,7 +113,33 @@ test("AC11 pinned clock loads October 2026 and an invalid price keeps the loan",
   const monthly = page.getByRole("region", { name: "Monthly payment" });
   await expect(monthly).toContainText("$3,936.85 PI");
   await expect(monthly).toContainText("$916.25 TI");
-  await expect(monthly.locator(".summary-prevailing-column")).toHaveCount(2);
+  await expect(monthly.locator(".summary-prevailing-segment")).toHaveCount(2);
+  const alignment = await monthly.locator(".summary-prevailing-segment").evaluateAll((nodes) =>
+    nodes.map((segment) => {
+      const amount = segment.querySelector(".summary-prevailing-amount");
+      if (!(amount instanceof HTMLElement)) return null;
+      const segmentBox = segment.getBoundingClientRect();
+      const amountBox = amount.getBoundingClientRect();
+      const style = getComputedStyle(amount);
+      return {
+        leftDelta: amountBox.left - segmentBox.left,
+        inside:
+          amountBox.top >= segmentBox.top - 1 && amountBox.bottom <= segmentBox.bottom + 1,
+        color: style.color,
+        clipped: style.overflow === "hidden" || amount.scrollWidth > amount.clientWidth + 1,
+        text: amount.textContent,
+      };
+    }),
+  );
+  expect(alignment.map((row) => row?.text)).toEqual(["$3,936.85 PI", "$916.25 TI"]);
+  for (const row of alignment) {
+    expect(row).not.toBeNull();
+    expect(row?.leftDelta).toBeGreaterThanOrEqual(-1);
+    expect(row?.leftDelta).toBeLessThanOrEqual(1);
+    expect(row?.inside).toBe(true);
+    expect(row?.color).toBe("rgb(255, 255, 255)");
+    expect(row?.clipped).toBe(false);
+  }
   await expect(page.locator("[data-bar]")).toHaveCount(360);
 
   const price = page.locator("#price");
@@ -317,8 +348,6 @@ async function headingText(page: Page): Promise<string> {
         parts.push(node.value);
       } else if (node instanceof HTMLSelectElement) {
         parts.push(node.options[node.selectedIndex]?.text ?? "");
-      } else if (node instanceof HTMLElement && node.classList.contains("fico-bands")) {
-        return;
       } else if (node instanceof HTMLButtonElement && node.id === "start") {
         parts.push(node.textContent?.trim() ?? "");
       } else if (node.nodeType === Node.TEXT_NODE) {
