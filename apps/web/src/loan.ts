@@ -857,15 +857,16 @@ export function saveStored(storage: FullStorageLike | undefined, set: StoredSet)
   }
 }
 
-export function prevailingExtraCents(report: Report, termMonths: number): number {
-  const rows = report.schedule.slice(0, report.payoff_month);
+export function prevailingExtraCents(report: Report): number {
+  const months = report.payoff_month;
+  const rows = report.schedule.slice(0, months);
   const counts = new Map<number, number>();
   for (const row of rows) {
     const extra = row.extra_cents;
     if (extra > 0) counts.set(extra, (counts.get(extra) ?? 0) + 1);
   }
   for (const [amount, count] of counts) {
-    if (count * 5 >= termMonths * 4) return amount;
+    if (count * 5 >= months * 4) return amount;
   }
   return 0;
 }
@@ -938,9 +939,8 @@ export function scenarioFigures(scenario: Scenario): ScenarioFigures | null {
     scenario.applied,
     lines.financedCents,
   );
-  const termMonths = parsedLoan.loan.years * 12;
   const modal = modalPaymentCents(prevailingReport);
-  const extra = prevailingExtraCents(prevailingReport, termMonths);
+  const extra = prevailingExtraCents(prevailingReport);
   const total = prevailingTotalCents(
     modal,
     lines.taxCents,
