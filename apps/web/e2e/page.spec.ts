@@ -16,16 +16,16 @@ test.afterEach(({ context }) => {
 
 test("AC3 example loan, chart, and November 2039 card", async ({ page }) => {
   await openExample(page);
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,792.22");
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$4,718.47");
   await expect(page.getByRole("region", { name: "Loan amount" })).toContainText("$570,000.00");
   await expect(page.getByRole("region", { name: "Total interest paid" })).toContainText("$795,200.72");
   await expect(page.getByRole("region", { name: "Total cost of loan" })).toContainText("$1,365,200.72");
   await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("October 2056 (30 years)");
   await expect(page.getByRole("region", { name: "Monthly payment" }).locator(".note")).toHaveCount(0);
   await expect(page.getByText("The extra payment is on top of this amount.")).toHaveCount(0);
-  await expect(page.getByText("Extra principal paid")).toHaveCount(0);
-  await expect(page.getByText("Interest saved")).toHaveCount(0);
-  await expect(page.getByText("Months saved")).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Extra principal paid" })).toContainText("$0.00");
+  await expect(page.getByRole("region", { name: "Interest saved" })).toContainText("$0.00");
+  await expect(page.getByRole("region", { name: "Months saved" })).toContainText("0");
 
   const year = page.locator("tbody[data-year='2026']");
   await expect(year.getByText("Nov 2026")).toBeVisible();
@@ -45,7 +45,7 @@ test("AC3 example loan, chart, and November 2039 card", async ({ page }) => {
   await expect(page.locator("[data-bar]")).toHaveCount(360);
   await indicateMonth(page, 157);
   const card = page.getByTestId("legend");
-  await expect(card.getByRole("heading", { name: "Nov 2039" })).toBeVisible();
+  await expect(card.getByRole("heading", { name: "157: Nov 2039" })).toBeVisible();
   await expect(card).toContainText("Principal paid");
   await expect(card).toContainText("$119,519.95");
   await expect(card).toContainText("Interest paid");
@@ -68,7 +68,7 @@ test("AC4 down payment changes the loan amount", async ({ page }) => {
   await page.locator("#price").fill("712.5");
   await page.locator("#down").fill("20");
   await expect(page.getByRole("region", { name: "Loan amount" })).toContainText("$570,000.00");
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,792.22");
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$4,682.84");
 
   await page.locator("#price").fill("399.999");
   await page.locator("#down").fill("3.5");
@@ -89,7 +89,14 @@ test("AC11 pinned clock loads October 2026 and an invalid price keeps the loan",
   await page.goto("/");
   await expect(page.locator("#start")).toHaveAttribute("data-value", "2026-10");
   await expect(page.locator("#start")).toHaveText("October 2026");
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,936.85");
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$4,853.10");
+  await expect(page.getByRole("region", { name: "Extra principal paid" })).toContainText("$0.00");
+  await expect(page.getByRole("region", { name: "Interest saved" })).toContainText("$0.00");
+  await expect(page.getByRole("region", { name: "Months saved" })).toContainText("0");
+  const monthly = page.getByRole("region", { name: "Monthly payment" });
+  await expect(monthly).toContainText("$3,936.85 PI");
+  await expect(monthly).toContainText("$916.25 TI");
+  await expect(monthly.locator(".summary-prevailing-tag")).toHaveCount(2);
   await expect(page.locator("[data-bar]")).toHaveCount(360);
 
   const price = page.locator("#price");
@@ -97,8 +104,26 @@ test("AC11 pinned clock loads October 2026 and an invalid price keeps the loan",
   await page.keyboard.press("End");
   await page.keyboard.type("x");
   await expect(page.getByRole("alert")).toContainText("Purchase price");
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,936.85");
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$4,853.10");
   await expect(page.locator("[data-bar]")).toHaveCount(360);
+});
+
+test("AC7 prevailing extra raises Monthly payment on the fresh loan", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
+  await page.goto("/");
+  await page.locator("summary", { hasText: "Make extra payments" }).click();
+  await page.locator("#extra-monthly").fill("1000");
+  await page.getByRole("button", { name: "Apply" }).click();
+  const monthly = page.getByRole("region", { name: "Monthly payment" });
+  await expect(monthly).toContainText("$5,853.10");
+  await expect(monthly).toContainText("$1,000.00 PE");
+});
+
+test("AC8 chart popup prefixes the payment number", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
+  await page.goto("/");
+  await indicateMonth(page, 87);
+  await expect(page.getByTestId("legend").getByRole("heading", { name: "87: Jan 2034" })).toBeVisible();
 });
 
 test("AC12 keyboard, tap, and expand all years", async ({ page }) => {
@@ -106,7 +131,7 @@ test("AC12 keyboard, tap, and expand all years", async ({ page }) => {
   await indicateMonth(page, 157);
   await page.getByTestId("chart").focus();
   await page.keyboard.press("ArrowRight");
-  await expect(page.getByTestId("legend").getByRole("heading", { name: "Dec 2039" })).toBeVisible();
+  await expect(page.getByTestId("legend").getByRole("heading", { name: "158: Dec 2039" })).toBeVisible();
 
   const chart = page.getByTestId("chart");
   const box = await chart.boundingBox();
@@ -191,7 +216,7 @@ test("AC9 the legend follows the pointer and flips at the window edge", async ({
   if (!viewport) throw new Error("no viewport");
 
   const left = await indicateMonth(page, 157);
-  await expect(card.getByRole("heading", { name: "Nov 2039" })).toBeVisible();
+  await expect(card.getByRole("heading", { name: "157: Nov 2039" })).toBeVisible();
   const first = await card.boundingBox();
   if (!first) throw new Error("no card");
   expect(first.x).toBeGreaterThanOrEqual(left.x + 16 - 0.5);
@@ -265,7 +290,7 @@ async function openExample(page: Page) {
   await page.locator("#down").fill("0");
   await page.locator("#years").fill("30");
   await page.locator("#rate").fill("7");
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,792.22");
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$4,718.47");
 }
 
 async function scrollChartToTop(page: Page) {
@@ -286,7 +311,7 @@ async function indicateMonth(page: Page, month: number) {
 function dateLabel(month: number): string {
   const index = 2026 * 12 + 9 + month;
   const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  return `${names[index % 12]} ${Math.floor(index / 12)}`;
+  return `${month}: ${names[index % 12]} ${Math.floor(index / 12)}`;
 }
 
 async function blockForeignHosts(context: BrowserContext) {
