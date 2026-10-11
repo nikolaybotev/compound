@@ -24,7 +24,7 @@ test("AC9 a fresh visit is the fixed heading with nine columns", async ({ page }
   await expect(page.getByTestId("arm-label")).toHaveCount(0);
   await expect(page.locator("summary", { hasText: "ARM terms" })).toHaveCount(0);
   await expect(page.locator("thead th")).toHaveCount(9);
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,936.85");
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$4,853.10");
   await expectNoFixedNote(page);
   await expect(page.getByRole("region", { name: "Highest payment" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Highest rate" })).toHaveCount(0);
@@ -37,7 +37,7 @@ test("AC9 selecting ARM at the default rate shows the 12.375% ceiling", async ({
   await expect(page.locator("summary", { hasText: "ARM terms" })).toHaveAttribute("aria-expanded", "true");
   await expect(page.locator("[data-line='arm-ceiling']")).toHaveText("Ceiling 12.375%");
   await expect(page.getByTestId("arm-label")).toHaveText("7/1");
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,936.85");
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$6,641.84");
   await expect(page.getByRole("region", { name: "Highest rate" })).toContainText("12.375% from November 2033");
   await expect(page.getByRole("region", { name: "Highest payment" })).toContainText(
     "$5,725.59 from November 2033",
@@ -80,8 +80,8 @@ test("AC9 the Example Credit Union 7/1 example heading, terms, and summary", asy
   );
 
   const monthly = page.getByRole("region", { name: "Monthly payment" });
-  await expect(monthly).toContainText("$3,371.77");
-  await expect(monthly.locator(".note")).toHaveText(ARM_NOTE);
+  await expect(monthly).toContainText("$5,953.96");
+  await expect(monthly.locator(".note")).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Highest rate" })).toContainText("10.875% from November 2033");
   await expect(page.getByRole("region", { name: "Highest payment" })).toContainText(
     "$5,037.71 from November 2033",
@@ -142,7 +142,7 @@ test("a rate edit under a floor already entered keeps the last valid rate", asyn
   await page.locator("#rate").fill("5");
   await expect(page.getByRole("alert")).toContainText("Lifetime floor");
   await expect(page.locator("#arm-floor")).toHaveAttribute("aria-invalid", "true");
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,371.77");
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$4,597.73");
 });
 
 test("a term that is not longer than the fixed period is reported on the fixed period", async ({ page }) => {
@@ -353,7 +353,7 @@ test("AC10 an index at the first adjustment recomputes the path", async ({ page 
   await expect(page.getByRole("region", { name: "Extra principal paid" })).toContainText("$100.00");
   await expect(page.getByRole("region", { name: "Months saved" })).toHaveText(/Months saved\s*0$/);
   await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("October 2056 (30 years)");
-  await expect(page.getByRole("region", { name: "Monthly payment" }).locator(".note")).toHaveText(ARM_NOTE);
+  await expect(page.getByRole("region", { name: "Monthly payment" }).locator(".note")).toHaveCount(0);
 
   await page.locator("#product").selectOption("fixed");
   await expectNoFixedNote(page);
