@@ -1230,7 +1230,6 @@ export function App() {
       </Disclosure>
       <Schedule
         years={years}
-        prevailingExtraCents={activeFigures?.prevailingExtraCents ?? 0}
         openYears={openYears}
         editingMonth={editingMonth}
         editingValue={editingValue}
