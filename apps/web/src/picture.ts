@@ -330,6 +330,21 @@ export function parseFicoScore(text: string): number | null {
   return value;
 }
 
+export const FICO_RANGES: ReadonlyArray<{ score: number; label: string }> = [
+  { score: 780, label: "780+" },
+  { score: 740, label: "740–779" },
+  { score: 700, label: "700–739" },
+  { score: 660, label: "660–699" },
+  { score: 620, label: "620–659" },
+];
+
+export function ficoRangeScore(score: number): number {
+  for (const range of FICO_RANGES) {
+    if (score >= range.score) return range.score;
+  }
+  return 620;
+}
+
 export function ficoBand(score: number): string {
   if (score >= 780) return "780+";
   if (score >= 740) return "740-779";
