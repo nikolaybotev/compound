@@ -22,6 +22,8 @@ One pull request into `main`. Merge when `test`, `web`, and CodeQL are green and
 
 4. **Tests and docs** — Update Playwright and the picture unit test. Update `AGENTS.md` and `REVIEW.md`. Bump `apps/web/package.json` and `PAGES_POINT_VERSION` to 0.10.
 
+5. **Month of year color** — Set `color: var(--ink)` on `.field select`. Leave `#extra-yearly-month[data-edited="true"]` on `#1d4ed8`. Playwright checks the unedited ink color, the edited blue, and the return to ink after Apply.
+
 ## DoD
 
 `node --test`, `pnpm --dir apps/web test`, and `pnpm --dir apps/web test:e2e` exit 0. Version is 0.10. `amortize.js` is unchanged.

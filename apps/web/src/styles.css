@@ -524,6 +524,7 @@ select {
   appearance: none;
   -webkit-appearance: none;
   border-radius: 0;
+  color: var(--ink);
   font: inherit;
   font-size: 1.05rem;
   line-height: inherit;

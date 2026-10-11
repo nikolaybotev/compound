@@ -17,6 +17,7 @@ Three touch-ups to the 0.9 follow-ups in `apps/web`. This folder builds on [inte
 - G1. Replace the FICO score, the word FICO, and the range buttons with one inline range dropdown.
 - G2. End Taxes and Insurance with a subtotal of property tax, home insurance, and conventional PMI.
 - G3. Draw each summary prevailing-bar amount inside its segment, readable, at the segment’s left edge.
+- G4. Paint an unedited Month of year in the ink color, and the edited blue only after an unapplied edit.
 
 **Non-goals**
 
@@ -33,6 +34,8 @@ Three touch-ups to the 0.9 follow-ups in `apps/web`. This folder builds on [inte
 
 3. **Summary prevailing bar.** On the Monthly payment line, each positive component is a segment. The amount `{dollars} {PI|TI|PE}` is drawn inside the segment, in white on the segment color, starting at the segment’s left edge, and is not clipped. A segment narrower than its amount lets the amount extend past the segment, still starting at that segment’s left edge, with the segment color behind the text. A zero share is omitted. The scenario-menu strips stay color-only.
 
+4. **Month of year color.** `#extra-yearly-month` is unedited on a fresh visit. Its text is the ink color, the same computed color as an unedited amount (`#17211f`). After a month change that Apply has not written, the text is `#1d4ed8`. Apply clears that and returns the ink color. `.field select` sets `color: var(--ink)`. The edited rule on `#extra-yearly-month[data-edited="true"]` stays.
+
 ## 4. Acceptance criteria
 
 | AC | Check |
@@ -41,6 +44,7 @@ Three touch-ups to the 0.9 follow-ups in `apps/web`. This folder builds on [inte
 | AC2 | Playwright: the last Taxes and Insurance row is Subtotal `$916.25` on the fresh loan and `$750.00` at 20% down. |
 | AC3 | Playwright: the fresh Monthly payment bar shows `$3,936.85 PI` and `$916.25 TI` inside the segments, each amount’s left edge on its segment’s left edge, white, and not clipped. `$1,000` extra adds `$1,000.00 PE`. |
 | AC4 | `node --test`, `pnpm --dir apps/web test`, and `pnpm --dir apps/web test:e2e` exit 0. `amortize.js` has no diff. Version is `0.10.0` and `PAGES_POINT_VERSION` is `0.10`. |
+| AC5 | Playwright: unedited `#extra-yearly-month` is `rgb(23, 33, 31)`, the same color as `#extra-yearly`. Choosing February before Apply is `rgb(29, 78, 216)`. Apply returns the ink color. |
 
 ## 5. Design decisions
 
@@ -49,6 +53,8 @@ Three touch-ups to the 0.9 follow-ups in `apps/web`. This folder builds on [inte
 **D2 — The subtotal is the three monthly rows.** Property tax, home insurance, and conventional PMI are the Taxes and Insurance table. Prepaid amounts live under Closing Costs and are not in this sum. On the fresh loan the three rows are `$575.00`, `$175.00`, and `$166.25`, which sum to `$916.25`, the same cents as the TI segment.
 
 **D3 — Amounts sit in the summary bar.** The 0.9 labels sit above the segments and clip when the column is narrower than the text. This release paints the amount inside the segment. White on `#1b7a4d`, `#2a4365`, and `#8a6218` stays readable, including when a narrow segment’s text extends across the next color, because the text carries its own segment color. Scenario-menu bars are `3rem` wide and stay unlabeled.
+
+**D4 — The month select needs an explicit ink color.** `.field select` sets `appearance: none` and had no `color`, so iPhone paints it system blue before any edit. Amount inputs already inherit the ink color. `color: var(--ink)` on `.field select` is the unedited color. `#extra-yearly-month[data-edited="true"]` still sets `#1d4ed8` and wins on specificity.
 
 ## 6. Version
 
