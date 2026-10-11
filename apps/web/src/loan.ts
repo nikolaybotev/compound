@@ -351,7 +351,8 @@ export function yearsAndMonths(months: number): string {
 }
 
 export function monthsSavedText(months: number): string {
-  return months < 12 ? String(months) : yearsAndMonths(months);
+  if (months < 12) return String(months);
+  return `${months} (${yearsAndMonths(months)})`;
 }
 
 export type Prefill = {

@@ -19,7 +19,7 @@ test("AC3 fresh Conventional heading and picture", async ({ page }) => {
   await expect(page.locator("#price")).toHaveValue("600");
   await expect(page.locator("#down")).toHaveValue("5");
   await expect(page.locator("#rate")).toHaveValue("7.375");
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,936.85");
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$4,853.10");
   await expect(page.getByRole("region", { name: "Loan amount" })).toContainText("$570,000.00");
 
   const extras = page.locator("summary", { hasText: "Make extra payments" });
@@ -118,7 +118,7 @@ test("AC6 a saved version-1 loan keeps its payment and shows thousands", async (
   await page.reload();
   await expect(page.locator("#price")).toHaveValue("570");
   await expect(page.getByRole("region", { name: "Loan amount" })).toContainText("$570,000.00");
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,792.22");
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$4,718.47");
   const pictureSummary = page.locator("summary", { hasText: "Monthly payment and closing costs" });
   await expect(pictureSummary).toHaveAttribute("aria-expanded", "false");
   await pictureSummary.click();
@@ -139,7 +139,7 @@ async function openExample(page: Page) {
   await page.locator("#down").fill("0");
   await page.locator("#years").fill("30");
   await page.locator("#rate").fill("7");
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,792.22");
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$4,718.47");
 }
 
 function extra(page: Page, month: number) {

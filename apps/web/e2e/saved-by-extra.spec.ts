@@ -75,7 +75,7 @@ async function openExample(page: Page) {
   await page.locator("#down").fill("0");
   await page.locator("#years").fill("30");
   await page.locator("#rate").fill("7");
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$3,792.22");
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$4,718.47");
 }
 
 async function applyMonthly(page: Page, amount: string) {

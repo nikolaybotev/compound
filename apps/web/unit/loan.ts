@@ -857,8 +857,8 @@ describe("yearsAndMonths", () => {
   test("months saved is a bare count under twelve", () => {
     expect(monthsSavedText(0)).toBe("0");
     expect(monthsSavedText(11)).toBe("11");
-    expect(monthsSavedText(12)).toBe("1 year");
-    expect(monthsSavedText(28)).toBe("2 years 4 months");
-    expect(monthsSavedText(179)).toBe("14 years 11 months");
+    expect(monthsSavedText(12)).toBe("12 (1 year)");
+    expect(monthsSavedText(28)).toBe("28 (2 years 4 months)");
+    expect(monthsSavedText(179)).toBe("179 (14 years 11 months)");
   });
 });
