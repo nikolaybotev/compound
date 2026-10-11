@@ -22,10 +22,9 @@ test("AC3 fresh visit label, heading, and single row without trash", async ({ pa
   const scenarioBox = await page.locator("#scenario").boundingBox();
   expect(titleBox && scenarioBox).toBeTruthy();
   expect(titleBox!.y).toBeLessThan(scenarioBox!.y);
-  await expect(page.locator("#scenario")).toHaveAttribute(
-    "aria-label",
-    "$4,853 - 600K | 5% down | 7.375% | 30 years | fixed",
-  );
+  const freshLabel = "1: $4,853 - 600K | 5% down | 7.375% | 30 years | fixed";
+  await expect(page.locator("#scenario")).toHaveAttribute("aria-label", freshLabel);
+  await expect(page.locator(".scenario-trigger-text")).toHaveText(freshLabel);
   await expect(page.locator("#price")).toHaveValue("600");
   expect(await headingText(page)).toBe(
     "600K | 5% down | 7.375% 30-year fixed | 780+ | starting October 2026",
@@ -48,10 +47,9 @@ test("AC4 New scenario, switch, reload, and outside close", async ({ page }) => 
   await page.goto("/");
   await page.locator("#scenario").click();
   await page.getByRole("button", { name: "New scenario" }).click();
-  await expect(page.locator("#scenario")).toHaveAttribute(
-    "aria-label",
-    "$4,853 - 600K | 5% down | 7.375% | 30 years | fixed",
-  );
+  const secondLabel = "2: $4,853 - 600K | 5% down | 7.375% | 30 years | fixed";
+  await expect(page.locator("#scenario")).toHaveAttribute("aria-label", secondLabel);
+  await expect(page.locator(".scenario-trigger-text")).toHaveText(secondLabel);
   await expect(page.locator("#start")).toHaveAttribute("data-value", "2026-10");
   await page.locator("#scenario").click();
   await expect(page.locator(".scenario-row-button").nth(1)).toContainText(/^2: /);
@@ -86,6 +84,9 @@ test("AC5 trash hover, confirm, and remove to one row", async ({ page }) => {
   await expect(page.getByRole("dialog", { name: /Remove scenario 1/ })).toHaveAttribute(
     "aria-modal",
     "true",
+  );
+  await expect(page.locator(".scenario-confirm-label")).toHaveText(
+    "$4,853 - 600K | 5% down | 7.375% | 30 years | fixed",
   );
   await expect(page.getByRole("button", { name: "Cancel" })).toBeFocused();
   await page.locator("#scenario").click();
@@ -151,7 +152,7 @@ test("AC6 export, import, bad files, and error clearing", async ({ page }) => {
 test("AC7 scenario label after Apply patterns", async ({ page }) => {
   await openExample(page);
   await applyMonthly(page, "100");
-  await expect(page.locator("#scenario")).toHaveAttribute("aria-label", /^\$4,953/);
+  await expect(page.locator("#scenario")).toHaveAttribute("aria-label", /^1: \$4,953/);
   await page.locator("#extra-monthly").fill("");
   await page.getByRole("button", { name: "Apply" }).click();
   await page.getByRole("button", { name: "Expand all years" }).click();
@@ -160,10 +161,24 @@ test("AC7 scenario label after Apply patterns", async ({ page }) => {
     await extra(page, month).press("Enter");
   }
   await page.getByRole("button", { name: "Apply" }).click();
-  await expect(page.locator("#scenario")).toHaveAttribute("aria-label", /^\$4,853/);
+  await expect(page.locator("#scenario")).toHaveAttribute("aria-label", /^1: \$4,853/);
   await extra(page, 1).fill("250");
   await extra(page, 1).press("Enter");
-  await expect(page.locator("#scenario")).toHaveAttribute("aria-label", /^\$4,853/);
+  await expect(page.locator("#scenario")).toHaveAttribute("aria-label", /^1: \$4,853/);
+});
+
+test("closed scenario number matches the open menu", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
+  await page.goto("/");
+  await page.locator("summary", { hasText: "Extra Payments" }).click();
+  await page.locator("#extra-monthly").fill("1000");
+  await page.getByRole("button", { name: "Apply" }).click();
+  const withExtra = "1: $5,853 - 600K | 5% down | 7.375% | 30 years | fixed";
+  await expect(page.locator("#scenario")).toHaveAttribute("aria-label", withExtra);
+  await expect(page.locator(".scenario-trigger-text")).toHaveText(withExtra);
+  await page.locator("#scenario").click();
+  await expect(page.locator(".scenario-row-button").first()).toHaveAttribute("aria-label", withExtra);
+  await expect(page.locator(".scenario-row-text").first()).toHaveText(withExtra);
 });
 
 test("AC10 version-1 legacy loads and writes v2 on edit", async ({ page }) => {
@@ -194,26 +209,23 @@ test("AC10 version-1 legacy loads and writes v2 on edit", async ({ page }) => {
   expect(JSON.parse(setAfter ?? "{}").scenarios[0].price).toBe("570000");
 });
 
-test("AC9 schedule Prevailing extra column", async ({ page }) => {
+test("schedule has no Prevailing extra column", async ({ page }) => {
   await openExample(page);
   await applyMonthly(page, "100");
   const headers = page.locator("thead th");
-  await expect(headers).toHaveCount(9);
-  const interestIndex = await headers.evaluateAll((cells) =>
-    cells.findIndex((cell) => cell.textContent === "Interest"),
-  );
-  const prevailingIndex = await headers.evaluateAll((cells) =>
-    cells.findIndex((cell) => cell.textContent === "Prevailing extra"),
-  );
-  const extraIndex = await headers.evaluateAll((cells) =>
-    cells.findIndex((cell) => cell.textContent === "Extra payment"),
-  );
-  expect(prevailingIndex).toBe(interestIndex + 1);
-  const monthRow = page.getByRole("row", { name: /Nov 2026/ });
-  await expect(monthRow.getByRole("cell").nth(4)).toHaveText("$100.00");
-  await page.getByRole("button", { name: "Expand all years" }).click();
-  const yearCell = page.locator("tbody[data-year='2026'] tr.year-row td").nth(4);
-  await expect(yearCell).toHaveText("");
+  await expect(headers).toHaveText([
+    "#",
+    "Date",
+    "Principal",
+    "Interest",
+    "Extra payment",
+    "Saved by extra",
+    "Principal balance",
+    "Interest balance",
+  ]);
+  await expect(page.getByRole("columnheader", { name: "Prevailing extra" })).toHaveCount(0);
+  await expect(extra(page, 1)).toHaveValue("100.00");
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$100.00 PE");
 });
 
 test("AC13 save failure alert and rollback", async ({ page }) => {
