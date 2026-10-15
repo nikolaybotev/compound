@@ -17,9 +17,12 @@ import { ScenarioBar } from "./scenarios";
 import {
   MONTH_NAMES,
   THOUSANDS_MESSAGE,
+  anyExtraEdited,
   bands,
   buildPrefillMap,
   defaultScenario,
+  indexCommitChanges,
+  levelArmExtras,
   dollarsToThousandsText,
   dropExtrasBeyond,
   extraInputValue,
@@ -511,12 +514,51 @@ export function App() {
     const parsed = parseIndexField(editingIndexValue);
     setEditingIndexMonth(null);
     if (!parsed.ok) return;
+    if (!indexCommitChanges(armSaved.index, month, parsed.percent)) return;
     const index = withIndex(armSaved.index, month, parsed.percent);
-    if (index === armSaved.index) return;
     const next = { ...armSaved, index };
     setArmSaved(next);
     setArmDraft({ ...armDraft, index });
-    persist({ arm: next, armStored: true });
+    const loanWithIndex: Loan =
+      armParsed.ok
+        ? { ...loan, arm: { enabled: true, values: armParsed.values, index } }
+        : loan;
+    let nextExtras = extras;
+    let nextApplied = applied;
+    if (
+      prefill.appliedLevel &&
+      !anyExtraEdited(extras, applied) &&
+      armParsed.ok &&
+      loanWithIndex.arm
+    ) {
+      const kept = new Map<number, number>();
+      for (const [entryMonth, amount] of extras) {
+        if (entryMonth < month) kept.set(entryMonth, amount);
+      }
+      const monthly = parseDollarField(prefill.appliedMonthly ?? "");
+      const yearly = parseDollarField(prefill.appliedYearly ?? "");
+      if (monthly.ok && yearly.ok) {
+        const levelMap = levelArmExtras(
+          loanWithIndex,
+          lines.financedCents,
+          monthly.dollars,
+          yearly.dollars,
+          prefill.appliedMonth ?? prefill.month,
+          month,
+          kept,
+        );
+        nextExtras = levelMap;
+        nextApplied = levelMap;
+      }
+    }
+    setExtras(nextExtras);
+    setApplied(nextApplied);
+    persist({
+      arm: next,
+      armStored: true,
+      extras: nextExtras,
+      applied: nextApplied,
+    });
   }
 
   function setRoundEighth(roundEighth: boolean) {
@@ -649,13 +691,25 @@ export function App() {
       return;
     }
     setApplyError(null);
-    const next = buildPrefillMap(
-      loan.years * 12,
-      loan.startMonth,
-      monthly.dollars,
-      yearly.dollars,
-      prefill.month,
-    );
+    const monthCount = loan.years * 12;
+    const useLevel = armOn && prefill.level === true;
+    const next = useLevel
+      ? levelArmExtras(
+          reportLoan,
+          lines.financedCents,
+          monthly.dollars,
+          yearly.dollars,
+          prefill.month,
+          1,
+          new Map(),
+        )
+      : buildPrefillMap(
+          monthCount,
+          loan.startMonth,
+          monthly.dollars,
+          yearly.dollars,
+          prefill.month,
+        );
     setExtras(next);
     setApplied(next);
     setEditingMonth(null);
@@ -664,6 +718,7 @@ export function App() {
       appliedMonthly: prefill.monthly,
       appliedYearly: prefill.yearly,
       appliedMonth: prefill.month,
+      appliedLevel: useLevel,
     };
     setPrefill(nextPrefill);
     persist({ extras: next, applied: next, prefill: nextPrefill });
@@ -985,6 +1040,17 @@ export function App() {
               </select>
             </div>
           </div>
+          {armOn ? (
+            <label class="arm-check" for="extra-level">
+              <input
+                id="extra-level"
+                type="checkbox"
+                checked={prefill.level === true}
+                onChange={(event) => changePrefill({ level: event.currentTarget.checked })}
+              />
+              Match the fixed-period total after each reset
+            </label>
+          ) : null}
           <div class="apply-row">
             <button type="button" onClick={applyPrefill}>
               Apply
