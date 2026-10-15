@@ -461,6 +461,75 @@ export function isEditedExtra(
   return (extras.get(month) ?? 0) !== (applied.get(month) ?? 0);
 }
 
+export function anyExtraEdited(
+  extras: Map<number, number>,
+  applied: Map<number, number>,
+): boolean {
+  const months = new Set<number>();
+  for (const month of extras.keys()) months.add(month);
+  for (const month of applied.keys()) months.add(month);
+  for (const month of months) {
+    if (isEditedExtra(extras, applied, month)) return true;
+  }
+  return false;
+}
+
+export function levelArmExtras(
+  loan: Loan,
+  financedCents: number,
+  monthlyDollars: number,
+  yearlyDollars: number,
+  yearlyMonth: number,
+  fromMonth: number,
+  kept: Map<number, number>,
+): Map<number, number> {
+  if (!loan.arm?.enabled) throw new Error("levelArmExtras requires an ARM loan");
+  const monthCount = loan.years * 12;
+  const { fixedMonths, adjustMonths } = loan.arm.values;
+  const resets = resetMonths(fixedMonths, adjustMonths, monthCount);
+  const prefill = buildPrefillMap(
+    monthCount,
+    loan.startMonth,
+    monthlyDollars,
+    yearlyDollars,
+    yearlyMonth,
+  );
+
+  const result = new Map<number, number>();
+  for (const [month, amount] of kept) {
+    if (month < fromMonth && amount > 0) result.set(month, amount);
+  }
+
+  const fixedPi = loanReport(loan, result, financedCents).monthly_payment_cents;
+  const formStart = Math.max(fromMonth, 1);
+  for (let month = formStart; month <= fixedMonths && month <= monthCount; month += 1) {
+    const amount = prefill.get(month);
+    if (amount !== undefined && amount > 0) result.set(month, amount);
+  }
+
+  for (const reset of resets) {
+    if (reset < fromMonth) continue;
+    for (let month = reset; month <= monthCount; month += 1) result.delete(month);
+
+    const report = loanReport(loan, result, financedCents);
+    if (reset > report.payoff_month) break;
+
+    const periodPayment = report.schedule[reset - 1]?.payment_cents ?? 0;
+    const resetIndex = resets.indexOf(reset);
+    const nextReset = resetIndex + 1 < resets.length ? resets[resetIndex + 1]! : monthCount + 1;
+    const periodEnd = Math.min(nextReset - 1, monthCount);
+
+    for (let month = reset; month <= periodEnd; month += 1) {
+      const formDollars = prefill.get(month) ?? 0;
+      const totalCents = fixedPi + (formDollars > 0 ? dollarsToCents(formDollars) : 0);
+      const extraCents = Math.max(0, totalCents - periodPayment);
+      if (extraCents > 0) result.set(month, centsToDollars(extraCents));
+    }
+  }
+
+  return result;
+}
+
 export function dropExtrasBeyond(
   extras: Map<number, number>,
   monthCount: number,
