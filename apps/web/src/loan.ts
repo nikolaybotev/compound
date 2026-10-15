@@ -366,6 +366,8 @@ export type Prefill = {
   yearly: string;
   month: number;
   open: boolean;
+  level?: boolean;
+  appliedLevel?: boolean;
   appliedMonthly?: string;
   appliedYearly?: string;
   appliedMonth?: number;
@@ -388,10 +390,32 @@ export function defaultPrefill(): Prefill {
     yearly: "",
     month: 1,
     open: false,
+    level: false,
+    appliedLevel: false,
     appliedMonthly: "",
     appliedYearly: "",
     appliedMonth: 1,
   };
+}
+
+function parsePrefillBoolean(value: unknown): boolean {
+  return value === true;
+}
+
+export function indexPercentStored(index: Array<[number, number]>, month: number): number | null {
+  const entry = index.find(([entryMonth]) => entryMonth === month);
+  return entry ? entry[1] : null;
+}
+
+export function indexCommitChanges(
+  index: Array<[number, number]>,
+  month: number,
+  percent: number | null,
+): boolean {
+  const stored = indexPercentStored(index, month);
+  if (stored === null && percent === null) return false;
+  if (stored === null || percent === null) return true;
+  return stored !== percent;
 }
 
 export function extraInputValue(dollars: number | undefined): string {
@@ -662,6 +686,8 @@ function parsePrefill(value: unknown): Prefill | null {
     yearly,
     month,
     open: record.open,
+    level: parsePrefillBoolean(record.level),
+    appliedLevel: parsePrefillBoolean(record.appliedLevel),
     appliedMonthly:
       typeof record.appliedMonthly === "string" ? record.appliedMonthly : monthly,
     appliedYearly: typeof record.appliedYearly === "string" ? record.appliedYearly : yearly,
@@ -759,6 +785,8 @@ function scenariosDiffer(legacy: Scenario, active: Scenario): boolean {
   if (legacy.prefill.yearly !== active.prefill.yearly) return true;
   if (legacy.prefill.month !== active.prefill.month) return true;
   if (legacy.prefill.open !== active.prefill.open) return true;
+  if (legacy.prefill.level !== active.prefill.level) return true;
+  if (legacy.prefill.appliedLevel !== active.prefill.appliedLevel) return true;
   if (legacy.armStored) {
     return JSON.stringify(armToStorage(legacy.arm)) !== JSON.stringify(armToStorage(active.arm));
   }

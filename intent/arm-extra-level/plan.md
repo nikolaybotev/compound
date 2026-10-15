@@ -10,7 +10,7 @@ Spec wins. Update this file in the same change whenever implementation departs f
 
 ## Stops
 
-None. The library stays untouched, the checkbox commits at Apply, and the point version stays 0.11. Those are decisions D1, D3, and D7 in the spec.
+The library stays untouched and the checkbox commits at Apply (D1 and D3). The page release sets `0.12.0` and `PAGES_POINT_VERSION` `0.12` per the owner's build instruction, not spec D7's 0.11.
 
 The build starts when the owner says to build. Each phase below is its own pull request, merged when CI is green, in order. This design pull request is not one of those phases. It does not change `apps/web/package.json` or `PAGES_POINT_VERSION`.
 
