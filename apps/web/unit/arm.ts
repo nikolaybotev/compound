@@ -304,6 +304,8 @@ describe("ARM storage", () => {
         yearly: "",
         month: 4,
         open: true,
+        level: false,
+        appliedLevel: false,
         appliedMonthly: "10",
         appliedYearly: "",
         appliedMonth: 4,
