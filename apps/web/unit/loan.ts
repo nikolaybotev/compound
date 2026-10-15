@@ -105,6 +105,53 @@ describe("chart bands", () => {
 });
 
 describe("extra prefill", () => {
+  test("a stored prefill with no level loads both booleans false", () => {
+    const storage = memoryStorage();
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        price: "600000",
+        down: "5",
+        years: "30",
+        rate: "5.875",
+        start: "2026-10",
+        extras: [],
+        prefill: { monthly: "", yearly: "", month: 1, open: false },
+      }),
+    );
+    const loaded = loadScenario(storage, new Date("2026-10-15T12:00:00Z"));
+    expect(loaded.prefill.level).toBe(false);
+    expect(loaded.prefill.appliedLevel).toBe(false);
+  });
+
+  test("a non-boolean level or appliedLevel loads as false", () => {
+    const storage = memoryStorage();
+    storage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        price: "600000",
+        down: "5",
+        years: "30",
+        rate: "5.875",
+        start: "2026-10",
+        extras: [],
+        prefill: {
+          monthly: "",
+          yearly: "",
+          month: 1,
+          open: false,
+          level: "yes",
+          appliedLevel: 1,
+        },
+      }),
+    );
+    const loaded = loadScenario(storage, new Date("2026-10-15T12:00:00Z"));
+    expect(loaded.prefill.level).toBe(false);
+    expect(loaded.prefill.appliedLevel).toBe(false);
+  });
+
   test("$100 a month fills months 1 through 360 and omits zeros", () => {
     const extras = buildPrefillMap(360, "2026-10", 100, 0, 1);
     expect(extras.size).toBe(360);
