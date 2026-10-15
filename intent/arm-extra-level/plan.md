@@ -1,0 +1,50 @@
+# plan.md — ARM extra level
+
+| | |
+|---|---|
+| Implements | [spec.md](spec.md) Draft 3 |
+| Status | Draft 3 |
+| Stage | 3 · Build |
+
+Spec wins. Update this file in the same change whenever implementation departs from it.
+
+## Stops
+
+None. The library stays untouched, the checkbox commits at Apply, and the point version stays 0.11. Those are decisions D1, D3, and D7 in the spec.
+
+The build starts when the owner says to build. Each phase below is its own pull request, merged when CI is green, in order. This design pull request is not one of those phases. It does not change `apps/web/package.json` or `PAGES_POINT_VERSION`.
+
+## Acceptance-criteria coverage
+
+| AC | Check | Phase |
+|---|---|---|
+| AC1 | `pnpm --dir apps/web test` on F2, F3, F4, F5, F6, and `anyExtraEdited` | 0 |
+| AC2 | Playwright: no checkbox on a fixed loan; unchecked ARM checkbox; F1 amounts on months 85 and 87 | 1 |
+| AC3 | Playwright: F2 cells after Apply, then F3 cells after index `0` at month 85 | 1 |
+| AC4 | Playwright: an edited month 1 blocks a later index clear | 1 |
+| AC5 | Unit load of a prefill with no `level`; version files unchanged; `node --test`; `amortize.js` absent from the diff | 0 (pure function and `node --test`), 1 (storage load and version files) |
+| AC6 | Playwright: clearing month 85 after AC3, with no extra cell edited, empties months 85, 87, and 97 | 1 |
+
+## Phase 0 — Level extras from the walk
+
+Files: `apps/web/src/loan.ts`, `apps/web/unit/extra-level.ts` (new)
+
+1. Export `levelArmExtras(loan, financedCents, monthlyDollars, yearlyDollars, yearlyMonth, fromMonth, kept)` and `anyExtraEdited(extras, applied)`. `financedCents` is the same principal `loanReport` already takes; on the current picture it equals `loan.loanCents`. `fromMonth` is 1 for Apply and the changed reset for an index commit. `kept` supplies months before `fromMonth`.
+2. Implement spec requirements 2 and 3. `buildPrefillMap` is the per-month form-extra lookup only, using `loan.startMonth`. It is not the map an index commit returns. Start the returned map from `kept`: copy every entry whose month is less than `fromMonth`, and do not recompute those months. The fixed-period form write applies only to months at or after `fromMonth`. Apply uses `fromMonth` 1, so that write covers months 1 through the fixed period. Read `monthly_payment_cents` from `loanReport` on the loan that was passed in, which already carries the ARM index for this call. For each reset at or after `fromMonth`, delete extras from that reset through the term, call `loanReport`, and if the reset is after `payoff_month` leave those months deleted and stop. Otherwise take `payment_cents` from that reset row. That cent is the period payment for every month of the period, including months after the eventual payoff that are still before the next reset. Do not read the zero `payment_cents` on a post-payoff row. For each month, write that month's own fixed-period total minus the period payment, floored at zero, with `centsToDollars`, and delete the month when the result is zero. A yearly month can stay positive when the reset month is deleted. Then go to the next reset. Do not read a later reset's payment from a walk that has not yet received this period's extras. The return is that one map. Phase 1 assigns it to both `extras` and `applied`. Merging new positive months into the old tail leaves the stale amounts requirement 5 forbids.
+3. `anyExtraEdited` is true when any month in either map fails `isEditedExtra`.
+4. Unit tests assert F2, F3, F4, F5, and F6 from spec requirement 8. Include the equal maps for F3's two entry paths, month 97 at 67947 cents of extra rather than 59811, and month 109 at 307656 cents rather than 302329. The F4 index commit passes `fromMonth` 97 and a `kept` map of the Apply extras for months before 97, and months 85–96 stay $2,381.49. On the F4 Apply, month 168 is 497092 cents and month 169 is absent. F5 omits months 85, 86, and 96 and stores 24573 cents at month 87. F6, run from the F3 map with the month 85 index cleared and `kept` equal to the extras before month 85, equals F2. The loan's `arm` object is the requirement 8 terms, passed through `toBuildReportArm` the way `loanReport` already does. An index commit's test passes the loan whose index is the one just written.
+
+DoD: `pnpm --dir apps/web test` exits 0. `node --test` exits 0. The diff does not contain `amortize.js`, `compound_interest_monthly.js`, `origination_fees.js`, or a skill. `apps/web/package.json` is still `0.11.0`.
+
+## Phase 1 — Checkbox, Apply, and the index write
+
+Files: `apps/web/src/app.tsx`, `apps/web/src/loan.ts`, `apps/web/src/styles.css`, `apps/web/unit/loan.ts`, `apps/web/e2e/extra-level.spec.ts` (new), `AGENTS.md`, `REVIEW.md`
+
+1. Add `level` and `appliedLevel` to `Prefill`, both defaulting false. `parsePrefill` treats a missing or non-boolean value as false and still returns the prefill. In `scenariosDiffer`, compare both with the other prefill fields, before the `if (legacy.armStored)` return. An ARM scenario that differs only in those booleans differs. In `apps/web/unit/loan.ts`, load through `loadScenario` or `parseStoredSet`: a stored prefill with no `level`, and a non-boolean `level` or `appliedLevel`, loads both as false and still returns the scenario (AC5). A save of a scenario that never stored them omits nothing special: they are booleans on `prefill`, so old files load as false.
+2. Render `#extra-level` only when the product is ARM and the terms in use parse. Place it after `#extra-monthly`, `#extra-yearly`, and `#extra-yearly-month`, and before the Apply row. The label and the accessible name are both `Match the fixed-period total after each reset`. Give it the `.arm-check` flex alignment (a row class is fine). Do not set `--edited` on it. Checking or unchecking updates `prefill.level` only. It does not change the column and it does not clear `appliedLevel`.
+3. `applyPrefill` follows requirement 4. Pass `reportLoan`, the loan the page already passes to `loanReport`, and `lines.financedCents`. The level call runs only when the product is ARM, the terms in use parse, and `#extra-level` is checked: `fromMonth` 1, an empty `kept`, and the parsed dollar amounts. That Apply stores `appliedLevel` true. Product fixed, or the checkbox off, writes `buildPrefillMap` for the whole term and stores `appliedLevel` false. An ARM Apply with the box off is F1: month 85 stays `100.00` and month 87 stays `350.00`. A fixed-mode Apply leaves `level` as stored. Both branches still snapshot the three form fields, replace `extras` and `applied` with the whole map, and clear the cell being edited.
+4. `commitIndex` follows requirement 5. An invalid `parseIndexField` returns first and writes nothing. Compare the stored percent for that month with the parsed percent by value, and write nothing when they are equal, including a clear of a cell that is already empty. `withIndex` returns a new array whenever the percent is non-null, so `index === armSaved.index` is not this check. A second commit of `0` or `4` writes nothing. When the percent differs, `appliedLevel` is true, and `anyExtraEdited` is false, call `levelArmExtras` in that same turn, before the next render. The loan is `reportLoan` with `arm.index` set to the index just stored on `next`. `setArmSaved` does not update the closed-over `reportLoan` until the next render, and the previous index would leave AC3 on the empty F2 cells. `fromMonth` is the committed month. `kept` is the current extras for months before it. Parse `appliedMonthly` and `appliedYearly` with `parseDollarField`. Pass `appliedMonth` through as `yearlyMonth`. Do not pass that number to `parseDollarField`. Replace both `extras` and `applied` with the returned map. Skip the level call when `appliedLevel` is false or `anyExtraEdited` is true. This commit does not refresh `appliedMonthly`, `appliedYearly`, `appliedMonth`, or `level`.
+5. Playwright for AC2, AC3, AC4, and AC6 in `apps/web/e2e/extra-level.spec.ts`, clock `2026-10-15`, on the fresh $600,000 / 5% down loan with the rate set to `5.875` and the product set to ARM. Open Extra Payments the way `extras.spec.ts` does. Open 2033 and 2034 the way `arm.spec.ts` opens a year. Month 87 is January 2034. The extra inputs are `Extra payment for month N`. The index input is `Index for month 85`. AC6 clears that index after AC3's commit of `0`, with no extra cell edited, and checks months 85, 87, and 97 empty and month 84 still `100.00`. The schedule is not opened past its payoff month for these checks.
+6. `AGENTS.md`: the Extra Payments form has `#extra-level`, labeled `Match the fixed-period total after each reset`, shown for ARM and defaulting off. Apply with it on writes `levelArmExtras`. That function calls `buildReport` once a period is filled and does not modify `amortize.js`. An index commit, when the last Apply stored `appliedLevel` and no extra cell differs from `applied`, replaces both extra maps from that reset through the term, including later periods whose index did not change, and deletes zeros. Things agents get wrong: do not add this math to `amortize.js`; do not read every reset payment before the earlier extras are in the map; do not zero a whole period because the reset month's extra is zero; do not stop an index update at the edited period; do not leave a stale positive extra when the new extra is zero; do not retarget a month after payoff from `payment_cents` 0; do not name a credit union here. `REVIEW.md`: Compliance adds `intent/arm-extra-level/`. Bugs adds a level extra other than spec requirement 3, and an index commit that leaves a later period's extra unchanged, or a stale positive extra in place, while `appliedLevel` is true and no extra amount is edited.
+
+DoD: `pnpm --dir apps/web test` and `pnpm --dir apps/web test:e2e` exit 0. `node --test` exits 0. AC2, AC3, AC4, and AC6 are the Playwright checks. `apps/web/package.json` is `0.11.0` and `PAGES_POINT_VERSION` in `.github/workflows/publish-gh-pages-production.yml` is `0.11`. The diff does not contain `amortize.js`.
