@@ -11,6 +11,14 @@ export type ScheduleRow = {
   index_percent?: number | null;
 };
 
+export type AdjustmentStats =
+  | Record<string, never>
+  | {
+      yearlyExtraCents?: number;
+      yearlyMonth?: number;
+      startMonth?: number;
+    };
+
 export type Arm = {
   fixedMonths: number;
   adjustMonths: number;
@@ -22,6 +30,17 @@ export type Arm = {
   initialFloorThousandths: number;
   roundEighth: boolean;
   indexByMonth: Map<number, number>;
+  adjustmentStats?: AdjustmentStats;
+};
+
+export type FirstAdjustment = {
+  month: number;
+  min_rate_percent: number;
+  max_rate_percent: number;
+  min_payment_cents: number;
+  max_payment_cents: number;
+  min_change_cents: number;
+  max_change_cents: number;
 };
 
 export type Adjustment = {
@@ -48,6 +67,9 @@ export type ArmReport = {
   max_payment_cents: number;
   max_payment_month: number;
   adjustments: Adjustment[];
+  first_adjustment?: FirstAdjustment;
+  even_out_cents?: number;
+  monthly_extra_cents?: number;
 };
 
 export type Report = {
