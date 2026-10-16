@@ -810,6 +810,37 @@ describe("loan scenarios storage and prevailing figures", () => {
     expect(loadStored(storage, now).scenarios[0].draft.price).toBe("570000");
   });
 
+  test("evenYearly and evenMonth round-trip on stored ARM scenarios", () => {
+    const storage = memoryStorage();
+    const scenario = freshConventional(now);
+    scenario.arm = defaultArm();
+    scenario.arm.enabled = true;
+    scenario.armStored = true;
+    expect(scenario.arm.evenYearly).toBe("");
+    expect(scenario.arm.evenMonth).toBe(1);
+    saveScenario(storage, scenario);
+    let loaded = loadScenario(storage, now);
+    expect(loaded.arm.evenYearly).toBe("");
+    expect(loaded.arm.evenMonth).toBe(1);
+
+    scenario.arm.evenYearly = "250";
+    saveScenario(storage, scenario);
+    loaded = loadScenario(storage, now);
+    expect(loaded.arm.evenYearly).toBe("250");
+
+    const other = { ...scenario, draft: { ...scenario.draft, price: "610000" } };
+    other.arm = { ...scenario.arm, evenYearly: "100" };
+    const set = { active: 0, scenarios: [scenario, other] };
+    expect(saveStored(storage, set)).toBe(true);
+    const parsed = JSON.parse(storage.getItem(storageSetKey(STORAGE_KEY))!);
+    expect(parsed.scenarios[0].arm.evenYearly).toBe("250");
+    expect(parsed.scenarios[1].arm.evenYearly).toBe("100");
+
+    scenario.arm.evenYearly = "nope";
+    saveScenario(storage, scenario);
+    expect(loadScenario(storage, now).arm.evenYearly).toBe("nope");
+  });
+
   test("missing storage returns one fresh scenario", () => {
     expect(loadStored(undefined, now).scenarios).toHaveLength(1);
   });

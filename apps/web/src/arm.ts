@@ -26,6 +26,8 @@ export type ArmDraft = {
   initialFloor: string;
   roundEighth: boolean;
   index: ArmIndexEntry[];
+  evenYearly: string;
+  evenMonth: number;
 };
 
 export type ArmValues = {
@@ -75,6 +77,8 @@ export function defaultArm(): ArmDraft {
     initialFloor: "2.5",
     roundEighth: false,
     index: [],
+    evenYearly: "",
+    evenMonth: 1,
   };
 }
 
@@ -266,6 +270,12 @@ export function armFromStorage(value: unknown): { arm: ArmDraft; stored: boolean
   draft.open = record.open;
   draft.roundEighth = record.roundEighth;
   draft.index = index;
+  draft.evenYearly = typeof record.evenYearly === "string" ? record.evenYearly : "";
+  const evenMonth = record.evenMonth;
+  draft.evenMonth =
+    typeof evenMonth === "number" && Number.isInteger(evenMonth) && evenMonth >= 1 && evenMonth <= 12
+      ? evenMonth
+      : 1;
   return { arm: draft, stored: true };
 }
 
@@ -283,5 +293,7 @@ export function armToStorage(arm: ArmDraft): ArmDraft {
     initialFloor: arm.initialFloor,
     roundEighth: arm.roundEighth,
     index: arm.index.map(([month, percent]) => [month, percent]),
+    evenYearly: arm.evenYearly,
+    evenMonth: arm.evenMonth,
   };
 }
