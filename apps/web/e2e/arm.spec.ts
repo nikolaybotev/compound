@@ -35,7 +35,7 @@ test("AC9 selecting ARM at the default rate shows the 12.375% ceiling", async ({
   await openFresh(page);
   await page.locator("#product").selectOption("arm");
   await expect(page.locator("summary", { hasText: "ARM terms" })).toHaveAttribute("aria-expanded", "true");
-  await expect(page.locator("[data-line='arm-ceiling']")).toHaveText("Ceiling 12.375%");
+  await expect(page.locator("[data-line='arm-ceiling']")).toHaveText("Ceiling 12.375% · Floor 2.5%");
   await expect(page.getByTestId("arm-label")).toHaveText("7/1");
   await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$6,641.84");
   await expect(page.getByRole("region", { name: "Highest rate" })).toContainText("12.375% from November 2033");
@@ -74,9 +74,9 @@ test("AC9 the Example Credit Union 7/1 example heading, terms, and summary", asy
   await expect(page.locator("#arm-round-eighth")).not.toBeChecked();
   await expect(page.getByLabel("Fixed period")).toBeVisible();
   await expect(page.getByLabel("Round to nearest 1/8 point")).toBeVisible();
-  await expect(page.locator("[data-line='arm-ceiling']")).toHaveText("Ceiling 10.875%");
+  await expect(page.locator("[data-line='arm-ceiling']")).toHaveText("Ceiling 10.875% · Floor 2.5%");
   await expect(page.locator("[data-line='arm-first-adjustment']")).toHaveText(
-    "First adjustment November 2033 (payment 85)",
+    "First adjustment November 2033 (payment 85) · -$941.16 to +$1,665.94",
   );
 
   const monthly = page.getByRole("region", { name: "Monthly payment" });
@@ -105,7 +105,7 @@ test("AC9 the structure label follows the interval", async ({ page }) => {
   await page.locator("#arm-fixed-years").fill("10");
   await expect(page.getByTestId("arm-label")).toHaveText("10/1");
   await expect(page.locator("[data-line='arm-first-adjustment']")).toHaveText(
-    "First adjustment November 2036 (payment 121)",
+    "First adjustment November 2036 (payment 121) · -$852.58 to +$1,494.94",
   );
   await expect(page.getByRole("region", { name: "Highest payment" })).toContainText(
     "$4,866.71 from November 2036",
@@ -174,7 +174,7 @@ test("switching to fixed and back keeps the terms and a closed disclosure stays 
   await page.locator("summary", { hasText: "ARM terms" }).click();
   await expect(page.locator("#arm-margin")).toHaveValue("3");
   await expect(page.locator("#arm-lifetime-cap")).toHaveValue("3");
-  await expect(page.locator("[data-line='arm-ceiling']")).toHaveText("Ceiling 8.875%");
+  await expect(page.locator("[data-line='arm-ceiling']")).toHaveText("Ceiling 8.875% · Floor 2.5%");
   await expect(page.getByRole("region", { name: "Highest rate" })).toContainText("8.875% from November 2033");
   await expect(page.getByRole("region", { name: "Total interest paid" })).not.toContainText("$1,103,636.33");
 });
@@ -432,7 +432,7 @@ async function openArm(page: Page) {
   await openFresh(page);
   await page.locator("#product").selectOption("arm");
   await page.locator("#rate").fill("5.875");
-  await expect(page.locator("[data-line='arm-ceiling']")).toHaveText("Ceiling 10.875%");
+  await expect(page.locator("[data-line='arm-ceiling']")).toHaveText("Ceiling 10.875% · Floor 2.5%");
 }
 
 async function headingText(page: Page): Promise<string> {

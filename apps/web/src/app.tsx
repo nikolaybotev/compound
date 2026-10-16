@@ -27,11 +27,13 @@ import {
   dropExtrasBeyond,
   extraInputValue,
   firstPaymentYear,
+  formatAdjustmentChange,
   formatMoney,
   groupByYear,
   isTrailingDotThousands,
   loadStored,
   loanReport,
+  loanStartMonthNumber,
   longDate,
   monthsSavedText,
   parseDollarField,
@@ -147,6 +149,11 @@ export function App() {
   );
   const [armDraft, setArmDraft] = useState(initial.scenario.arm);
   const [armSaved, setArmSaved] = useState(initial.scenario.arm);
+  const [evenYearlyCents, setEvenYearlyCents] = useState(() => {
+    const parsed = parseDollarField(initial.scenario.arm.evenYearly);
+    return parsed.ok ? dollarsToCents(parsed.dollars) : 0;
+  });
+  const [evenYearlyError, setEvenYearlyError] = useState(false);
   const [editingMonth, setEditingMonth] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [editingIndexMonth, setEditingIndexMonth] = useState<number | null>(null);
@@ -185,6 +192,9 @@ export function App() {
     );
     setArmDraft(scenario.arm);
     setArmSaved(scenario.arm);
+    const yearlyParsed = parseDollarField(scenario.arm.evenYearly);
+    setEvenYearlyCents(yearlyParsed.ok ? dollarsToCents(yearlyParsed.dollars) : 0);
+    setEvenYearlyError(false);
     setError(null);
     setInvalidField(null);
     setPictureError(null);
@@ -330,9 +340,18 @@ export function App() {
         : loan,
     [loan, armSaved, armParsed],
   );
+  const scheduleAdjustmentStats = useMemo(() => {
+    if (!armOn) return undefined;
+    if (evenYearlyCents <= 0) return {};
+    return {
+      yearlyExtraCents: evenYearlyCents,
+      yearlyMonth: armSaved.evenMonth,
+      startMonth: loanStartMonthNumber(loan.startMonth),
+    };
+  }, [armOn, evenYearlyCents, armSaved.evenMonth, loan.startMonth]);
   const report = useMemo(
-    () => loanReport(reportLoan, extras, lines.financedCents),
-    [reportLoan, extras, lines.financedCents],
+    () => loanReport(reportLoan, extras, lines.financedCents, scheduleAdjustmentStats),
+    [reportLoan, extras, lines.financedCents, scheduleAdjustmentStats],
   );
   const years = useMemo(
     () => groupByYear(reportLoan, report, extras, lines.financedCents, applied),
@@ -567,6 +586,35 @@ export function App() {
 
   function setArmOpen(open: boolean) {
     commitArm({ ...armSaved, open });
+  }
+
+  function persistEvenArm(nextArm: ArmDraft) {
+    setArmSaved(nextArm);
+    setArmDraft(nextArm);
+    persist({ arm: nextArm, armStored: true });
+  }
+
+  function updateEvenYearly(value: string) {
+    const nextArm = { ...armSaved, evenYearly: value };
+    setArmDraft({ ...armDraft, evenYearly: value });
+    setArmSaved(nextArm);
+    persist({ arm: nextArm, armStored: true });
+    if (value.trim() === "") {
+      setEvenYearlyError(false);
+      setEvenYearlyCents(0);
+      return;
+    }
+    const parsed = parseDollarField(value);
+    if (!parsed.ok) {
+      setEvenYearlyError(true);
+      return;
+    }
+    setEvenYearlyError(false);
+    setEvenYearlyCents(dollarsToCents(parsed.dollars));
+  }
+
+  function updateEvenMonth(month: number) {
+    persistEvenArm({ ...armSaved, evenMonth: month });
   }
 
   function onPriceInput(value: string) {
@@ -924,12 +972,59 @@ export function App() {
             />
             Round to nearest 1/8 point
           </label>
-          <p class="arm-computed" data-line="arm-ceiling">
-            {`Ceiling ${formatPercentThousandths(rateThousandths + armParsed.values.lifetimeCapThousandths)}%`}
-          </p>
-          <p class="arm-computed" data-line="arm-first-adjustment">
-            {`First adjustment ${armDateLabel(loan, armParsed.values.fixedMonths + 1)} (payment ${armParsed.values.fixedMonths + 1})`}
-          </p>
+          {report.arm?.first_adjustment ? (
+            <>
+              <p class="arm-computed" data-line="arm-ceiling">
+                {`Ceiling ${report.arm.ceiling_percent}% · Floor ${report.arm.floor_percent}%`}
+              </p>
+              <p class="arm-computed" data-line="arm-first-adjustment">
+                {`First adjustment ${armDateLabel(loan, report.arm.first_adjustment.month)} (payment ${report.arm.first_adjustment.month}) · ${formatAdjustmentChange(report.arm.first_adjustment.min_change_cents)} to ${formatAdjustmentChange(report.arm.first_adjustment.max_change_cents)}`}
+              </p>
+              <p class="arm-computed" data-line="arm-even-out">
+                {`Even-out extra ${formatMoney(report.arm.even_out_cents ?? 0)}`}
+              </p>
+              <div class="inputs arm-even-inputs">
+                <Field
+                  id="arm-even-yearly"
+                  label="Yearly extra"
+                  value={armDraft.evenYearly}
+                  invalid={evenYearlyError}
+                  onInput={updateEvenYearly}
+                />
+                <div class="field">
+                  <label for="arm-even-month">Yearly extra month</label>
+                  <select
+                    id="arm-even-month"
+                    value={String(armSaved.evenMonth)}
+                    onChange={(event) => updateEvenMonth(Number(event.currentTarget.value))}
+                  >
+                    {MONTH_NAMES.map((name, index) => (
+                      <option key={name} value={index + 1}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              {evenYearlyError ? (
+                <p class="error" role="alert">
+                  Yearly extra must be a dollar amount greater than or equal to zero, with at most two decimal places.
+                </p>
+              ) : null}
+              <p class="arm-computed" data-line="arm-monthly-extra">
+                {`Monthly extra ${formatMoney(report.arm.monthly_extra_cents ?? 0)}`}
+              </p>
+            </>
+          ) : (
+            <>
+              <p class="arm-computed" data-line="arm-ceiling">
+                {`Ceiling ${formatPercentThousandths(rateThousandths + armParsed.values.lifetimeCapThousandths)}%`}
+              </p>
+              <p class="arm-computed" data-line="arm-first-adjustment">
+                {`First adjustment ${armDateLabel(loan, armParsed.values.fixedMonths + 1)} (payment ${armParsed.values.fixedMonths + 1})`}
+              </p>
+            </>
+          )}
         </Disclosure>
       ) : null}
       <Disclosure

@@ -59,6 +59,16 @@ function firstYear(): Map<number, number> {
 }
 
 describe("ARM terms", () => {
+  test("armFromStorage loads evenYearly and evenMonth leniently", () => {
+    const base = { ...defaultArm(), enabled: true, open: true };
+    expect(armFromStorage({ ...base, evenYearly: 250 }).arm.evenYearly).toBe("");
+    const loaded = armFromStorage({ ...base, evenYearly: "250", evenMonth: 3 });
+    expect(loaded.stored).toBe(true);
+    expect(loaded.arm.evenYearly).toBe("250");
+    expect(loaded.arm.evenMonth).toBe(3);
+    expect(armFromStorage({ ...base, evenMonth: 99 }).arm.evenMonth).toBe(1);
+  });
+
   test("defaults are the sheet's values", () => {
     expect(defaultArm()).toEqual({
       enabled: false,
@@ -73,6 +83,8 @@ describe("ARM terms", () => {
       initialFloor: "2.5",
       roundEighth: false,
       index: [],
+      evenYearly: "",
+      evenMonth: 1,
     });
   });
 
@@ -349,6 +361,8 @@ describe("ARM storage", () => {
         "open",
         "periodicCap",
         "roundEighth",
+        "evenYearly",
+        "evenMonth",
       ].sort(),
     );
     expect(loadScenario(storage, now)).toEqual(scenario);
