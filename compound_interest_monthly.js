@@ -36,6 +36,9 @@ function parseArgs(argv) {
     'initial-floor': undefined,
     'round-eighth': false,
     index: undefined,
+    'even-yearly': undefined,
+    'even-month': undefined,
+    start: undefined,
   };
   const seen = new Set();
   for (let i = 0; i < argv.length; i += 1) {
@@ -51,7 +54,8 @@ function parseArgs(argv) {
       || token === '--months' || token === '--extra' || token === '--fixed-years'
       || token === '--fixed-months' || token === '--adjust-months' || token === '--margin'
       || token === '--caps' || token === '--floor' || token === '--initial-floor'
-      || token === '--index'
+      || token === '--index' || token === '--even-yearly' || token === '--even-month'
+      || token === '--start'
     ) {
       if (seen.has(token)) fail(`duplicate argument: ${token}`);
       const value = argv[i + 1];
@@ -201,8 +205,66 @@ function loadIndex(filePath) {
 
 const ARM_FLAGS = [
   'fixed-years', 'fixed-months', 'adjust-months', 'margin', 'caps', 'floor',
-  'initial-floor', 'round-eighth', 'index',
+  'initial-floor', 'round-eighth', 'index', 'even-yearly', 'even-month', 'start',
 ];
+
+const EVEN_YEARLY_PATTERN = /^(?:\d+)(?:\.\d{1,2})?$/;
+
+function parseEvenYearlyCents(text) {
+  if (!EVEN_YEARLY_PATTERN.test(text)) {
+    fail('invalid --even-yearly: amount must be a dollar amount greater than or equal to zero, with at most two decimal places');
+  }
+  const dollars = Number(text);
+  if (!Number.isFinite(dollars) || dollars < 0) {
+    fail('invalid --even-yearly: amount must be a dollar amount greater than or equal to zero, with at most two decimal places');
+  }
+  return dollarsToCents(dollars);
+}
+
+function parseEvenMonth(text) {
+  if (!/^(?:[1-9]|1[0-2])$/.test(text)) {
+    fail('invalid --even-month: month must be an integer from 1 through 12');
+  }
+  return Number(text);
+}
+
+function parseStartMonth(text) {
+  if (/^(?:[1-9]|1[0-2])$/.test(text)) {
+    return Number(text);
+  }
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(text);
+  if (match) {
+    return Number(match[2]);
+  }
+  fail('invalid --start: month must be 1 through 12 or YYYY-MM');
+}
+
+function resolveAdjustmentStats(opts) {
+  const hasYearly = opts['even-yearly'] !== undefined;
+  const hasMonth = opts['even-month'] !== undefined;
+  const hasStart = opts.start !== undefined;
+  if (!hasYearly && !hasMonth && !hasStart) {
+    return {};
+  }
+  if ((hasMonth || hasStart) && !hasYearly) {
+    fail('missing required argument: --even-yearly');
+  }
+  const yearlyExtraCents = parseEvenYearlyCents(opts['even-yearly']);
+  if (yearlyExtraCents > 0) {
+    const missing = [];
+    if (!hasMonth) missing.push('--even-month');
+    if (!hasStart) missing.push('--start');
+    if (missing.length > 0) {
+      fail(`missing required argument: ${missing.join(', ')}`);
+    }
+    return {
+      yearlyExtraCents,
+      yearlyMonth: parseEvenMonth(opts['even-month']),
+      startMonth: parseStartMonth(opts.start),
+    };
+  }
+  return {};
+}
 
 function armModeOn(opts) {
   return ARM_FLAGS.some((name) => (name === 'round-eighth' ? opts[name] : opts[name] !== undefined));
@@ -235,7 +297,7 @@ function resolveArm(opts, monthCount) {
     ? floorThousandths
     : parsePercentFlag(opts['initial-floor'], '--initial-floor', 'first adjustment floor');
   const indexByMonth = opts.index === undefined ? new Map() : loadIndex(opts.index);
-  return {
+  const arm = {
     fixedMonths,
     adjustMonths,
     marginThousandths,
@@ -247,6 +309,8 @@ function resolveArm(opts, monthCount) {
     roundEighth: opts['round-eighth'],
     indexByMonth,
   };
+  arm.adjustmentStats = resolveAdjustmentStats(opts);
+  return arm;
 }
 
 function parsePositiveTerm(text, flag) {
@@ -281,6 +345,16 @@ function percentText(percent) {
   return String(percent);
 }
 
+function formatAdjustmentChange(cents) {
+  if (cents < 0) {
+    return `-${formatGroupedCents(-cents)}`;
+  }
+  if (cents > 0) {
+    return `+${formatGroupedCents(cents)}`;
+  }
+  return formatGroupedCents(0);
+}
+
 function printSummary(report) {
   const lines = [
     `Monthly payment: ${formatGroupedCents(report.monthly_payment_cents)}`,
@@ -298,6 +372,15 @@ function printSummary(report) {
       `Highest payment: ${formatGroupedCents(report.arm.max_payment_cents)} (from month ${report.arm.max_payment_month})`,
       `Adjustments: ${report.arm.adjustments.length}`,
     );
+    if (report.arm.first_adjustment !== undefined) {
+      const range = report.arm.first_adjustment;
+      lines.push(
+        `Ceiling: ${percentText(report.arm.ceiling_percent)}% / Floor: ${percentText(report.arm.floor_percent)}%`,
+        `First adjustment month ${range.month}: ${formatAdjustmentChange(range.min_change_cents)} to ${formatAdjustmentChange(range.max_change_cents)}`,
+        `Even-out extra: ${formatGroupedCents(report.arm.even_out_cents)}`,
+        `Monthly extra: ${formatGroupedCents(report.arm.monthly_extra_cents)}`,
+      );
+    }
   }
   process.stdout.write(`${lines.join('\n')}\n`);
 }
@@ -349,6 +432,12 @@ function runCli(argv) {
   const principal = parseAmount(opts.amount);
   const ratePercent = parseRate(opts.rate);
   const { monthCount, yearsForJson } = resolveTerm(opts);
+  if (
+    (opts['even-month'] !== undefined || opts.start !== undefined)
+    && opts['even-yearly'] === undefined
+  ) {
+    fail('missing required argument: --even-yearly');
+  }
   const arm = armModeOn(opts) ? resolveArm(opts, monthCount) : undefined;
   const extras = opts.extra === undefined ? new Map() : loadExtras(opts.extra, monthCount);
   const report = buildReport(principal, ratePercent, monthCount, extras, yearsForJson, arm);

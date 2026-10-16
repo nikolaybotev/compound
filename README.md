@@ -78,8 +78,11 @@ That loan (the Example Credit Union 7/1 example in the docs) pays $3,371.77 for 
 | `--initial-floor P` | Floor at the first reset. Defaults to `--floor`. |
 | `--round-eighth` | Round index plus margin to the nearest 0.125 point before the caps and floors. Off by default. |
 | `--index FILE` | A `month,index` CSV. |
+| `--even-yearly AMOUNT` | Dollar amount for the yearly extra used only in the monthly-extra solve (zero allowed). |
+| `--even-month N` | Calendar month 1–12 when the yearly extra lands. |
+| `--start MONTH` | Loan start month as `10` or `YYYY-MM` (only the month is used). Payment 1 is the next calendar month. |
 
-`--amount`, `--rate`, a term, one fixed flag, `--adjust-months`, `--margin`, `--caps`, and `--floor` are required in ARM mode. A missing flag exits non-zero and names every missing flag. `--index`, `--initial-floor`, or `--round-eighth` without the required flags is the same error. Without any ARM flag nothing changes: the fixed-rate output is byte for byte what it was.
+`--amount`, `--rate`, a term, one fixed flag, `--adjust-months`, `--margin`, `--caps`, and `--floor` are required in ARM mode. A missing flag exits non-zero and names every missing flag. `--index`, `--initial-floor`, `--round-eighth`, `--even-yearly`, `--even-month`, or `--start` without the required flags is the same error. Without any ARM flag nothing changes: the fixed-rate output is byte for byte what it was. A positive `--even-yearly` also requires `--even-month` and `--start`. `--even-month` or `--start` without `--even-yearly` names `--even-yearly`.
 
 **Worst case.** With no index, the first reset moves the rate up by the initial cap and every later reset moves it up by the periodic cap, each time stopping at the ceiling. On 5/2/5 from 5.875% the first reset is 10.875% and every later reset stays there. On 2/2/5 the resets are 7.875%, 9.875%, 10.875%.
 
