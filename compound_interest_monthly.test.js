@@ -539,19 +539,52 @@ test('arm-loan AC6 the Lender A summary ends with the four ARM lines', () => {
   const result = run(feArgs);
   assert.equal(result.status, 0, result.stderr);
   const lines = result.stdout.trimEnd().split('\n');
-  assert.equal(lines.length, 11);
+  assert.equal(lines.length, 15);
   assert.equal(lines[0], 'Monthly payment: 3,371.77');
-  assert.deepEqual(lines.slice(-4), [
+  assert.deepEqual(lines.slice(7, 11), [
     'Initial rate: 5.875%',
     'Highest rate: 10.875% (from month 85)',
     'Highest payment: 5,037.71 (from month 85)',
     'Adjustments: 23',
   ]);
+  assert.deepEqual(lines.slice(-4), [
+    'Ceiling: 10.875% / Floor: 2.5%',
+    'First adjustment month 85: -941.16 to +1,665.94',
+    'Even-out extra: 823.21',
+    'Monthly extra: 823.21',
+  ]);
+});
+
+test('arm-adjustment-stats AC2 CLI summary, JSON, and even flags', () => {
+  const yearlyArgs = [
+    ...feArgs,
+    '--even-yearly', '250', '--even-month', '1', '--start', '10', '--json',
+  ];
+  const fromBareStart = jsonRun(yearlyArgs);
+  assert.equal(fromBareStart.arm.even_out_cents, 82321);
+  assert.equal(fromBareStart.arm.monthly_extra_cents, 81249);
+  const fromYearStart = jsonRun([...feArgs, '--even-yearly', '250', '--even-month', '1', '--start', '2026-10', '--json']);
+  assert.equal(fromYearStart.arm.monthly_extra_cents, 81249);
+
+  const noEven = jsonRun([...feArgs, '--json']);
+  assert.equal(noEven.arm.even_out_cents, 82321);
+  assert.equal(noEven.arm.monthly_extra_cents, 82321);
+  assert.equal(noEven.arm.first_adjustment.month, 85);
+
+  const missingMonth = failure([...feArgs, '--even-yearly', '250', '--start', '10']);
+  assert.match(missingMonth, /--even-month/);
+
+  const missingStart = failure([...feArgs, '--even-yearly', '250', '--even-month', '1']);
+  assert.match(missingStart, /--start/);
+
+  const missingYearly = failure([...feArgs, '--even-month', '1']);
+  assert.match(missingYearly, /--even-yearly/);
 });
 
 test('arm-loan AC6 --json reports the arm object and --schedule rows', () => {
   const report = jsonRun([...feArgs, '--json']);
   assert.equal(report.arm.adjustments.length, 23);
+  assert.equal(report.arm.even_out_cents, 82321);
   assert.equal(report.arm.max_payment_cents, 503771);
   assert.equal(report.interest_cents, 110363633);
   assert.equal(report.rate_percent, 5.875);
