@@ -8,6 +8,7 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const { dollarsToCents } = require('./compound_interest_monthly.js');
+const { buildReport } = require('./amortize');
 
 const script = path.join(__dirname, 'compound_interest_monthly.js');
 const firstYear = path.join(__dirname, 'fixtures', 'first-year-100.csv');
@@ -803,4 +804,178 @@ test('arm-loan the skill symlink still resolves to the calculator', () => {
     fs.realpathSync(path.join(skillDir, 'scripts', 'compound_interest_monthly.js')),
     fs.realpathSync(script),
   );
+});
+
+function sheetArmTerms(overrides = {}) {
+  return {
+    fixedMonths: 84,
+    adjustMonths: 12,
+    marginThousandths: 2500,
+    initialCapThousandths: 5000,
+    periodicCapThousandths: 2000,
+    lifetimeCapThousandths: 5000,
+    floorThousandths: 2500,
+    initialFloorThousandths: 2500,
+    roundEighth: false,
+    indexByMonth: new Map(),
+    ...overrides,
+  };
+}
+
+function sheetReport(extras, armOverrides, adjustmentStats) {
+  const arm = sheetArmTerms(armOverrides);
+  if (adjustmentStats !== undefined) {
+    arm.adjustmentStats = adjustmentStats;
+  }
+  return buildReport(570000, 5.875, 360, extras || new Map(), undefined, arm);
+}
+
+test('arm-adjustment-stats AC1 F1 through F10 and validation on buildReport', () => {
+  const f1 = sheetReport(new Map(), {}, {});
+  assert.equal(f1.monthly_payment_cents, 337177);
+  assert.deepEqual(f1.arm.first_adjustment, {
+    month: 85,
+    min_rate_percent: 2.5,
+    max_rate_percent: 10.875,
+    min_payment_cents: 243061,
+    max_payment_cents: 503771,
+    min_change_cents: -94116,
+    max_change_cents: 166594,
+  });
+  assert.equal(f1.arm.even_out_cents, 82321);
+  assert.equal(f1.arm.monthly_extra_cents, 82321);
+
+  const extras = new Map();
+  for (let month = 1; month <= 12; month += 1) {
+    extras.set(month, 100);
+  }
+  const withSchedule = sheetReport(extras, { indexByMonth: new Map([[85, 4420]]) }, {});
+  assert.equal(withSchedule.arm.even_out_cents, 82321);
+  assert.equal(withSchedule.arm.first_adjustment.max_payment_cents, 503771);
+
+  const f2 = sheetReport(new Map(), {}, {
+    yearlyExtraCents: 25000,
+    yearlyMonth: 1,
+    startMonth: 10,
+  });
+  assert.equal(f2.arm.even_out_cents, 82321);
+  assert.equal(f2.arm.monthly_extra_cents, 81249);
+
+  const f3 = sheetReport(new Map(), {}, {
+    yearlyExtraCents: 120000,
+    yearlyMonth: 1,
+    startMonth: 10,
+  });
+  assert.equal(f3.arm.monthly_extra_cents, 77176);
+
+  const f4 = sheetReport(new Map(), {}, {
+    yearlyExtraCents: 2000000,
+    yearlyMonth: 1,
+    startMonth: 10,
+  });
+  assert.equal(f4.arm.monthly_extra_cents, 0);
+
+  const f5 = sheetReport(new Map(), {
+    initialCapThousandths: 2000,
+    periodicCapThousandths: 2000,
+  }, {});
+  assert.equal(f5.arm.ceiling_percent, 10.875);
+  assert.equal(f5.arm.first_adjustment.max_rate_percent, 7.875);
+  assert.equal(f5.arm.first_adjustment.max_payment_cents, 400385);
+  assert.equal(f5.arm.first_adjustment.max_change_cents, 63208);
+  assert.equal(f5.arm.even_out_cents, 34852);
+
+  const f6 = sheetReport(new Map(), {
+    marginThousandths: 3000,
+    lifetimeCapThousandths: 3000,
+  }, {});
+  assert.equal(f6.arm.ceiling_percent, 8.875);
+  assert.equal(f6.arm.floor_percent, 2.5);
+  assert.equal(f6.arm.first_adjustment.min_rate_percent, 3);
+  assert.equal(f6.arm.first_adjustment.min_payment_cents, 255926);
+  assert.equal(f6.arm.first_adjustment.min_change_cents, -81251);
+  assert.equal(f6.arm.first_adjustment.max_payment_cents, 433797);
+  assert.equal(f6.arm.first_adjustment.max_change_cents, 96620);
+
+  const f7 = sheetReport(new Map(), { initialFloorThousandths: 4000 }, {});
+  assert.equal(f7.arm.floor_percent, 2.5);
+  assert.equal(f7.arm.first_adjustment.min_rate_percent, 4);
+  assert.equal(f7.arm.first_adjustment.min_payment_cents, 282810);
+  assert.equal(f7.arm.first_adjustment.min_change_cents, -54367);
+
+  const f8 = sheetReport(new Map(), {
+    initialCapThousandths: 0,
+    lifetimeCapThousandths: 0,
+  }, {});
+  assert.equal(f8.arm.even_out_cents, 0);
+  assert.equal(f8.arm.first_adjustment.max_change_cents, 0);
+  assert.equal(f8.arm.first_adjustment.min_change_cents, -94116);
+
+  const margin20 = sheetReport(new Map(), { marginThousandths: 20000 }, {});
+  assert.equal(margin20.arm.first_adjustment.min_rate_percent, 10.875);
+  assert.equal(margin20.arm.first_adjustment.max_rate_percent, 10.875);
+  assert.equal(margin20.arm.first_adjustment.min_payment_cents, 503771);
+  assert.equal(margin20.arm.first_adjustment.max_payment_cents, 503771);
+
+  const f10 = sheetReport(new Map(), {
+    initialCapThousandths: 1000,
+    lifetimeCapThousandths: 5000,
+    initialFloorThousandths: 8000,
+  }, {});
+  assert.equal(f10.arm.ceiling_percent, 10.875);
+  assert.equal(f10.arm.floor_percent, 2.5);
+  assert.equal(f10.arm.first_adjustment.min_rate_percent, 8);
+  assert.equal(f10.arm.first_adjustment.max_rate_percent, 8);
+  assert.equal(f10.arm.first_adjustment.min_payment_cents, 404499);
+  assert.equal(f10.arm.first_adjustment.max_payment_cents, 404499);
+  assert.equal(f10.arm.first_adjustment.min_change_cents, 67322);
+  assert.equal(f10.arm.first_adjustment.max_change_cents, 67322);
+
+  const noStats = sheetReport(new Map(), {}, undefined);
+  assert.equal('first_adjustment' in noStats.arm, false);
+  assert.equal('even_out_cents' in noStats.arm, false);
+  assert.equal('monthly_extra_cents' in noStats.arm, false);
+
+  const shortFixed = buildReport(570000, 5.875, 360, new Map(), undefined, {
+    ...sheetArmTerms({ fixedMonths: 6 }),
+    adjustmentStats: { yearlyExtraCents: 25000, yearlyMonth: 8, startMonth: 10 },
+  });
+  assert.equal(shortFixed.arm.monthly_extra_cents, shortFixed.arm.even_out_cents);
+
+  const throwsYearlyMonth = () => sheetReport(new Map(), {}, {
+    yearlyExtraCents: 25000,
+    yearlyMonth: 0,
+    startMonth: 10,
+  });
+  assert.throws(throwsYearlyMonth, (err) => err.message === 'yearlyMonth');
+
+  const throwsStartMonth = () => sheetReport(new Map(), {}, {
+    yearlyExtraCents: 25000,
+    yearlyMonth: 1,
+    startMonth: 13,
+  });
+  assert.throws(throwsStartMonth, (err) => err.message === 'startMonth');
+
+  assert.throws(
+    () => sheetReport(new Map(), {}, { yearlyExtraCents: 25000, startMonth: 10 }),
+    (err) => err.message === 'yearlyMonth',
+  );
+  assert.throws(
+    () => sheetReport(new Map(), {}, { yearlyExtraCents: 25000, yearlyMonth: 1 }),
+    (err) => err.message === 'startMonth',
+  );
+
+  for (const bad of [-1, 1.5, Number.NaN, '250']) {
+    assert.throws(
+      () => sheetReport(new Map(), {}, { yearlyExtraCents: bad }),
+      (err) => err.message === 'yearlyExtraCents',
+    );
+  }
+
+  const zeroMonths = sheetReport(new Map(), {}, {
+    yearlyExtraCents: 0,
+    yearlyMonth: 0,
+    startMonth: 13,
+  });
+  assert.equal(zeroMonths.arm.monthly_extra_cents, 82321);
 });
