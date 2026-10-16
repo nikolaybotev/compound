@@ -291,18 +291,41 @@ export function parseLoan(draft: LoanDraft): ParseResult {
   };
 }
 
+export type AdjustmentStatsInput =
+  | Record<string, never>
+  | {
+      yearlyExtraCents?: number;
+      yearlyMonth?: number;
+      startMonth?: number;
+    };
+
+export function loanStartMonthNumber(startMonth: string): number {
+  const parts = startMonth.split("-");
+  return Number(parts[parts.length - 1]);
+}
+
+export function formatAdjustmentChange(cents: number): string {
+  if (cents < 0) return `-${formatMoney(-cents)}`;
+  if (cents > 0) return `+${formatMoney(cents)}`;
+  return formatMoney(0);
+}
+
 export function loanReport(
   loan: Loan,
   extras: Map<number, number> = new Map(),
   financedCents: number = loan.loanCents,
+  adjustmentStats?: AdjustmentStatsInput,
 ): Report {
+  const arm = armArgument(loan);
+  const armWithStats =
+    arm && adjustmentStats !== undefined ? { ...arm, adjustmentStats } : arm;
   return buildReport(
     centsToDollars(financedCents),
     loan.ratePercent,
     loan.years * 12,
     extras,
     loan.years,
-    armArgument(loan),
+    armWithStats,
   );
 }
 
