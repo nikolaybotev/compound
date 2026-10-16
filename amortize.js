@@ -304,6 +304,262 @@ function thousandthsToPercent(thousandths) {
   return thousandths / 1000;
 }
 
+function centsToMapDollars(cents) {
+  if (cents === 0) {
+    return 0;
+  }
+  const negative = cents < 0;
+  const abs = Math.abs(cents);
+  const whole = Math.trunc(abs / 100);
+  const frac = String(abs % 100).padStart(2, '0');
+  const dollars = Number(`${whole}.${frac}`);
+  return negative ? -dollars : dollars;
+}
+
+function calendarMonthForPayment(startMonth, paymentMonth) {
+  return ((startMonth + paymentMonth - 1) % 12) + 1;
+}
+
+function validateAdjustmentStats(adjustmentStats) {
+  if (adjustmentStats === undefined) {
+    return null;
+  }
+  if (adjustmentStats === null || typeof adjustmentStats !== 'object') {
+    throw new Error('adjustmentStats must be an object');
+  }
+  const yearlyExtraCents = adjustmentStats.yearlyExtraCents;
+  if (yearlyExtraCents === undefined || yearlyExtraCents === 0) {
+    return { yearlyExtraCents: 0 };
+  }
+  if (!Number.isSafeInteger(yearlyExtraCents) || yearlyExtraCents < 0) {
+    throw new Error('yearlyExtraCents');
+  }
+  const yearlyMonth = adjustmentStats.yearlyMonth;
+  if (!Number.isSafeInteger(yearlyMonth) || yearlyMonth < 1 || yearlyMonth > 12) {
+    throw new Error('yearlyMonth');
+  }
+  const startMonth = adjustmentStats.startMonth;
+  if (!Number.isSafeInteger(startMonth) || startMonth < 1 || startMonth > 12) {
+    throw new Error('startMonth');
+  }
+  return { yearlyExtraCents, yearlyMonth, startMonth };
+}
+
+function yearlyMonthLandsInFixedPeriod(arm, stats) {
+  if (stats.yearlyExtraCents <= 0) {
+    return false;
+  }
+  for (let month = 1; month <= arm.fixedMonths; month += 1) {
+    if (calendarMonthForPayment(stats.startMonth, month) === stats.yearlyMonth) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function buildProbeExtras(monthlyExtraCents, arm, stats) {
+  const map = new Map();
+  for (let month = 1; month <= arm.fixedMonths; month += 1) {
+    let cents = monthlyExtraCents;
+    if (
+      stats.yearlyExtraCents > 0
+      && yearlyMonthLandsInFixedPeriod(arm, stats)
+      && calendarMonthForPayment(stats.startMonth, month) === stats.yearlyMonth
+    ) {
+      cents += stats.yearlyExtraCents;
+    }
+    const dollars = centsToMapDollars(cents);
+    if (dollars !== 0) {
+      map.set(month, dollars);
+    }
+  }
+  return map;
+}
+
+function firstAdjustmentPaymentCents(
+  principal,
+  initialThousandths,
+  monthCount,
+  arm,
+  ceiling,
+  extrasByMonth,
+  indexByMonth,
+) {
+  const walked = walkArm(
+    principal,
+    initialThousandths,
+    monthCount,
+    extrasByMonth,
+    arm,
+    ceiling,
+    indexByMonth,
+  );
+  const firstMonth = arm.fixedMonths + 1;
+  if (walked.payoffMonth < firstMonth) {
+    return 0;
+  }
+  return dollarsToCents(walked.rows[firstMonth - 1].payment);
+}
+
+function firstAdjustmentRatePercent(
+  principal,
+  initialThousandths,
+  monthCount,
+  arm,
+  ceiling,
+  extrasByMonth,
+  indexByMonth,
+) {
+  const walked = walkArm(
+    principal,
+    initialThousandths,
+    monthCount,
+    extrasByMonth,
+    arm,
+    ceiling,
+    indexByMonth,
+  );
+  const firstMonth = arm.fixedMonths + 1;
+  if (walked.payoffMonth < firstMonth) {
+    return 0;
+  }
+  return thousandthsToPercent(walked.rows[firstMonth - 1].rateThousandths);
+}
+
+function solveEvenOutCents(
+  principal,
+  initialThousandths,
+  monthCount,
+  arm,
+  ceiling,
+  initialPaymentCents,
+  maxChangeCents,
+  stats,
+) {
+  if (maxChangeCents <= 0) {
+    return 0;
+  }
+  const emptyIndex = new Map();
+  const passes = (candidate) => {
+    const extras = buildProbeExtras(candidate, arm, stats);
+    const payment = firstAdjustmentPaymentCents(
+      principal,
+      initialThousandths,
+      monthCount,
+      arm,
+      ceiling,
+      extras,
+      emptyIndex,
+    );
+    return payment <= initialPaymentCents + candidate;
+  };
+  let lo = 0;
+  let hi = maxChangeCents;
+  while (lo < hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (passes(mid)) {
+      hi = mid;
+    } else {
+      lo = mid + 1;
+    }
+  }
+  return lo;
+}
+
+function computeAdjustmentStats(
+  principal,
+  initialThousandths,
+  monthCount,
+  arm,
+  ceiling,
+  initialPaymentCents,
+  stats,
+) {
+  const firstMonth = arm.fixedMonths + 1;
+  const emptyExtras = new Map();
+  const emptyIndex = new Map();
+  const indexZero = new Map([[firstMonth, 0]]);
+
+  const maxPaymentCents = firstAdjustmentPaymentCents(
+    principal,
+    initialThousandths,
+    monthCount,
+    arm,
+    ceiling,
+    emptyExtras,
+    emptyIndex,
+  );
+  const maxRatePercent = firstAdjustmentRatePercent(
+    principal,
+    initialThousandths,
+    monthCount,
+    arm,
+    ceiling,
+    emptyExtras,
+    emptyIndex,
+  );
+  const minPaymentCents = firstAdjustmentPaymentCents(
+    principal,
+    initialThousandths,
+    monthCount,
+    arm,
+    ceiling,
+    emptyExtras,
+    indexZero,
+  );
+  const minRatePercent = firstAdjustmentRatePercent(
+    principal,
+    initialThousandths,
+    monthCount,
+    arm,
+    ceiling,
+    emptyExtras,
+    indexZero,
+  );
+
+  const maxChangeCents = maxPaymentCents - initialPaymentCents;
+  const minChangeCents = minPaymentCents - initialPaymentCents;
+
+  const evenOutCents = solveEvenOutCents(
+    principal,
+    initialThousandths,
+    monthCount,
+    arm,
+    ceiling,
+    initialPaymentCents,
+    maxChangeCents,
+    { yearlyExtraCents: 0 },
+  );
+
+  let monthlyExtraCents = evenOutCents;
+  if (stats.yearlyExtraCents > 0 && yearlyMonthLandsInFixedPeriod(arm, stats)) {
+    monthlyExtraCents = solveEvenOutCents(
+      principal,
+      initialThousandths,
+      monthCount,
+      arm,
+      ceiling,
+      initialPaymentCents,
+      maxChangeCents,
+      stats,
+    );
+  }
+
+  return {
+    first_adjustment: {
+      month: firstMonth,
+      min_rate_percent: minRatePercent,
+      max_rate_percent: maxRatePercent,
+      min_payment_cents: minPaymentCents,
+      max_payment_cents: maxPaymentCents,
+      min_change_cents: minChangeCents,
+      max_change_cents: maxChangeCents,
+    },
+    even_out_cents: evenOutCents,
+    monthly_extra_cents: monthlyExtraCents,
+  };
+}
+
 function armSummary(arm, actual, indexByMonth, initialThousandths, ceiling) {
   let maxRate = initialThousandths;
   let maxRateMonth = 1;
@@ -372,6 +628,21 @@ function buildArmReport(principal, ratePercent, monthCount, extrasByMonth, years
     report.years = yearsForJson;
   }
   report.arm = armSummary(arm, actual, indexByMonth, initialThousandths, ceiling);
+  if (arm.adjustmentStats !== undefined) {
+    const stats = validateAdjustmentStats(arm.adjustmentStats);
+    const adjustment = computeAdjustmentStats(
+      principal,
+      initialThousandths,
+      monthCount,
+      arm,
+      ceiling,
+      report.monthly_payment_cents,
+      stats,
+    );
+    report.arm.first_adjustment = adjustment.first_adjustment;
+    report.arm.even_out_cents = adjustment.even_out_cents;
+    report.arm.monthly_extra_cents = adjustment.monthly_extra_cents;
+  }
   const schedule = scheduleRows(actual, baseline, report.interest_saved_cents);
   report.schedule = schedule.map((row, index) => {
     const source = actual.rows[index];
