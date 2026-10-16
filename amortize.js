@@ -426,6 +426,88 @@ function firstAdjustmentRatePercent(
   return thousandthsToPercent(walked.rows[firstMonth - 1].rateThousandths);
 }
 
+function remainingBalanceAfterFixedPeriod(
+  principal,
+  initialThousandths,
+  monthCount,
+  arm,
+  ceiling,
+  extrasByMonth,
+) {
+  const walked = walkArm(
+    principal,
+    initialThousandths,
+    monthCount,
+    extrasByMonth,
+    arm,
+    ceiling,
+    new Map(),
+  );
+  const firstMonth = arm.fixedMonths + 1;
+  if (walked.payoffMonth < firstMonth) {
+    return null;
+  }
+  return walked.rows[arm.fixedMonths - 1].remainingPrincipal;
+}
+
+function maxRateThousandthsAtFirstAdjustment(initialThousandths, arm, ceiling) {
+  return resetRate(initialThousandths, 1, arm, ceiling, undefined).rate;
+}
+
+function closedFormEvenOutDollars(
+  principal,
+  initialThousandths,
+  monthCount,
+  arm,
+  ceiling,
+  initialPaymentDollars,
+  stats,
+) {
+  const extrasBase = buildProbeExtras(0, arm, stats);
+  const balanceBase = remainingBalanceAfterFixedPeriod(
+    principal,
+    initialThousandths,
+    monthCount,
+    arm,
+    ceiling,
+    extrasBase,
+  );
+  if (balanceBase === null) {
+    return 0;
+  }
+  const extrasOneDollar = buildProbeExtras(100, arm, stats);
+  const balanceOneDollar = remainingBalanceAfterFixedPeriod(
+    principal,
+    initialThousandths,
+    monthCount,
+    arm,
+    ceiling,
+    extrasOneDollar,
+  );
+  if (balanceOneDollar === null) {
+    return 0;
+  }
+  const slope = balanceBase - balanceOneDollar;
+  const paymentsLeft = monthCount - arm.fixedMonths;
+  const maxRateThousandths = maxRateThousandthsAtFirstAdjustment(initialThousandths, arm, ceiling);
+  const monthlyRate = maxRateThousandths / 100000 / 12;
+  const paymentPerDollar = paymentFor(1, monthlyRate, paymentsLeft);
+  const numerator = balanceBase * paymentPerDollar - initialPaymentDollars;
+  const denominator = slope * paymentPerDollar + 1;
+  if (!(denominator > 0) || !(slope > 0)) {
+    return 0;
+  }
+  let extra = numerator / denominator;
+  if (!Number.isFinite(extra) || extra < 0) {
+    return 0;
+  }
+  const maxExtra = balanceBase / slope;
+  if (extra > maxExtra) {
+    extra = maxExtra;
+  }
+  return extra;
+}
+
 function solveEvenOutCents(
   principal,
   initialThousandths,
@@ -436,11 +518,25 @@ function solveEvenOutCents(
   maxChangeCents,
   stats,
 ) {
+  const firstMonth = arm.fixedMonths + 1;
+  const noExtraWalk = walkArm(
+    principal,
+    initialThousandths,
+    monthCount,
+    new Map(),
+    arm,
+    ceiling,
+    new Map(),
+  );
+  if (noExtraWalk.payoffMonth < firstMonth) {
+    return 0;
+  }
   if (maxChangeCents <= 0) {
     return 0;
   }
   const emptyIndex = new Map();
   const passes = (candidate) => {
+    if (candidate < 0) return false;
     const extras = buildProbeExtras(candidate, arm, stats);
     const payment = firstAdjustmentPaymentCents(
       principal,
@@ -453,17 +549,46 @@ function solveEvenOutCents(
     );
     return payment <= initialPaymentCents + candidate;
   };
-  let lo = 0;
-  let hi = maxChangeCents;
-  while (lo < hi) {
-    const mid = Math.floor((lo + hi) / 2);
-    if (passes(mid)) {
-      hi = mid;
-    } else {
-      lo = mid + 1;
+  if (passes(0)) {
+    return 0;
+  }
+  const initialPaymentDollars = noExtraWalk.payment;
+  const realDollars = closedFormEvenOutDollars(
+    principal,
+    initialThousandths,
+    monthCount,
+    arm,
+    ceiling,
+    initialPaymentDollars,
+    stats,
+  );
+  const floorCents = Math.floor(realDollars * 100);
+  const ceilCents = Math.ceil(realDollars * 100);
+  const tryCandidate = (candidate) => {
+    if (candidate < 0) return null;
+    return passes(candidate) ? candidate : null;
+  };
+  let found = tryCandidate(floorCents);
+  if (found !== null) {
+    return found;
+  }
+  if (ceilCents !== floorCents) {
+    found = tryCandidate(ceilCents);
+    if (found !== null) {
+      return found;
     }
   }
-  return lo;
+  for (let step = 1; step <= maxChangeCents + 1; step += 1) {
+    found = tryCandidate(ceilCents + step);
+    if (found !== null) {
+      return found;
+    }
+    found = tryCandidate(floorCents - step);
+    if (found !== null) {
+      return found;
+    }
+  }
+  return 0;
 }
 
 function computeAdjustmentStats(
