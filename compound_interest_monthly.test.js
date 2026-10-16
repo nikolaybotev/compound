@@ -767,6 +767,31 @@ test('arm-loan --index CSV rules mirror --extra', () => {
   });
 });
 
+test('arm-adjustment-stats AC3 skill phrases for adjustment stats', () => {
+  const skillPath = path.join(__dirname, '.agents', 'skills', 'mortgage-loan-calculator', 'SKILL.md');
+  const skill = fs.readFileSync(skillPath, 'utf8').replace(/[ \t]*\n[ \t]*(?=[a-z(])/g, ' ');
+  const phrases = [
+    '`arm.floor_percent`',
+    '`arm.ceiling_percent`',
+    '`arm.first_adjustment`',
+    '`arm.even_out_cents`',
+    '`arm.monthly_extra_cents`',
+    'integer cents',
+    'A range or even-out question with no yearly amount omits `--even-yearly`, `--even-month`, and `--start`',
+    'A positive yearly amount passes all three flags',
+    'A yearly amount of 0 omits only `--even-month` and `--start`',
+    'yearly-extra question',
+    'Do not invent the yearly amount',
+    'Payment 1 is the month after the start month',
+    '`--start 10`',
+    'do not write it into the `month,extra` CSV',
+    'the only arithmetic this skill does',
+  ];
+  for (const phrase of phrases) {
+    assert.ok(skill.includes(phrase), `missing: ${phrase}`);
+  }
+});
+
 test('arm-loan AC7 the skill lifts the ARM refusal and states the ARM rules', () => {
   const skillPath = path.join(__dirname, '.agents', 'skills', 'mortgage-loan-calculator', 'SKILL.md');
   const skill = fs.readFileSync(skillPath, 'utf8').replace(/[ \t]*\n[ \t]*(?=[a-z(])/g, ' ');
