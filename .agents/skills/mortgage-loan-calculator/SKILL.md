@@ -58,6 +58,8 @@ Never pass `--round-eighth` unless the user says the note rounds to an eighth. D
 
 Answer a summary question from `--json` alone. Read `monthly_payment_cents` (the initial payment), `arm.max_rate_percent`, `arm.max_payment_cents`, `arm.max_payment_month`, `arm.adjustments` (each reset's `month`, `index_percent`, `fully_indexed_percent`, `rate_percent`, and `payment_cents`), `interest_cents`, and `interest_saved_cents`. A fully indexed rate above the lifetime ceiling is reported at the ceiling; `fully_indexed_percent` shows what the index asked for. Answer a month question from `--json --schedule` and read `rate_percent`, `payment_cents`, and the existing row fields.
 
+Answer a floor, a first-adjustment range, an even-out extra, or a yearly-extra question from `--json` alone. Read the integer cents and the percents on `arm.floor_percent`, `arm.ceiling_percent`, `arm.first_adjustment`, `arm.even_out_cents`, and `arm.monthly_extra_cents`. `floor_percent`, `ceiling_percent`, and the two `*_rate_percent` fields on `arm.first_adjustment` are percents. The payment, change, even-out, and monthly-extra fields are integer cents. Do not read the human summary's grouped dollars as those figures. Do not solve for the extra and do not write it into the `month,extra` CSV. A range or even-out question with no yearly amount omits `--even-yearly`, `--even-month`, and `--start` and is answered without those flags; do not ask for a yearly amount, a month of the year, or a loan start month on that question. A yearly-extra question that left out the yearly amount, the month of the year, or the loan start month asks for the missing one. Do not invent the yearly amount, the month of the year, the start month, or a year. Payment 1 is the month after the start month, so payments that start in November pass `--start 10`; a bare month is enough. A positive yearly amount passes all three flags (`--even-yearly`, `--even-month`, `--start`). A yearly amount of 0 omits only `--even-month` and `--start`.
+
 Extra principal works on an ARM through the same `month,extra` CSV. Each reset re-amortizes the actual unpaid balance over the payments left, so extra principal lowers the next reset payment and may shorten the term by little or nothing. Report `interest_saved_cents` and `months_saved` as the calculator gives them.
 
 A recast question on an ARM is declined in one sentence: the two-run recast procedure is for a fixed rate, and an ARM already re-amortizes at each reset.
@@ -119,7 +121,8 @@ node scripts/compound_interest_monthly.js \
   (--years TERM_YEARS | --months TERM_MONTHS) \
   [--fixed-years FIXED_YEARS | --fixed-months FIXED_MONTHS] [--adjust-months INTERVAL] \
   [--margin MARGIN] [--caps INITIAL/PERIODIC/LIFETIME] [--floor LIFETIME_FLOOR] \
-  [--index index.csv] [--extra extras.csv] --json [--schedule]
+  [--index index.csv] [--even-yearly AMOUNT] [--even-month N] [--start MONTH] \
+  [--extra extras.csv] --json [--schedule]
 ```
 
 Exactly one of `--years` or `--months` is required. `--rate` is the note rate in percent, with at most three decimal places. In ARM mode `--rate` is the initial rate.
