@@ -28,7 +28,7 @@ One formula in the library produces those figures. The command-line tool prints 
 - This folder builds on `intent/arm-loan/` and `intent/arm-extra-level/`. The walk, the index cell, the schedule, and the level-extra checkbox stay as those specs left them, except for the figures this change adds beside the schedule.
 - The formula lives in `amortize.js`. That file stays free of Node APIs. The page imports the library and does not keep a second formula. The skill runs `compound_interest_monthly.js` and does not compute the figures itself.
 - The build order is the library, then the command-line tool, then the skill, then the page.
-- The even-out extra is solved so that paying it makes the ceiling payment at the first adjustment equal the initial principal-and-interest plus that extra. It is not the no-extra payment jump.
+- The even-out extra is the smallest cent at which the first-adjustment payment is at or below the initial principal and interest plus that cent. A fixture that lands one cent under is not called equal. It is not the no-extra payment jump.
 - These figures are not written into the schedule, and they do not change the Extra Payments form.
 - These three files do not name a credit union.
 - The point version stays unchanged on this docs pull request.
