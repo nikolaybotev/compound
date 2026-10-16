@@ -136,7 +136,7 @@ async function openArm(page: Page) {
   await openFresh(page);
   await page.locator("#product").selectOption("arm");
   await page.locator("#rate").fill("5.875");
-  await expect(page.locator("[data-line='arm-ceiling']")).toHaveText("Ceiling 10.875%");
+  await expect(page.locator("[data-line='arm-ceiling']")).toHaveText("Ceiling 10.875% · Floor 2.5%");
 }
 
 async function blockForeignHosts(context: BrowserContext) {
