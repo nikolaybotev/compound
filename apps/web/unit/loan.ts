@@ -16,9 +16,11 @@ import {
   groupByYear,
   isEditedExtra,
   isTrailingDotThousands,
+  levelArmExtras,
   loadScenario,
   loadStored,
   loanReport,
+  type Loan,
   modalPaymentCents,
   parseLoan,
   parseStoredSet,
@@ -547,6 +549,34 @@ function appliedEveryMonth(scenario: ReturnType<typeof defaultScenario>, dollars
   scenario.extras = new Map(applied);
 }
 
+function arm5875Scenario(now: Date, fixedYears = "7") {
+  const scenario = freshConventional(now);
+  scenario.draft.rate = "5.875";
+  scenario.arm = defaultArm();
+  scenario.arm.fixedYears = fixedYears;
+  scenario.arm.enabled = true;
+  scenario.armStored = true;
+  return scenario;
+}
+
+function financedCentsFor(scenario: ReturnType<typeof defaultScenario>): number {
+  const parsed = parseLoan(scenario.draft);
+  if (!parsed.ok) throw new Error("loan must parse");
+  return parsed.loan.loanCents;
+}
+
+function loanForLevelExtras(scenario: ReturnType<typeof defaultScenario>): Loan {
+  const parsed = parseLoan(scenario.draft);
+  if (!parsed.ok) throw new Error("loan must parse");
+  const rateThousandths = Math.round(parsed.loan.ratePercent * 1000);
+  const armParsed = parseArm(scenario.arm, parsed.loan.years, rateThousandths);
+  if (!armParsed.ok) throw new Error("arm must parse");
+  return {
+    ...parsed.loan,
+    arm: { enabled: true, values: armParsed.values, index: scenario.arm.index },
+  };
+}
+
 describe("loan scenarios storage and prevailing figures", () => {
   const now = new Date("2026-10-15T12:00:00Z");
 
@@ -559,7 +589,128 @@ describe("loan scenarios storage and prevailing figures", () => {
     expect(figures.totalCents).toBe(485_310);
   });
 
-  test("F2 $100 every month after Apply qualifies as prevailing extra", () => {
+  test("F1 fixed $100 in months 1–84 with stored ARM disabled", () => {
+    const scenario = freshConventional(now);
+    scenario.armStored = true;
+    const applied = new Map<number, number>();
+    for (let month = 1; month <= 84; month += 1) applied.set(month, 100);
+    scenario.applied = applied;
+    expect(scenario.arm.enabled).toBe(false);
+    expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(0);
+  });
+
+  test("F2 ARM fixed-period $100 in months 1–84", () => {
+    const scenario = arm5875Scenario(now);
+    const applied = new Map<number, number>();
+    for (let month = 1; month <= 84; month += 1) applied.set(month, 100);
+    scenario.applied = applied;
+    const figures = scenarioFigures(scenario);
+    expect(figures?.prevailingExtraCents).toBe(10_000);
+    expect(figures?.modalPaymentCents).toBe(493_534);
+    expect(figures?.totalCents).toBe(595_159);
+  });
+
+  test("F3 ARM $100 in every month", () => {
+    const scenario = arm5875Scenario(now);
+    appliedEveryMonth(scenario, 100, 360);
+    const figures = scenarioFigures(scenario);
+    expect(figures?.prevailingExtraCents).toBe(10_000);
+    expect(figures?.modalPaymentCents).toBe(337_177);
+    expect(figures?.totalCents).toBe(438_802);
+  });
+
+  test("F4 ARM yearly January mix in fixed period", () => {
+    const scenario = arm5875Scenario(now);
+    const applied = new Map<number, number>();
+    for (let month = 1; month <= 84; month += 1) {
+      const january = [3, 15, 27, 39, 51, 63, 75].includes(month);
+      applied.set(month, january ? 350 : 100);
+    }
+    scenario.applied = applied;
+    expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(10_000);
+  });
+
+  test("F5 5/1 ARM extras only after fixed period", () => {
+    const scenario = arm5875Scenario(now, "5");
+    appliedEveryMonth(scenario, 100, 360);
+    for (let month = 1; month <= 60; month += 1) scenario.applied.delete(month);
+    const figures = scenarioFigures(scenario);
+    expect(figures?.prevailingExtraCents).toBe(0);
+    expect(figures?.modalPaymentCents).toBe(337_177);
+    expect(figures?.totalCents).toBe(428_802);
+  });
+
+  test("F6 5/1 two amounts prefers fixed-period $100", () => {
+    const scenario = arm5875Scenario(now, "5");
+    const applied = new Map<number, number>();
+    for (let month = 1; month <= 60; month += 1) applied.set(month, 100);
+    for (let month = 61; month <= 358; month += 1) applied.set(month, 500);
+    scenario.applied = applied;
+    const figures = scenarioFigures(scenario);
+    expect(figures?.prevailingExtraCents).toBe(10_000);
+    expect(figures?.modalPaymentCents).toBe(337_177);
+    expect(figures?.totalCents).toBe(438_802);
+  });
+
+  test("F7 ARM 80 percent boundary on 84-month window for $1", () => {
+    const scenario = arm5875Scenario(now);
+    const applied = new Map<number, number>();
+    for (let month = 1; month <= 68; month += 1) applied.set(month, 1);
+    scenario.applied = applied;
+    expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(100);
+    expect(scenarioFigures(scenario)?.totalCents).toBe(595_410);
+    const shorter = new Map(applied);
+    shorter.delete(68);
+    scenario.applied = shorter;
+    expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(0);
+    expect(scenarioFigures(scenario)?.totalCents).toBe(595_311);
+  });
+
+  test("F8 ARM lump payoff in month 1", () => {
+    const scenario = arm5875Scenario(now);
+    scenario.applied = new Map([[1, 570_000]]);
+    const figures = scenarioFigures(scenario);
+    expect(figures?.prevailingExtraCents).toBe(57_000_000);
+    expect(figures?.modalPaymentCents).toBe(337_177);
+    expect(figures?.totalCents).toBe(57_428_802);
+  });
+
+  test("F9 ARM payoff month 84 keeps $5000 group", () => {
+    const scenario = arm5875Scenario(now);
+    appliedEveryMonth(scenario, 5000, 360);
+    expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(500_000);
+  });
+
+  test("F10 ARM payoff month 85 excludes month 85 from count", () => {
+    const scenario = arm5875Scenario(now);
+    appliedEveryMonth(scenario, 4900, 360);
+    expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(490_000);
+  });
+
+  test("F11 ARM $1 in months 1–67 and 85 only", () => {
+    const scenario = arm5875Scenario(now);
+    const applied = new Map<number, number>();
+    for (let month = 1; month <= 67; month += 1) applied.set(month, 1);
+    applied.set(85, 1);
+    scenario.applied = applied;
+    expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(0);
+  });
+
+  test("levelArmExtras monthly $100 matches F2 prevailing extra", () => {
+    const scenario = arm5875Scenario(now);
+    const handBuilt = new Map<number, number>();
+    for (let month = 1; month <= 84; month += 1) handBuilt.set(month, 100);
+    scenario.applied = handBuilt;
+    const handFigures = scenarioFigures(scenario);
+    const loan = loanForLevelExtras(scenario);
+    const levelMap = levelArmExtras(loan, financedCentsFor(scenario), 100, 0, 1, 1, new Map());
+    expect(levelMap.has(85)).toBe(false);
+    scenario.applied = levelMap;
+    expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(handFigures?.prevailingExtraCents);
+    expect(scenarioFigures(scenario)?.totalCents).toBe(handFigures?.totalCents);
+  });
+
+  test("fixed $100 every month after Apply qualifies as prevailing extra", () => {
     const scenario = freshConventional(now);
     appliedEveryMonth(scenario, 100, 360);
     const figures = scenarioFigures(scenario);
