@@ -1156,13 +1156,71 @@ function evenOutCentsByBinarySearch(
   return lo;
 }
 
-function assertEvenOutMatchesBinarySearch(loan) {
+const EVEN_OUT_CAP_55 = {};
+const EVEN_OUT_CAP_225 = { initialCapThousandths: 2000, periodicCapThousandths: 2000 };
+const EVEN_OUT_CAP_115 = { initialCapThousandths: 1000, periodicCapThousandths: 1000 };
+
+function evenOutGrid48Loans() {
+  const principals = [100_000, 570_000, 855_000];
+  const rates = [3.25, 5.875, 6.99, 7.375];
+  const fixedMonthsList = [36, 84];
+  const capStyles = [
+    { overrides: EVEN_OUT_CAP_55 },
+    { overrides: EVEN_OUT_CAP_225 },
+  ];
+  const loans = [];
+  for (const principal of principals) {
+    for (const ratePercent of rates) {
+      for (const fixedMonths of fixedMonthsList) {
+        for (const capStyle of capStyles) {
+          loans.push({
+            principal,
+            ratePercent,
+            monthCount: 360,
+            armOverrides: { fixedMonths, ...capStyle.overrides },
+          });
+        }
+      }
+    }
+  }
+  return loans;
+}
+
+function evenOutGrid432Loans() {
+  const principals = [80_000, 250_000, 570_000, 855_000];
+  const rates = [2.5, 3.625, 4.75, 5.875, 7, 8.125];
+  const fixedMonthsList = [1, 2, 3, 6, 12, 24];
+  const capStyles = [
+    { overrides: EVEN_OUT_CAP_55 },
+    { overrides: EVEN_OUT_CAP_225 },
+    { overrides: EVEN_OUT_CAP_115 },
+  ];
+  const loans = [];
+  for (const principal of principals) {
+    for (const ratePercent of rates) {
+      for (const fixedMonths of fixedMonthsList) {
+        for (const capStyle of capStyles) {
+          loans.push({
+            principal,
+            ratePercent,
+            monthCount: 360,
+            armOverrides: { fixedMonths, ...capStyle.overrides },
+          });
+        }
+      }
+    }
+  }
+  return loans;
+}
+
+function assertEvenOutCentsMatchesBinarySearch(loan) {
   const {
     principal,
     ratePercent,
     monthCount,
     armOverrides = {},
     adjustmentStats = {},
+    label = '',
   } = loan;
   const arm = sheetArmTerms(armOverrides);
   const report = buildReport(
@@ -1175,9 +1233,6 @@ function assertEvenOutMatchesBinarySearch(loan) {
   );
   const initialPaymentCents = report.monthly_payment_cents;
   const maxChangeCents = report.arm.first_adjustment.max_change_cents;
-  const evenStats = { yearlyExtraCents: 0 };
-  const monthlyStats = normalizeEvenOutStats(adjustmentStats);
-
   const searchedEven = evenOutCentsByBinarySearch(
     principal,
     ratePercent,
@@ -1185,27 +1240,39 @@ function assertEvenOutMatchesBinarySearch(loan) {
     arm,
     initialPaymentCents,
     maxChangeCents,
-    evenStats,
+    { yearlyExtraCents: 0 },
   );
-  assert.equal(
-    searchedEven,
-    report.arm.even_out_cents,
-    `${loan.label}: even_out_cents`,
-  );
+  const prefix = label ? `${label}: ` : '';
+  assert.equal(searchedEven, report.arm.even_out_cents, `${prefix}even_out_cents`);
+  return report;
+}
 
+function assertEvenOutAndMonthlyMatchBinarySearch(loan) {
+  const report = assertEvenOutCentsMatchesBinarySearch(loan);
+  const {
+    principal,
+    ratePercent,
+    monthCount,
+    armOverrides = {},
+    adjustmentStats = {},
+    label = '',
+  } = loan;
+  const arm = sheetArmTerms(armOverrides);
+  const monthlyStats = normalizeEvenOutStats(adjustmentStats);
   const searchedMonthly = evenOutCentsByBinarySearch(
     principal,
     ratePercent,
     monthCount,
     arm,
-    initialPaymentCents,
-    maxChangeCents,
+    report.monthly_payment_cents,
+    report.arm.first_adjustment.max_change_cents,
     monthlyStats,
   );
+  const prefix = label ? `${label}: ` : '';
   assert.equal(
     searchedMonthly,
     report.arm.monthly_extra_cents,
-    `${loan.label}: monthly_extra_cents`,
+    `${prefix}monthly_extra_cents`,
   );
 }
 
@@ -1248,13 +1315,6 @@ test('even-out closed form matches test-only binary search on walks', () => {
       monthCount: 360,
       armOverrides: { initialCapThousandths: 0, lifetimeCapThousandths: 0 },
       adjustmentStats: {},
-    },
-    {
-      label: 'payoff before first adjustment',
-      principal: 570_000,
-      ratePercent: 5.875,
-      monthCount: 360,
-      adjustmentStats: { yearlyExtraCents: 10_000_000, yearlyMonth: 1, startMonth: 10 },
     },
     {
       label: 'F6 margin 3% lifetime cap 3%',
@@ -1306,35 +1366,39 @@ test('even-out closed form matches test-only binary search on walks', () => {
     },
   ];
 
-  const principals = [100_000, 570_000, 855_000];
-  const rates = [3.25, 5.875, 6.99, 7.375];
-  const fixedMonthsList = [36, 84];
-  const capStyles = [
-    { suffix: '5/2/5', overrides: {} },
-    { suffix: '2/2/5', overrides: { initialCapThousandths: 2000, periodicCapThousandths: 2000 } },
-  ];
-
-  const gridLoans = [];
-  for (const principal of principals) {
-    for (const ratePercent of rates) {
-      for (const fixedMonths of fixedMonthsList) {
-        for (const capStyle of capStyles) {
-          gridLoans.push({
-            label: `grid ${principal} @ ${ratePercent}% fixed ${fixedMonths}mo ${capStyle.suffix}`,
-            principal,
-            ratePercent,
-            monthCount: 360,
-            armOverrides: { fixedMonths, ...capStyle.overrides },
-            adjustmentStats: {},
-          });
-        }
-      }
-    }
+  for (const loan of namedLoans) {
+    assertEvenOutAndMonthlyMatchBinarySearch(loan);
   }
 
-  const loans = [...namedLoans, ...gridLoans];
-  for (const loan of loans) {
-    assertEvenOutMatchesBinarySearch(loan);
+  const payoffBeforeAdjustment = {
+    label: 'payoff before first adjustment yearly',
+    principal: 570_000,
+    ratePercent: 5.875,
+    monthCount: 360,
+    adjustmentStats: { yearlyExtraCents: 10_000_000, yearlyMonth: 1, startMonth: 10 },
+  };
+  const payoffReport = assertEvenOutCentsMatchesBinarySearch(payoffBeforeAdjustment);
+  assert.equal(payoffReport.arm.monthly_extra_cents, 0);
+  assert.equal(
+    evenOutCentsByBinarySearch(
+      payoffBeforeAdjustment.principal,
+      payoffBeforeAdjustment.ratePercent,
+      payoffBeforeAdjustment.monthCount,
+      sheetArmTerms(),
+      payoffReport.monthly_payment_cents,
+      payoffReport.arm.first_adjustment.max_change_cents,
+      normalizeEvenOutStats(payoffBeforeAdjustment.adjustmentStats),
+    ),
+    0,
+  );
+
+  const grid48 = evenOutGrid48Loans();
+  const grid432 = evenOutGrid432Loans();
+  assert.equal(grid48.length, 48);
+  assert.equal(grid432.length, 432);
+  const gridLoans = [...grid48, ...grid432];
+  assert.equal(gridLoans.length, 480);
+  for (const loan of gridLoans) {
+    assertEvenOutCentsMatchesBinarySearch({ ...loan, adjustmentStats: {} });
   }
-  assert.equal(loans.length, 60);
 });
