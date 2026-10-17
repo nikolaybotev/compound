@@ -606,8 +606,8 @@ describe("loan scenarios storage and prevailing figures", () => {
     scenario.applied = applied;
     const figures = scenarioFigures(scenario);
     expect(figures?.prevailingExtraCents).toBe(10_000);
-    expect(figures?.modalPaymentCents).toBe(493_534);
-    expect(figures?.totalCents).toBe(595_159);
+    expect(figures?.modalPaymentCents).toBe(337_177);
+    expect(figures?.totalCents).toBe(438_802);
   });
 
   test("F3 ARM $100 in every month", () => {
@@ -658,12 +658,12 @@ describe("loan scenarios storage and prevailing figures", () => {
     for (let month = 1; month <= 68; month += 1) applied.set(month, 1);
     scenario.applied = applied;
     expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(100);
-    expect(scenarioFigures(scenario)?.totalCents).toBe(595_410);
+    expect(scenarioFigures(scenario)?.totalCents).toBe(428_902);
     const shorter = new Map(applied);
     shorter.delete(68);
     scenario.applied = shorter;
     expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(0);
-    expect(scenarioFigures(scenario)?.totalCents).toBe(595_311);
+    expect(scenarioFigures(scenario)?.totalCents).toBe(428_802);
   });
 
   test("F8 ARM lump payoff in month 1", () => {
@@ -742,18 +742,18 @@ describe("loan scenarios storage and prevailing figures", () => {
     expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(0);
   });
 
-  test("F5 7/1 ARM worst case heading total", () => {
+  test("S3 7/1 ARM worst case uses initial payment", () => {
     const scenario = freshConventional(now);
     scenario.draft.rate = "5.875";
     scenario.arm = defaultArm();
     scenario.arm.enabled = true;
     scenario.armStored = true;
     const figures = scenarioFigures(scenario);
-    expect(figures?.modalPaymentCents).toBe(503_771);
-    expect(figures?.totalCents).toBe(595_396);
+    expect(figures?.modalPaymentCents).toBe(337_177);
+    expect(figures?.totalCents).toBe(428_802);
   });
 
-  test("F6 ARM tie uses earlier payment amount", () => {
+  test("S6 ARM 15-year fixed period uses initial payment", () => {
     const scenario = freshConventional(now);
     scenario.draft.rate = "5.875";
     scenario.arm = defaultArm();
@@ -799,6 +799,51 @@ describe("loan scenarios storage and prevailing figures", () => {
     expect(scenarioFigures(scenario)?.prevailingExtraCents).toBe(57_000_000);
     expect(scenarioFigures(scenario)?.modalPaymentCents).toBe(393_685);
     expect(scenarioFigures(scenario)?.totalCents).toBe(57_485_310);
+  });
+
+  test("S1 sample ARM with fixed-period even-out extra", () => {
+    const scenario = freshConventional(now);
+    scenario.draft.rate = "5.5";
+    scenario.draft.start = "2026-11";
+    scenario.arm = defaultArm();
+    scenario.arm.enabled = true;
+    scenario.armStored = true;
+    const applied = new Map<number, number>();
+    for (let month = 1; month <= 84; month += 1) applied.set(month, 823.6);
+    scenario.applied = applied;
+    const figures = scenarioFigures(scenario);
+    expect(figures?.modalPaymentCents).toBe(323_640);
+    expect(figures?.prevailingExtraCents).toBe(82_360);
+    expect(figures?.totalCents).toBe(497_625);
+    const loan = loanForLevelExtras(scenario);
+    const report = loanReport(loan, new Map(applied), financedCentsFor(scenario));
+    expect(report.arm?.max_payment_cents).toBe(406_000);
+    expect(report.arm?.max_payment_month).toBe(85);
+    expect(paymentDate("2026-11", 85)).toEqual({ year: 2033, month: 12 });
+    scenario.applied = new Map([[1, 570_000]]);
+    expect(scenarioFigures(scenario)?.modalPaymentCents).toBe(323_640);
+  });
+
+  test("S2 same ARM with no extra", () => {
+    const scenario = freshConventional(now);
+    scenario.draft.rate = "5.5";
+    scenario.draft.start = "2026-11";
+    scenario.arm = defaultArm();
+    scenario.arm.enabled = true;
+    scenario.armStored = true;
+    const figures = scenarioFigures(scenario);
+    expect(figures?.modalPaymentCents).toBe(323_640);
+    expect(figures?.totalCents).toBe(415_265);
+  });
+
+  test("S5 ARM at fresh note rate", () => {
+    const scenario = freshConventional(now);
+    scenario.arm = defaultArm();
+    scenario.arm.enabled = true;
+    scenario.armStored = true;
+    const figures = scenarioFigures(scenario);
+    expect(figures?.modalPaymentCents).toBe(393_685);
+    expect(figures?.totalCents).toBe(485_310);
   });
 
   test("F8 legacy-only load and prototype merge", () => {
