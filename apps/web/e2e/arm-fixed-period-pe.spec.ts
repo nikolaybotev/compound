@@ -21,17 +21,17 @@ test("AC2 level checkbox on, $100 in fixed period only", async ({ page }) => {
 
   await expect(page.locator("#scenario")).toHaveAttribute(
     "aria-label",
-    "1: $5,952 - 600K | 5% down | 5.875% | 30 years | 7/1",
+    "1: $4,388 - 600K | 5% down | 5.875% | 30 years | 7/1",
   );
 
   const monthly = page.getByRole("region", { name: "Monthly payment" });
-  await expect(monthly).toContainText("$5,951.59");
+  await expect(monthly).toContainText("$4,388.02");
   await expect(monthly).toContainText("$100.00 PE");
 
   const bar = monthly.locator(".summary-prevailing-track");
   await expect(bar).toHaveAttribute(
     "aria-label",
-    "Principal and interest $4,935.34, Taxes and insurance $916.25, Prevailing extra $100.00",
+    "Principal and interest $3,371.77, Taxes and insurance $916.25, Prevailing extra $100.00",
   );
   const peGrow = await monthly.locator(".prevailing-pe").evaluate((el) => el.style.flexGrow);
   expect(peGrow).toBe("10000");
