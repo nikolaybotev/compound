@@ -1026,7 +1026,10 @@ export function saveStored(storage: FullStorageLike | undefined, set: StoredSet)
 }
 
 export function prevailingExtraCents(report: Report): number {
-  const months = report.payoff_month;
+  const months =
+    report.arm !== undefined
+      ? Math.min(report.payoff_month, report.arm.fixed_months)
+      : report.payoff_month;
   const rows = report.schedule.slice(0, months);
   const counts = new Map<number, number>();
   for (const row of rows) {
