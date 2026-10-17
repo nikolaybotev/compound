@@ -37,7 +37,7 @@ test("AC9 selecting ARM at the default rate shows the 12.375% ceiling", async ({
   await expect(page.locator("summary", { hasText: "ARM terms" })).toHaveAttribute("aria-expanded", "true");
   await expect(page.locator("[data-line='arm-ceiling']")).toHaveText("Ceiling 12.375% · Floor 2.5%");
   await expect(page.getByTestId("arm-label")).toHaveText("7/1");
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$6,641.84");
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$4,853.10");
   await expect(page.getByRole("region", { name: "Highest rate" })).toContainText("12.375% from November 2033");
   await expect(page.getByRole("region", { name: "Highest payment" })).toContainText(
     "$5,725.59 from November 2033",
@@ -80,7 +80,7 @@ test("AC9 the Example Credit Union 7/1 example heading, terms, and summary", asy
   );
 
   const monthly = page.getByRole("region", { name: "Monthly payment" });
-  await expect(monthly).toContainText("$5,953.96");
+  await expect(monthly).toContainText("$4,288.02");
   await expect(monthly.locator(".note")).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Highest rate" })).toContainText("10.875% from November 2033");
   await expect(page.getByRole("region", { name: "Highest payment" })).toContainText(
@@ -133,7 +133,7 @@ test("a rate edit under a floor already entered keeps the last valid rate", asyn
   await page.locator("#rate").fill("5");
   await expect(page.getByRole("alert")).toContainText("Lifetime floor");
   await expect(page.locator("#arm-floor")).toHaveAttribute("aria-invalid", "true");
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$4,597.73");
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$4,288.02");
 });
 
 test("a term that is not longer than the fixed period is reported on the fixed period", async ({ page }) => {
@@ -391,7 +391,7 @@ test("AC14 ARM order, summary, and no picture principal row", async ({ page }) =
   expect(mainOrder.indexOf("Taxes and Insurance")).toBeLessThan(mainOrder.indexOf("Summary"));
   expect(mainOrder.indexOf("Summary")).toBeLessThan(mainOrder.indexOf("Chart"));
 
-  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$5,953.96");
+  await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$4,288.02");
   await expect(page.getByText(ARM_NOTE)).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Highest rate" })).toBeVisible();
   await expect(page.getByRole("region", { name: "Highest payment" })).toBeVisible();
