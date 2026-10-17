@@ -1043,10 +1043,13 @@ export function prevailingExtraCents(report: Report): number {
 }
 
 export function modalPaymentCents(report: Report): number {
+  if (report.arm !== undefined) {
+    return report.monthly_payment_cents;
+  }
   const rows = report.schedule.slice(0, report.payoff_month);
   const counts = new Map<number, { count: number; firstMonth: number }>();
   for (const row of rows) {
-    const payment = report.arm ? (row.payment_cents ?? 0) : report.monthly_payment_cents;
+    const payment = report.monthly_payment_cents;
     const entry = counts.get(payment) ?? { count: 0, firstMonth: row.month };
     entry.count += 1;
     counts.set(payment, entry);
