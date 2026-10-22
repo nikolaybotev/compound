@@ -87,7 +87,7 @@ test("AC9 the Example Credit Union 7/1 example heading, terms, and summary", asy
     "$5,037.71 from November 2033",
   );
   await expect(page.getByRole("region", { name: "Total interest paid" })).toContainText("$1,103,636.33");
-  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("October 2056");
+  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("November 1, 2056");
 
   await page.locator("#product").selectOption("fixed");
   expect(await headingText(page)).toBe(
@@ -141,10 +141,10 @@ test("a term that is not longer than the fixed period is reported on the fixed p
   await page.locator("#years").fill("7");
   await expect(page.getByRole("alert")).toContainText("Fixed period must be shorter than the term");
   await expect(page.locator("#arm-fixed-years")).toHaveAttribute("aria-invalid", "true");
-  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("October 2056");
+  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("November 1, 2056");
   await page.locator("#years").fill("15");
   await expect(page.getByRole("alert")).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("October 2041");
+  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("November 1, 2041");
 });
 
 test("switching to fixed and back keeps the terms and a closed disclosure stays closed", async ({ page }) => {
@@ -342,7 +342,7 @@ test("AC10 an index at the first adjustment recomputes the path", async ({ page 
   await expect(page.getByRole("region", { name: "Interest saved" })).toContainText("$309.06");
   await expect(page.getByRole("region", { name: "Extra principal paid" })).toContainText("$100.00");
   await expect(page.getByRole("region", { name: "Months saved" })).toHaveText(/Months saved\s*0$/);
-  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("October 2056 (30 years)");
+  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("November 1, 2056 (30 years)");
   await expect(page.getByRole("region", { name: "Monthly payment" }).locator(".note")).toHaveCount(0);
 
   await page.locator("#product").selectOption("fixed");

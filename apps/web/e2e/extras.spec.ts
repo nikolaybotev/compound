@@ -39,7 +39,7 @@ test("AC5 Apply $100 monthly, and typing does nothing until Apply", async ({ pag
   expect(labels.indexOf("Extra principal paid")).toBe(labels.indexOf("Interest saved") - 1);
   await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$4,818.47");
   await expect(page.getByRole("region", { name: "Payoff date" })).toContainText(
-    "June 2054 (27 years 8 months)",
+    "July 1, 2054 (27 years 8 months)",
   );
   await expect(page.locator("[data-bar]")).toHaveCount(332);
 });
@@ -74,7 +74,7 @@ test("AC7 $1,000 every January lands on month 3", async ({ page }) => {
   await expect(extra(page, 1)).toHaveValue("");
   await expect(extra(page, 3)).toHaveValue("1000.00");
   await expect(page.getByRole("region", { name: "Interest saved" })).toContainText("$66,633.36");
-  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("October 2054 (28 years)");
+  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("November 1, 2054 (28 years)");
   await expect(page.getByRole("region", { name: "Extra principal paid" })).toContainText("$28,000.00");
   await expect(page.getByRole("region", { name: "Months saved" })).toContainText("24 (2 years)");
 });

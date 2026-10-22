@@ -579,6 +579,10 @@ input.extra[data-edited="true"] {
   align-items: baseline;
   justify-content: space-between;
   gap: 1rem;
+  margin-bottom: 0.35rem;
+}
+
+.schedule-footnote {
   margin-bottom: 0.75rem;
 }
 

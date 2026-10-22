@@ -35,7 +35,7 @@ You may derive principal as purchase price minus down payment when both are give
 
 ## How to read a plan
 
-Month 1 is the first payment. Treat the first year as months 1 through 12. Treat every month, when no end is named, as months 1 through the payment count `n`: the `--months` value when the term was given in months, or `years * 12` when the term was given with `--years`. On a recast, the first run's JSON `months` is `n` for expanding "every month" on that run. Do not expand an extra plan with `years * 12` when the user gave the term in months.
+Month 1 is the first payment. The start month is the funding month. Payment 1 accrues in the next calendar month and is due on the 1st of the month after that. When a borrower asks for a payoff date, they mean the due date of the last payment, not the accrual month on the schedule. If the user gives a first-payment due date and no funding month, the funding month is two calendar months earlier under that rule. If the user says the lender applied an interest credit, ask before shifting the funding month, and say the amortization page does not model a credit. Treat the first year as months 1 through 12. Treat every month, when no end is named, as months 1 through the payment count `n`: the `--months` value when the term was given in months, or `years * 12` when the term was given with `--years`. On a recast, the first run's JSON `months` is `n` for expanding "every month" on that run. Do not expand an extra plan with `years * 12` when the user gave the term in months.
 
 Write one CSV row per extra payment. The header is `month,extra`. The example question ($570,000, 7%, 30 years, $100 extra in each of the first 12 payments) is complete: write twelve rows of `100` and do not ask for more facts. Write the file in a temporary directory. Do not commit it.
 
@@ -80,7 +80,7 @@ Map the recast timing:
 - "After N months" → payment month `N`
 - "At month M" → payment month `M`
 
-A calendar recast needs the first payment month. Payment number is `(year2 - year1) * 12 + (month2 - month1) + 1`, with months numbered January = 1. If the first payment month is missing and the recast is named as a calendar month, ask. If the loan start could be either the closing month or the first payment month and the user did not say which, ask.
+A calendar recast needs the first payment month. Payment number is `(year2 - year1) * 12 + (month2 - month1) + 1`, with months numbered January = 1. If the first payment month is missing and the recast is named as a calendar month, ask. If the user names a funding month or a first-payment due date without saying which calendar month payment 1 accrues in, ask using the funding-month and due-date rules above.
 
 A lump sum paid with the recast is an extra row on the recast month in the first run's CSV (duplicate months sum).
 
