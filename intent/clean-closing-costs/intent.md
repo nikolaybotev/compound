@@ -7,6 +7,7 @@
 | Status | Draft |
 | Stage | 1 · Plan |
 | Feeds | [spec.md](spec.md) → [plan.md](plan.md) |
+| Evidence | [case-studies.md](case-studies.md) — Bank B and reference quotes that support the shipped 0.16 defaults (not a change request). |
 | Builds on | [intent/complete-loan-picture/](../complete-loan-picture/intent.md), [intent/ui-facelift/](../ui-facelift/intent.md), [intent/loan-scenarios/](../loan-scenarios/intent.md) |
 
 ## Problem
