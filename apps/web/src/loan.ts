@@ -381,6 +381,58 @@ export function formatPayoffDate(startMonth: string, payoffMonth: number): strin
   return `${MONTH_NAMES[due.month - 1]} 1, ${due.year} (${yearsAndMonths(payoffMonth)})`;
 }
 
+export type CalendarDate = { year: number; month: number; day: number };
+
+export function formatCalendarDay(date: CalendarDate): string {
+  return `${MONTH_NAMES[date.month - 1]} ${date.day}, ${date.year}`;
+}
+
+export function formatDueOnFirst(startMonth: string, paymentNumber: number): string {
+  const due = dueDate(startMonth, paymentNumber);
+  return formatCalendarDay({ year: due.year, month: due.month, day: 1 });
+}
+
+function subtractUtcDays(from: CalendarDate, days: number): CalendarDate {
+  const time = Date.UTC(from.year, from.month - 1, from.day) - days * 86_400_000;
+  const next = new Date(time);
+  return {
+    year: next.getUTCFullYear(),
+    month: next.getUTCMonth() + 1,
+    day: next.getUTCDate(),
+  };
+}
+
+export function armChangeDate(startMonth: string, firstAdjustmentPayment: number): CalendarDate {
+  const accrual = paymentDate(startMonth, firstAdjustmentPayment);
+  return { year: accrual.year, month: accrual.month, day: 1 };
+}
+
+export function armTimelineLines(
+  startMonth: string,
+  firstAdjustmentPayment: number,
+  adjustMonths: number,
+): string[] {
+  const change = armChangeDate(startMonth, firstAdjustmentPayment);
+  const firstDue = dueDate(startMonth, firstAdjustmentPayment);
+  const firstDueDay: CalendarDate = { year: firstDue.year, month: firstDue.month, day: 1 };
+  const indexRead = subtractUtcDays(change, 45);
+  const initialFrom = subtractUtcDays(firstDueDay, 240);
+  const initialThrough = subtractUtcDays(firstDueDay, 210);
+  const shortInterval = adjustMonths === 1;
+  const laterMinDays = shortInterval ? 25 : 60;
+  const laterMaxDays = 120;
+  const laterFrom = subtractUtcDays(firstDueDay, laterMaxDays);
+  const laterThrough = subtractUtcDays(firstDueDay, laterMinDays);
+  const laterWindow = shortInterval ? "25 to 120" : "60 to 120";
+  return [
+    `Change date ${formatCalendarDay(change)}. That month's schedule row is the first month at the new rate. The payment due on that date is still the previous amount.`,
+    `Index read ${formatCalendarDay(indexRead)}, 45 days before the change date. The usual agency-note lookback. The note can set a different count.`,
+    `Initial notice ${formatCalendarDay(initialFrom)} – ${formatCalendarDay(initialThrough)}, 210 to 240 days before the first new payment.`,
+    `Later notice ${formatCalendarDay(laterFrom)} – ${formatCalendarDay(laterThrough)}, ${laterWindow} days before that payment. A notice of the actual rate cannot be sent before the index is read. That limit is an inference, not a separate rule.`,
+    `After that, the rate can change every ${adjustMonths} months, on the 1st of the accrual month, and the new payment is first due on the 1st of the next month.`,
+  ];
+}
+
 export function shortDate(year: number, month: number): string {
   return `${SHORT_MONTHS[month - 1]} ${year}`;
 }

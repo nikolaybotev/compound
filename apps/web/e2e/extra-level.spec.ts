@@ -3,7 +3,7 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 const origin = "http://127.0.0.1:4173";
 const leaks = new WeakMap<BrowserContext, string[]>();
 
-const LEVEL_LABEL = "Match the fixed-period total after each reset";
+const LEVEL_LABEL = "Match the initial-period total after each reset";
 
 test.beforeEach(async ({ context }) => {
   await blockForeignHosts(context);

@@ -196,6 +196,28 @@ test('AC6 repo document strings', () => {
   assert.ok(review.includes('intent/arm-concepts/'));
 });
 
+test('AC11 CHARM notice windows and payment timing', () => {
+  const skill = readSkill();
+  const procedure = skill.slice(skill.indexOf('## Procedure'), skill.indexOf('## Sequence diagram'));
+  for (const phrase of [
+    'new payment is first due',
+    'payment due on the change date itself is still the previous amount',
+    '12 CFR 1026.20(d)',
+    '210 to 240 days',
+    '12 CFR 1026.20(c)(2)',
+    '60 and no more than 120 days',
+    '7/6',
+    '5/6',
+    '25-to-120-day',
+    'every 60 days or more often',
+    '1-month adjustment interval',
+    'initial period',
+    'adjustment period',
+  ]) {
+    assert.ok(procedure.includes(phrase), `Procedure missing: ${phrase}`);
+  }
+});
+
 test('AC8 How to answer phrases', () => {
   const skill = readSkill();
   const section = skill.slice(skill.indexOf('## How to answer'));
