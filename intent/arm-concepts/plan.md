@@ -3,10 +3,16 @@
 | | |
 |---|---|
 | Implements | [spec.md](spec.md) Draft 3 |
-| Status | Draft 3 |
+| Status | Draft 4 |
 | Stage | 3 · Build |
 
 Spec wins. Update this file in the same change whenever implementation departs from it.
+
+## Amendment (2026-10-22) — types explainer
+
+Spec Draft 4 requirement 11, D13, AC3, AC8, AC9, and AC10 supersede the earlier sentences in this plan that say the skill contains no dollar amount, that its level-two headings are only the original five, that interest-only and payment-option loans are absent from the skill, and that `README.md` and `AGENTS.md` say the skill produces no number. Those documents now say it runs nothing and does not compute a payment, rate, or index for a person's loan. The procedure still has no dollar amount. The skill still calculates nothing for a person's loan and still runs nothing.
+
+This amendment edits `.agents/skills/arm-loan-concepts/SKILL.md`, `arm_loan_concepts.test.js`, `README.md`, `AGENTS.md`, `REVIEW.md`, and this folder. It does not edit `amortize.js`, `compound_interest_monthly.js`, `origination_fees.js`, the calculator skill, the fee skill, `apps/web`, or a workflow, and it does not bump the page version. The page has no help or learn area, so the explainer stays in the concepts skill.
 
 ## Stops
 
@@ -22,13 +28,14 @@ This folder lands as its own pull request holding `intent.md`, `spec.md`, and `p
 |---|---|---|
 | AC1 | `arm_loan_concepts.test.js`: file exists, frontmatter `name`, the two `description` phrases after whitespace is collapsed, no `disable-model-invocation: true`, `readdirSync` of the skill directory is exactly `['SKILL.md']` | 0 |
 | AC2 | Same test: every required name, formula, relation, rounding, no-index, and through-maturity phrase present; `mortgage-loan-calculator` exactly once | 0 |
-| AC3 | Same test: no `/\$\s?\d/`, no `/\b(daily|weekly)\b/i`, no `http`, `node scripts/`, `compound_interest_monthly`, `--json`, `--amount`, `--index`, no case-sensitive `R0`, `C1`, `Cp`, `CL`, `F1`, `FL`, `Rc`, `upper_j`, `lower_j`, and no `erDiagram`, `classDiagram`, or `flowchart` | 0 |
+| AC3 | Same test: dollar amounts are only the requirement 11 illustrations and only inside `## Types`; no `/\$\s?\d/` outside that section; no `/\b(daily|weekly)\b/i`, no `http`, `node scripts/`, `compound_interest_monthly`, `--json`, `--amount`, `--index`, no case-sensitive `R0`, `C1`, `Cp`, `CL`, `F1`, `FL`, `Rc`, `upper_j`, `lower_j`, and no `erDiagram`, `classDiagram`, or `flowchart` | 0 |
 | AC4 | Same test: exactly one ` ```mermaid ` fence followed by `sequenceDiagram`; the block has the participants, both sets of bounds, and the required words, and no `;`, `#`, or `^`. The render check is by hand in the pull request | 0 |
 | AC5 | Same test: the sheet's values, the start-rate and ceiling sentence, `30 years`, the `one example` / `not the definition` label; no `Buy-Down` before the first ` ```mermaid ` fence | 0 |
 | AC6 | Same test for the `README.md`, `AGENTS.md`, and `REVIEW.md` strings; the two other skills unchanged is a pull-request diff check | 0 |
 | AC7 | `node --test` exits 0 with the new file collected; the three existing `*.test.js` files unchanged is a pull-request diff check | 0 |
-| AC8 | Same test: the How to answer phrases after the `## How to answer` heading | 0 |
-| AC9 | Same test: the five headings each once, in order, with the ` ```mermaid ` fence between `## Sequence diagram` and `## Example: Example Credit Union 7/1` | 0 |
+| AC8 | Same test: the How to answer phrases after the `## How to answer` heading, including the labeled-illustration refusal | 0 |
+| AC9 | Same test: the six headings, `## Types` first, each once, in order, with the ` ```mermaid ` fence between `## Sequence diagram` and `## Example: Example Credit Union 7/1` | 0 |
+| AC10 | Same test: the Types phrases in spec AC10, between `## Types` and `## Parameters` | 0 |
 
 ## Phase 0 — Skill, test, and repo documents
 

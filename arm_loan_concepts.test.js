@@ -77,7 +77,31 @@ test('AC2 required names, formulas, and relations', () => {
 
 test('AC3 forbidden content', () => {
   const skill = readSkill();
-  assert.doesNotMatch(skill, /\$\s?\d/);
+  const allowedDollars = new Set([
+    '$600,000',
+    '$570,000',
+    '$4,853',
+    '$3,936.85',
+    '$3,503.13',
+    '$433.72',
+    '$5,725.59',
+    '$211,000',
+    '$703.33',
+  ]);
+  const amounts = skill.match(/\$\d{1,3}(?:,\d{3})*(?:\.\d+)?/g) ?? [];
+  assert.ok(amounts.length > 0, 'labeled illustrations are missing');
+  for (const amount of amounts) {
+    assert.equal(/\s/.test(amount), false, `dollar amount has whitespace: ${amount}`);
+    assert.ok(allowedDollars.has(amount), `unexpected dollar amount ${amount}`);
+  }
+  for (const amount of allowedDollars) {
+    assert.ok(skill.includes(amount), `missing illustration ${amount}`);
+  }
+  const typesStart = skill.indexOf('## Types');
+  const parametersStart = skill.indexOf('## Parameters');
+  assert.ok(typesStart >= 0 && parametersStart > typesStart);
+  const outside = skill.slice(0, typesStart) + skill.slice(parametersStart);
+  assert.doesNotMatch(outside, /\$\s?\d/);
   assert.doesNotMatch(skill, /\b(daily|weekly)\b/i);
   for (const forbidden of [
     'http',
@@ -190,6 +214,10 @@ test('AC8 How to answer phrases', () => {
     'negative-amortization',
     'balloon',
     'payment-capped',
+    'labeled illustration',
+    'CFPB sample',
+    "person's loan",
+    'do not scale',
   ]) {
     assert.ok(section.includes(phrase), `How to answer missing: ${phrase}`);
   }
@@ -198,6 +226,7 @@ test('AC8 How to answer phrases', () => {
 test('AC9 heading order and mermaid placement', () => {
   const skill = readSkill();
   const headings = [
+    '## Types',
     '## Parameters',
     '## Procedure',
     '## Sequence diagram',
@@ -216,4 +245,54 @@ test('AC9 heading order and mermaid placement', () => {
   const seqIdx = skill.indexOf('## Sequence diagram');
   const exampleIdx = skill.indexOf('## Example: Example Credit Union 7/1');
   assert.ok(fenceIdx > seqIdx && fenceIdx < exampleIdx);
+});
+
+test('AC10 types explainer', () => {
+  const skill = readSkill();
+  const types = skill.slice(skill.indexOf('## Types'), skill.indexOf('## Parameters'));
+  for (const phrase of [
+    'two independent axes',
+    'Traditional ARM',
+    'Hybrid ARM',
+    '1/1',
+    '5/1',
+    '7/1',
+    '10/1',
+    '5/6m',
+    '7/6m',
+    '5/3',
+    'Fully amortizing',
+    'Interest-only',
+    'Option ARM',
+    'payment-option',
+    'positive amortization',
+    'zero amortization',
+    'negative amortization',
+    'does not compound',
+    '1-Year CMT',
+    'SOFR',
+    'fully indexed rate',
+    'lookback',
+    '5/2/5',
+    '2/2/8',
+    '3.25%',
+    '4% margin',
+    'teaser',
+    'composite rate',
+    'CHARM booklet',
+    'Qualified Mortgage',
+    'Nashua',
+    'Brentwood',
+    '1.683%',
+    '1.32%',
+    '570000 × 0.07375 / 12',
+    '211000 × 0.04 / 12',
+    '12.375%',
+    'labeled illustration',
+    'CFPB sample illustration',
+    "not a reader's loan",
+    '7.375% + 5 points = 12.375%',
+  ]) {
+    assert.ok(types.includes(phrase), `Types missing: ${phrase}`);
+  }
 });
