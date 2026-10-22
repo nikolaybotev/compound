@@ -57,15 +57,23 @@ import {
 } from "./loan";
 import {
   FICO_RANGES,
+  TITLE_PRESET_RATES,
   buildPicture,
-  loadStoredCount,
+  centsToProrationField,
+  clampClosingDay,
+  closingInterestDays,
+  closingMonthParts,
+  defaultProrationCents,
   ficoBand,
   ficoRangeScore,
+  parseClosingDay,
   parseFicoScore,
   parsePicture,
   parseWholeCount,
   percentThousandths,
   pmiDraftForLoan,
+  sellerCreditWarning,
+  titlePercentHundredThousandths,
   type PictureDraft,
   type PictureInputField,
   type PictureValues,
@@ -78,28 +86,6 @@ const MONTHLY_AMOUNT = "Additional amount to monthly payment";
 const YEARLY_AMOUNT = "Additional yearly payment";
 const PROPERTY_TAX_NOTE = "Nashua: 1.683%; Brentwood: 1.32%.";
 
-type PictureCounts = {
-  insuranceMonths: number;
-  taxMonths: number;
-  interestDays: number;
-};
-
-function pictureCountsFromValues(values: PictureValues): PictureCounts {
-  return {
-    insuranceMonths: values.insuranceMonths,
-    taxMonths: values.taxMonths,
-    interestDays: values.interestDays,
-  };
-}
-
-function pictureCountsFromDraft(draft: PictureDraft): PictureCounts {
-  return {
-    insuranceMonths: loadStoredCount(draft.insuranceMonths, 12),
-    taxMonths: loadStoredCount(draft.taxMonths, 4),
-    interestDays: loadStoredCount(draft.interestDays, 15),
-  };
-}
-
 function readInitial(): {
   stored: StoredSet;
   scenario: Scenario;
@@ -110,7 +96,7 @@ function readInitial(): {
   const scenario = stored.scenarios[stored.active];
   const parsed = parseLoan(scenario.draft);
   if (!parsed.ok) throw new Error(parsed.message);
-  const picture = parsePicture(scenario.picture, pictureCountsFromDraft(scenario.picture));
+  const picture = parsePicture(scenario.picture, scenario.draft.start);
   if (!picture.ok) throw new Error(picture.message);
   return { stored, scenario, loan: parsed.loan, pictureValues: picture.values };
 }
@@ -136,7 +122,7 @@ export function App() {
   const [pictureDraft, setPictureDraft] = useState(initial.scenario.picture);
   const [pictureSaved, setPictureSaved] = useState(initial.scenario.picture);
   const [pictureValues, setPictureValues] = useState(initial.pictureValues);
-  const [pictureCounts, setPictureCounts] = useState(() => pictureCountsFromValues(initial.pictureValues));
+  const [prorationStored, setProrationStored] = useState(initial.scenario.prorationStored);
   const [error, setError] = useState<string | null>(null);
   const [invalidField, setInvalidField] = useState<string | null>(null);
   const [pictureError, setPictureError] = useState<string | null>(null);
@@ -167,12 +153,13 @@ export function App() {
     picture: initial.scenario.picture,
     arm: initial.scenario.arm,
     armStored: initial.scenario.armStored,
+    prorationStored: initial.scenario.prorationStored,
   });
 
   function reseedFromScenario(scenario: Scenario) {
     const parsed = parseLoan(scenario.draft);
     if (!parsed.ok) throw new Error(parsed.message);
-    const picture = parsePicture(scenario.picture, pictureCountsFromDraft(scenario.picture));
+    const picture = parsePicture(scenario.picture, scenario.draft.start);
     if (!picture.ok) throw new Error(picture.message);
     setDraft(scenario.draft);
     setValidText({ down: scenario.draft.down, rate: scenario.draft.rate, fico: scenario.draft.fico });
@@ -184,7 +171,7 @@ export function App() {
     setPictureDraft(scenario.picture);
     setPictureSaved(scenario.picture);
     setPictureValues(picture.values);
-    setPictureCounts(pictureCountsFromValues(picture.values));
+    setProrationStored(scenario.prorationStored);
     setOpenYears(
       scenario.openYears
         ? new Set(scenario.openYears)
@@ -211,6 +198,7 @@ export function App() {
       picture: scenario.picture,
       arm: scenario.arm,
       armStored: scenario.armStored,
+      prorationStored: scenario.prorationStored,
     };
   }
 
@@ -240,6 +228,7 @@ export function App() {
       prefill: patch.prefill ?? snapshot.current.prefill,
       openYears: patch.openYears === undefined ? snapshot.current.openYears : patch.openYears,
       picture: patch.picture ?? snapshot.current.picture,
+      prorationStored: patch.prorationStored ?? snapshot.current.prorationStored,
       arm: patch.arm ?? snapshot.current.arm,
       armStored: patch.armStored ?? snapshot.current.armStored,
     };
@@ -320,9 +309,30 @@ export function App() {
   }
 
   const lines = useMemo(
-    () => buildPicture(loan, validText.rate, validText.down, pictureValues),
-    [loan, validText, pictureValues],
+    () => buildPicture(loan, validText.rate, validText.down, draft.start, pictureValues),
+    [loan, validText, draft.start, pictureValues],
   );
+  const closingMonthLabel = useMemo(() => {
+    const { year, month } = closingMonthParts(draft.start);
+    return longDate(year, month);
+  }, [draft.start]);
+  const closingDayCount = useMemo(
+    () => closingInterestDays(draft.start, pictureValues.closingDay),
+    [draft.start, pictureValues.closingDay],
+  );
+  const closingDayCountText =
+    closingDayCount === 1 ? "1 day" : `${closingDayCount} days`;
+  const titlePresetValue = useMemo(() => {
+    const units = titlePercentHundredThousandths(pictureDraft.title);
+    if (units === null) return "";
+    const match = TITLE_PRESET_RATES.find((preset) => preset.units === units);
+    return match?.label ?? "";
+  }, [pictureDraft.title]);
+  const sellerCreditNote = useMemo(() => {
+    const downTh = percentThousandths(validText.down.trim());
+    if (downTh === null) return null;
+    return sellerCreditWarning(downTh, pictureValues.sellerCreditCents, loan.priceCents);
+  }, [validText.down, pictureValues.sellerCreditCents, loan.priceCents]);
   const activeFigures = useMemo(
     () => scenarioFigures(loanSet.scenarios[loanSet.active]),
     [loanSet],
@@ -412,7 +422,22 @@ export function App() {
     let pictureNext: typeof pictureDraft | undefined;
     if (field === "down") {
       pictureNext = pmiDraftForLoan(pictureDraft, next.down, validText.fico);
-      const pictureParsed = parsePicture(pictureNext, pictureCounts);
+    } else if (field === "start") {
+      const day = parseClosingDay(pictureDraft.closingDay) ?? 1;
+      pictureNext = { ...pictureDraft, closingDay: String(clampClosingDay(day, next.start)) };
+    }
+    if (!prorationStored && (field === "price" || field === "down" || field === "start")) {
+      const taxTh = percentThousandths(pictureDraft.tax.trim());
+      if (taxTh !== null) {
+        const base = pictureNext ?? pictureDraft;
+        pictureNext = {
+          ...base,
+          proration: centsToProrationField(defaultProrationCents(parsed.loan.priceCents, taxTh)),
+        };
+      }
+    }
+    if (pictureNext) {
+      const pictureParsed = parsePicture(pictureNext, next.start);
       if (pictureParsed.ok) {
         setPictureDraft(pictureNext);
         setPictureSaved({ ...pictureNext, open: pictureDraft.open, closingOpen: pictureDraft.closingOpen });
@@ -447,7 +472,7 @@ export function App() {
     let pictureNext: typeof pictureDraft | undefined;
     if (ficoBand(score) !== ficoBand(previousScore)) {
       pictureNext = pmiDraftForLoan(pictureDraft, validText.down, String(score));
-      const pictureParsed = parsePicture(pictureNext, pictureCounts);
+      const pictureParsed = parsePicture(pictureNext, draft.start);
       if (pictureParsed.ok) {
         setPictureDraft(pictureNext);
         setPictureSaved({
@@ -673,17 +698,24 @@ export function App() {
   }
 
   function updatePicture(field: PictureInputField, value: string) {
-    const next = { ...pictureDraft, [field]: value };
-    setPictureDraft(next);
-    let counts = pictureCounts;
-    if (field === "insuranceMonths" || field === "taxMonths" || field === "interestDays") {
-      const parsedCount = parseWholeCount(value);
-      if (parsedCount !== null) {
-        counts = { ...counts, [field]: parsedCount };
-        setPictureCounts(counts);
+    let next = { ...pictureDraft, [field]: value };
+    if (field === "closingDay") {
+      const parsedDay = parseClosingDay(value);
+      if (parsedDay !== null) {
+        next = { ...next, closingDay: String(clampClosingDay(parsedDay, draft.start)) };
       }
     }
-    const parsed = parsePicture(next, counts);
+    if (field === "tax" && !prorationStored) {
+      const taxTh = percentThousandths(value.trim());
+      if (taxTh !== null) {
+        next = {
+          ...next,
+          proration: centsToProrationField(defaultProrationCents(loan.priceCents, taxTh)),
+        };
+      }
+    }
+    setPictureDraft(next);
+    const parsed = parsePicture(next, draft.start);
     if (!parsed.ok) {
       setPictureError(parsed.message);
       setPictureInvalid(parsed.field);
@@ -691,17 +723,28 @@ export function App() {
     }
     const saved = { ...next, open: pictureDraft.open, closingOpen: pictureDraft.closingOpen };
     setPictureValues(parsed.values);
-    setPictureCounts(pictureCountsFromValues(parsed.values));
     setPictureSaved(saved);
     setPictureError(null);
     setPictureInvalid(null);
-    persist({ picture: saved });
+    const patch: Partial<Scenario> = { picture: saved };
+    if (field === "proration") {
+      setProrationStored(true);
+      patch.prorationStored = true;
+    }
+    persist(patch);
+  }
+
+  function updateTitlePreset(label: string) {
+    const preset = TITLE_PRESET_RATES.find((entry) => entry.label === label);
+    if (!preset) return;
+    const text = preset.units === 100_000 ? "1" : preset.units === 75_000 ? "0.75" : "0.40";
+    updatePicture("title", text);
   }
 
   function updatePictureBasis(value: string) {
     const next = { ...pictureDraft, interestBasis: value };
     setPictureDraft(next);
-    const parsed = parsePicture(next, pictureCounts);
+    const parsed = parsePicture(next, draft.start);
     if (!parsed.ok) return;
     const saved = { ...next, open: pictureDraft.open, closingOpen: pictureDraft.closingOpen };
     setPictureValues(parsed.values);
@@ -1237,92 +1280,48 @@ export function App() {
         <table class="picture-table">
           <tbody>
             <MoneyRow
-              line="origination"
-              label="Lender origination fee"
-              amount={lines.originationCents}
+              line="lender-fees"
+              label="Lender fees"
+              amount={lines.lenderFeesCents}
               rate={
                 <PictureInput
-                  id="picture-origination"
-                  label="Lender origination"
-                  value={pictureDraft.origination}
-                  invalid={pictureInvalid === "origination"}
-                  suffix="%"
-                  onInput={(value) => updatePicture("origination", value)}
-                />
-              }
-            />
-            <MoneyRow
-              line="processing"
-              label="Lender processing fee"
-              amount={lines.processingCents}
-              rate={
-                <PictureInput
-                  id="picture-processing"
-                  label="Lender processing fee"
-                  value={pictureDraft.processing}
-                  invalid={pictureInvalid === "processing"}
+                  id="picture-lender-fees"
+                  label="Lender fees"
+                  value={pictureDraft.lenderFees}
+                  invalid={pictureInvalid === "lenderFees"}
                   prefix="$"
-                  onInput={(value) => updatePicture("processing", value)}
-                />
-              }
-            />
-            <MoneyRow
-              line="appraisal"
-              label="Conventional appraisal"
-              amount={lines.appraisalCents}
-              rate={
-                <PictureInput
-                  id="picture-appraisal"
-                  label="Conventional appraisal"
-                  value={pictureDraft.appraisal}
-                  invalid={pictureInvalid === "appraisal"}
-                  prefix="$"
-                  onInput={(value) => updatePicture("appraisal", value)}
+                  onInput={(value) => updatePicture("lenderFees", value)}
                 />
               }
             />
             <MoneyRow
               line="title"
-              label="Title and escrow"
+              label="Title, escrow, and recording"
               amount={lines.titleCents}
               rate={
-                <PictureInput
-                  id="picture-title"
-                  label="Title and escrow"
-                  value={pictureDraft.title}
-                  invalid={pictureInvalid === "title"}
-                  suffix="%"
-                  onInput={(value) => updatePicture("title", value)}
-                />
-              }
-            />
-            <MoneyRow
-              line="recording"
-              label="Recording and taxes"
-              amount={lines.recordingCents}
-              rate={
-                <PictureInput
-                  id="picture-recording"
-                  label="Recording and taxes"
-                  value={pictureDraft.recording}
-                  invalid={pictureInvalid === "recording"}
-                  prefix="$"
-                  onInput={(value) => updatePicture("recording", value)}
-                />
-              }
-            />
-            <MoneyRow
-              line="prepaid-insurance"
-              label="Prepaid home insurance"
-              amount={lines.prepaidInsuranceCents}
-              rate={
-                <PictureInput
-                  id="picture-insurance-months"
-                  label="Prepaid home insurance months"
-                  value={pictureDraft.insuranceMonths}
-                  invalid={pictureInvalid === "insuranceMonths"}
-                  onInput={(value) => updatePicture("insuranceMonths", value)}
-                />
+                <span class="picture-title-row">
+                  <div class="field">
+                    <select
+                      id="picture-title-preset"
+                      aria-label="Title, escrow, and recording preset"
+                      value={titlePresetValue}
+                      onChange={(event) => updateTitlePreset(event.currentTarget.value)}
+                    >
+                      <option value=""> </option>
+                      {TITLE_PRESET_RATES.map((preset) => (
+                        <option key={preset.label} value={preset.label}>{preset.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <PictureInput
+                    id="picture-title"
+                    label="Title, escrow, and recording"
+                    value={pictureDraft.title}
+                    invalid={pictureInvalid === "title"}
+                    suffix="%"
+                    onInput={(value) => updatePicture("title", value)}
+                  />
+                </span>
               }
             />
             <MoneyRow
@@ -1331,13 +1330,15 @@ export function App() {
               amount={lines.prepaidInterestCents}
               rate={
                 <span class="picture-interest-row">
+                  <span class="picture-closing-month">{closingMonthLabel}</span>
                   <PictureInput
-                    id="picture-interest-days"
-                    label="Prepaid interest days"
-                    value={pictureDraft.interestDays}
-                    invalid={pictureInvalid === "interestDays"}
-                    onInput={(value) => updatePicture("interestDays", value)}
+                    id="picture-closing-day"
+                    label="Closing day"
+                    value={pictureDraft.closingDay}
+                    invalid={pictureInvalid === "closingDay"}
+                    onInput={(value) => updatePicture("closingDay", value)}
                   />
+                  <span class="picture-affix">{closingDayCountText}</span>
                   <select
                     id="picture-interest-basis"
                     aria-label="Interest day-count basis"
@@ -1351,38 +1352,134 @@ export function App() {
               }
             />
             <MoneyRow
-              line="prepaid-tax"
-              label="Prepaid property taxes"
-              amount={lines.prepaidTaxCents}
+              line="homeowners-insurance"
+              label="Homeowners insurance"
+              amount={lines.homeownersInsuranceCents}
+              rate={<span class="picture-affix">12 months</span>}
+            />
+            <MoneyRow
+              line="tax-impound"
+              label="Property tax impound"
+              amount={lines.taxImpoundCents}
               rate={
                 <PictureInput
-                  id="picture-tax-months"
-                  label="Prepaid property tax months"
-                  value={pictureDraft.taxMonths}
-                  invalid={pictureInvalid === "taxMonths"}
-                  onInput={(value) => updatePicture("taxMonths", value)}
+                  id="picture-tax-impound-months"
+                  label="Property tax impound months"
+                  value={pictureDraft.taxImpoundMonths}
+                  invalid={pictureInvalid === "taxImpoundMonths"}
+                  onInput={(value) => updatePicture("taxImpoundMonths", value)}
                 />
               }
             />
             <MoneyRow
-              line="cushion"
-              label="Escrow cushion"
-              amount={lines.cushionCents}
+              line="insurance-impound"
+              label="Insurance impound"
+              amount={lines.insuranceImpoundCents}
               rate={
                 <PictureInput
-                  id="picture-cushion"
-                  label="Escrow cushion"
-                  value={pictureDraft.cushion}
-                  invalid={pictureInvalid === "cushion"}
-                  prefix="$"
-                  onInput={(value) => updatePicture("cushion", value)}
+                  id="picture-insurance-impound-months"
+                  label="Insurance impound months"
+                  value={pictureDraft.insuranceImpoundMonths}
+                  invalid={pictureInvalid === "insuranceImpoundMonths"}
+                  onInput={(value) => updatePicture("insuranceImpoundMonths", value)}
                 />
               }
             />
-            <MoneyRow line="closing" label="Total closing costs" amount={lines.closingCents} />
-            <MoneyRow line="cash-to-close" label="Total cash to close" amount={lines.cashToCloseCents} />
+            <MoneyRow
+              line="mi-impound"
+              label="Mortgage insurance impound"
+              amount={lines.miImpoundCents}
+              rate={
+                <PictureInput
+                  id="picture-mi-impound-months"
+                  label="Mortgage insurance impound months"
+                  value={pictureDraft.miImpoundMonths}
+                  invalid={pictureInvalid === "miImpoundMonths"}
+                  onInput={(value) => updatePicture("miImpoundMonths", value)}
+                />
+              }
+            />
+            <MoneyRow
+              line="proration"
+              label="Property-tax proration"
+              amount={lines.prorationCents}
+              rate={
+                <PictureInput
+                  id="picture-proration"
+                  label="Property-tax proration"
+                  value={pictureDraft.proration}
+                  invalid={pictureInvalid === "proration"}
+                  onInput={(value) => updatePicture("proration", value)}
+                />
+              }
+            />
+            <MoneyRow line="closing" label="Closing costs" amount={lines.closingCents} />
+            <MoneyRow
+              line="points"
+              label="Points"
+              amount={lines.pointsCents}
+              rate={
+                <PictureInput
+                  id="picture-points"
+                  label="Points"
+                  value={pictureDraft.points}
+                  invalid={pictureInvalid === "points"}
+                  suffix="%"
+                  onInput={(value) => updatePicture("points", value)}
+                />
+              }
+            />
+            <MoneyRow line="closing-and-points" label="Closing costs and points" amount={lines.closingAndPointsCents} />
+            <MoneyRow
+              line="seller-credit"
+              label="Seller credit"
+              amount={pictureValues.sellerCreditCents}
+              rate={
+                <PictureInput
+                  id="picture-seller-credit"
+                  label="Seller credit"
+                  value={pictureDraft.sellerCredit}
+                  invalid={pictureInvalid === "sellerCredit"}
+                  prefix="$"
+                  onInput={(value) => updatePicture("sellerCredit", value)}
+                />
+              }
+            />
+            <MoneyRow
+              line="lender-credit"
+              label="Lender credit"
+              amount={pictureValues.lenderCreditCents}
+              rate={
+                <PictureInput
+                  id="picture-lender-credit"
+                  label="Lender credit"
+                  value={pictureDraft.lenderCredit}
+                  invalid={pictureInvalid === "lenderCredit"}
+                  prefix="$"
+                  onInput={(value) => updatePicture("lenderCredit", value)}
+                />
+              }
+            />
+            <MoneyRow line="cash-to-close" label="Cash to close" amount={lines.cashToCloseCents} />
+            <MoneyRow
+              line="earnest"
+              label="Earnest money already paid"
+              amount={pictureValues.earnestCents}
+              rate={
+                <PictureInput
+                  id="picture-earnest"
+                  label="Earnest money already paid"
+                  value={pictureDraft.earnest}
+                  invalid={pictureInvalid === "earnest"}
+                  prefix="$"
+                  onInput={(value) => updatePicture("earnest", value)}
+                />
+              }
+            />
+            <MoneyRow line="due-at-closing" label="Due at closing" amount={lines.dueAtClosingCents} />
           </tbody>
         </table>
+        {sellerCreditNote ? <p class="note">{sellerCreditNote}</p> : null}
         {pictureError ? (
           <p class="error" role="alert">
             {pictureError}

@@ -90,29 +90,165 @@ test("AC4 down payment clears PMI", async ({ page }) => {
   await expect(page.locator("[data-line='subtotal']")).toContainText("$750.00");
 });
 
-test("AC10 closing costs at 20% down with 360 and 365 basis", async ({ page }) => {
+test("AC5 fresh Closing Costs dollars and basis switch", async ({ page }) => {
   await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
   await page.goto("/");
-  await page.locator("#down").fill("20");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
   await page.locator("summary", { hasText: "Closing Costs" }).click();
   const closing = page.locator("details.picture-closing");
-  await expect(closing.locator("[data-line='origination']")).toContainText("$4,800.00");
+  await expect(page.locator("#picture-lender-fees")).toHaveValue("3000");
+  await expect(closing.locator("[data-line='lender-fees']")).toContainText("$3,000.00");
+  await expect(page.locator("#picture-title-preset")).toHaveValue("50/50");
+  await expect(page.locator("#picture-title")).toHaveValue("0.75");
   await expect(closing.locator("[data-line='title']")).toContainText("$4,500.00");
-  await expect(closing.locator("[data-line='prepaid-insurance']")).toContainText("$2,100.00");
-  await expect(closing.locator("[data-line='prepaid-interest']")).toContainText("$1,475.00");
-  await expect(closing.locator("[data-line='prepaid-tax']")).toContainText("$2,300.00");
-  await expect(closing.locator("[data-line='cushion']")).toContainText("$1,500.00");
-  await expect(closing.locator("[data-line='closing']")).toContainText("$19,175.00");
-  await expect(closing.locator("[data-line='cash-to-close']")).toContainText("$139,175.00");
+  await expect(page.locator("#picture-closing-day")).toHaveValue("1");
+  await expect(closing.locator("[data-line='prepaid-interest']")).toContainText("October 2026");
+  await expect(closing.locator("[data-line='prepaid-interest']")).toContainText("31 days");
   await expect(page.locator("#picture-interest-basis")).toHaveValue("360");
-  await expect(page.locator("#picture-interest-days")).toHaveValue("15");
+  await expect(closing.locator("[data-line='prepaid-interest']")).toContainText("$3,619.90");
+  await expect(closing.locator("[data-line='homeowners-insurance']")).toContainText("$2,100.00");
+  await expect(closing.locator("[data-line='homeowners-insurance']")).toContainText("12 months");
+  await expect(closing.locator("[data-line='tax-impound']")).toContainText("$3,450.00");
+  await expect(closing.locator("[data-line='insurance-impound']")).toContainText("$525.00");
+  await expect(closing.locator("[data-line='mi-impound']")).toContainText("$332.50");
+  await expect(page.locator("#picture-proration")).toHaveValue("575");
+  await expect(closing.locator("[data-line='proration']")).toContainText("$575.00");
+  await expect(closing.locator("[data-line='closing']")).toContainText("$18,102.40");
+  await expect(page.locator("#picture-points")).toHaveValue("0");
+  await expect(closing.locator("[data-line='points']")).toContainText("$0.00");
+  await expect(closing.locator("[data-line='closing-and-points']")).toContainText("$18,102.40");
+  await expect(closing.locator("[data-line='cash-to-close']")).toContainText("$48,102.40");
+  await expect(closing.locator("[data-line='due-at-closing']")).toContainText("$48,102.40");
+  await expect(page.locator("#picture-origination")).toHaveCount(0);
+  await expect(page.locator("#picture-processing")).toHaveCount(0);
+  await expect(page.locator("#picture-appraisal")).toHaveCount(0);
+  await expect(page.locator("#picture-recording")).toHaveCount(0);
+  await expect(page.locator("#picture-interest-days")).toHaveCount(0);
+  await expect(page.locator("#picture-cushion")).toHaveCount(0);
 
   await page.locator("#picture-interest-basis").selectOption("365");
-  await expect(closing.locator("[data-line='prepaid-interest']")).toContainText("$1,454.85");
-  await expect(closing.locator("[data-line='cash-to-close']")).toContainText("$139,154.85");
+  await expect(closing.locator("[data-line='prepaid-interest']")).toContainText("$3,570.27");
+  await expect(closing.locator("[data-line='closing']")).toContainText("$18,052.77");
+  await expect(closing.locator("[data-line='cash-to-close']")).toContainText("$48,052.77");
   await page.locator("#picture-interest-basis").selectOption("360");
-  await expect(closing.locator("[data-line='prepaid-interest']")).toContainText("$1,475.00");
-  await expect(closing.locator("[data-line='cash-to-close']")).toContainText("$139,175.00");
+  await expect(closing.locator("[data-line='prepaid-interest']")).toContainText("$3,619.90");
+  await expect(closing.locator("[data-line='closing']")).toContainText("$18,102.40");
+  await expect(closing.locator("[data-line='cash-to-close']")).toContainText("$48,102.40");
+});
+
+test("AC6 presets, closing calendar, and 20% down MI impound", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.locator("summary", { hasText: "Closing Costs" }).click();
+  const closing = page.locator("details.picture-closing");
+  await page.locator("#picture-title-preset").selectOption("Buyer pays all");
+  await expect(page.locator("#picture-title")).toHaveValue("1");
+  await expect(closing.locator("[data-line='title']")).toContainText("$6,000.00");
+  await page.locator("#picture-title-preset").selectOption("Seller pays the owner's policy and escrow");
+  await expect(page.locator("#picture-title")).toHaveValue("0.40");
+  await expect(closing.locator("[data-line='title']")).toContainText("$2,400.00");
+  await page.locator("#picture-title-preset").selectOption("50/50");
+  await expect(page.locator("#picture-title")).toHaveValue("0.75");
+  await expect(closing.locator("[data-line='title']")).toContainText("$4,500.00");
+  await page.locator("#picture-title").fill("0.64925");
+  await page.locator("#picture-title").press("Tab");
+  await expect(page.locator("#picture-title-preset")).toHaveValue("");
+  await expect(closing.locator("[data-line='title']")).toContainText("$3,895.50");
+
+  await setStartMonth(page, 2026, 11);
+  await expect(closing.locator("[data-line='prepaid-interest']")).toContainText("November 2026");
+  await page.locator("#picture-closing-day").fill("6");
+  await page.locator("#picture-closing-day").press("Tab");
+  await expect(closing.locator("[data-line='prepaid-interest']")).toContainText("25 days");
+  await page.locator("#picture-closing-day").fill("31");
+  await page.locator("#picture-closing-day").press("Tab");
+  await expect(page.locator("#picture-closing-day")).toHaveValue("30");
+  await expect(closing.locator("[data-line='prepaid-interest']")).toContainText("1 day");
+
+  await page.locator("#down").fill("20");
+  await expect(closing.locator("[data-line='mi-impound']")).toContainText("$0.00");
+  await expect(page.locator("#picture-mi-impound-months")).toHaveValue("2");
+});
+
+test("AC7 seller credit warning and picture migration", async ({ page }) => {
+  await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
+  await page.goto("/");
+  await page.evaluate(() => localStorage.clear());
+  await page.reload();
+  await page.locator("summary", { hasText: "Closing Costs" }).click();
+  const note =
+    "The usual conventional cap is 3% of the lower of price or appraisal. This check uses price because there is no appraisal.";
+  await page.locator("#picture-seller-credit").fill("18000.01");
+  await page.locator("#picture-seller-credit").press("Tab");
+  await expect(page.locator(".picture-closing .note")).toContainText(note);
+  await page.locator("#picture-seller-credit").fill("18000");
+  await page.locator("#picture-seller-credit").press("Tab");
+  await expect(page.locator(".picture-closing .note")).toHaveCount(0);
+  await page.locator("#down").fill("10");
+  await page.locator("#picture-seller-credit").fill("100000");
+  await page.locator("#picture-seller-credit").press("Tab");
+  await expect(page.locator(".picture-closing .note")).toHaveCount(0);
+  await page.locator("#down").fill("5");
+
+  await page.evaluate(() => {
+    localStorage.setItem(
+      "compound-amortization-v1",
+      JSON.stringify({
+        version: 1,
+        price: "570000",
+        down: "0",
+        years: "30",
+        rate: "7",
+        start: "2026-10",
+      }),
+    );
+  });
+  await page.reload();
+  await page.locator("summary", { hasText: "Closing Costs" }).click();
+  await expect(page.locator("#picture-lender-fees")).toHaveValue("3000");
+  await expect(page.locator("#picture-title")).toHaveValue("0.75");
+  await expect(page.locator("#picture-origination")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Import" }).click();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "compound-loan-scenarios.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(
+      JSON.stringify({
+        version: 2,
+        active: 0,
+        scenarios: [
+          {
+            price: "600000",
+            down: "5",
+            years: "30",
+            rate: "7.375",
+            start: "2026-10",
+            fico: "780",
+            extras: [],
+            applied: [],
+            prefill: {
+              monthly: "",
+              yearly: "",
+              month: 1,
+              open: false,
+              level: false,
+              appliedLevel: false,
+            },
+            openYears: null,
+            picture: { origination: "1", processing: "1200", title: "0.5" },
+          },
+        ],
+      }),
+    ),
+  });
+  await page.locator("summary", { hasText: "Closing Costs" }).click();
+  await expect(page.locator("#picture-lender-fees")).toHaveValue("6900");
+  await expect(page.locator("#picture-title")).toHaveValue("0.5");
+  await expect(page.locator("#picture-closing-day")).toHaveValue("1");
 });
 
 test("AC5 summaries have no border and a picture edit survives Apply", async ({ page }) => {
@@ -177,12 +313,9 @@ test("AC6 a saved version-1 loan keeps its payment and shows thousands", async (
   await expect(page.locator("#picture-tax")).toHaveValue("1.15");
   await expect(page.locator("#picture-insurance")).toHaveValue("0.35");
   await expect(page.locator("#picture-pmi")).toHaveValue("0.45");
-  await expect(page.locator("#picture-origination")).toHaveValue("1");
-  await expect(page.locator("#picture-title")).toHaveValue("0.75");
   await page.locator("summary", { hasText: "Closing Costs" }).click();
-  await expect(page.locator("#picture-processing")).toHaveValue("1200");
-  await expect(page.locator("#picture-appraisal")).toHaveValue("500");
-  await expect(page.locator("#picture-recording")).toHaveValue("800");
+  await expect(page.locator("#picture-lender-fees")).toHaveValue("3000");
+  await expect(page.locator("#picture-title")).toHaveValue("0.75");
 });
 
 test("AC11 FICO range and PMI ladder", async ({ page }) => {

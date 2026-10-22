@@ -476,10 +476,21 @@ dd {
   font-size: 0.9rem;
 }
 
-.picture-interest-row {
+.picture-interest-row,
+.picture-title-row {
   display: inline-flex;
   align-items: baseline;
   gap: 0.35rem;
+}
+
+.picture-title-row .field {
+  margin: 0;
+}
+
+.picture-closing-month {
+  color: var(--muted);
+  font-size: 0.9rem;
+  white-space: nowrap;
 }
 
 .picture-input {
