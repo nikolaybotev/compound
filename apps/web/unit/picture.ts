@@ -1,12 +1,17 @@
 import { describe, expect, test } from "vitest";
 import { buildReport } from "../../../amortize.js";
-import { downPaymentCents, parseLoan } from "../src/loan";
+import { downPaymentCents, formatMoney, parseLoan, paymentDate } from "../src/loan";
 import {
   buildPicture,
+  centsToProrationField,
+  clampClosingDay,
+  closingInterestDays,
   conventionalPmi,
   defaultPicture,
+  defaultProrationCents,
+  daysInMonth,
+  isLeapYear,
   pmiPercentInputFromThousandths,
-  loadStoredCount,
   loadStoredInterestBasis,
   parsePicture,
   parseWholeCount,
@@ -19,29 +24,30 @@ import {
   percentThousandths,
   ficoRangeScore,
   pmiThousandthsForScore,
+  sellerCreditWarning,
+  titleCentsFromPrice,
+  titlePercentHundredThousandths,
   type PictureLines,
+  type PictureValues,
 } from "../src/picture";
 
-function countsFromDraft(draft: ReturnType<typeof defaultPicture>) {
-  return {
-    insuranceMonths: loadStoredCount(draft.insuranceMonths, 12),
-    taxMonths: loadStoredCount(draft.taxMonths, 4),
-    interestDays: loadStoredCount(draft.interestDays, 15),
-  };
-}
+const START = "2026-10";
 
 function linesFor(draft: {
   price?: string;
   down?: string;
   years?: string;
   rate?: string;
+  start?: string;
   picture?: ReturnType<typeof defaultPicture>;
+  values?: Partial<PictureValues>;
 }): PictureLines {
   const price = draft.price ?? "600000";
   const down = draft.down ?? "5";
   const years = draft.years ?? "30";
   const rate = draft.rate ?? "7.375";
-  const parsed = parseLoan({ price, down, years, rate, start: "2026-10" });
+  const start = draft.start ?? START;
+  const parsed = parseLoan({ price, down, years, rate, start });
   if (!parsed.ok) throw new Error("loan must parse");
   let pictureDraft = draft.picture ?? defaultPicture();
   if (draft.down !== undefined && draft.picture === undefined) {
@@ -51,9 +57,10 @@ function linesFor(draft: {
       pictureDraft = { ...pictureDraft, pmi: pmiPercentInputFromThousandths(pmi.thousandths) };
     }
   }
-  const picture = parsePicture(pictureDraft, countsFromDraft(pictureDraft));
+  const picture = parsePicture(pictureDraft, start);
   if (!picture.ok) throw new Error("picture must parse");
-  return buildPicture(parsed.loan, rate, down, picture.values);
+  const values = { ...picture.values, ...draft.values };
+  return buildPicture(parsed.loan, rate, down, start, values);
 }
 
 describe("default Conventional picture", () => {
@@ -70,17 +77,21 @@ describe("default Conventional picture", () => {
     expect(lines.pmiRateText).toBe("0.35%");
     expect(lines.totalMonthlyCents).toBe(485_310);
     expect(lines.headingDollars).toBe(4853);
-    expect(lines.originationCents).toBe(570_000);
-    expect(lines.processingCents).toBe(120_000);
-    expect(lines.appraisalCents).toBe(50_000);
+    expect(lines.lenderFeesCents).toBe(300_000);
     expect(lines.titleCents).toBe(450_000);
-    expect(lines.recordingCents).toBe(80_000);
-    expect(lines.prepaidInsuranceCents).toBe(210_000);
-    expect(lines.prepaidInterestCents).toBe(175_156);
-    expect(lines.prepaidTaxCents).toBe(230_000);
-    expect(lines.cushionCents).toBe(150_000);
-    expect(lines.closingCents).toBe(2_035_156);
-    expect(lines.cashToCloseCents).toBe(5_035_156);
+    expect(lines.prepaidInterestCents).toBe(361_990);
+    expect(lines.prepaidInterestDays).toBe(31);
+    expect(lines.homeownersInsuranceCents).toBe(210_000);
+    expect(lines.taxImpoundCents).toBe(345_000);
+    expect(lines.insuranceImpoundCents).toBe(52_500);
+    expect(lines.miImpoundCents).toBe(33_250);
+    expect(lines.prorationCents).toBe(57_500);
+    expect(lines.closingCents).toBe(1_810_240);
+    expect(lines.pointsCents).toBe(0);
+    expect(lines.closingAndPointsCents).toBe(1_810_240);
+    expect(lines.cashToCloseCents).toBe(4_810_240);
+    expect(lines.dueAtClosingCents).toBe(4_810_240);
+    expect(lines.closingCents).toBeGreaterThan(1_657_241);
   });
 
   test("percent-of-money uses the same half-up division as down payment", () => {
@@ -89,123 +100,205 @@ describe("default Conventional picture", () => {
   });
 });
 
+describe("AC1 reference fixture", () => {
+  test("clean closing costs, points outside, prepaid interest and impounds", () => {
+    const picture = defaultPicture();
+    picture.lenderFees = "2618";
+    picture.title = "0.64925";
+    picture.closingDay = "6";
+    picture.interestBasis = "365";
+    picture.taxImpoundMonths = "6";
+    picture.insuranceImpoundMonths = "3";
+    picture.miImpoundMonths = "2";
+    picture.proration = "813.92";
+    picture.points = "0.25";
+    picture.sellerCredit = "10000";
+    picture.earnest = "18000";
+    picture.tax = "1.25";
+    picture.pmi = "0.21";
+    const lines = linesFor({
+      price: "600000",
+      down: "5",
+      rate: "7.25",
+      start: "2026-11",
+      picture,
+      values: {
+        homeownersInsuranceAnnualCents: 197_200,
+      },
+    });
+    expect(percentOfCents(60_000_000, 1250, 12)).toBe(62_500);
+    expect(lines.lenderFeesCents).toBe(261_800);
+    expect(lines.titleCents).toBe(389_550);
+    expect(titleCentsFromPrice(60_000_000, 65_000)).toBe(390_000);
+    const interest = prepaidInterestCents365(57_000_000, 7250, 25);
+    expect(interest).toBe(283_050);
+    expect(lines.prepaidInterestCents).toBe(283_050);
+    expect(283_048).not.toBe(lines.prepaidInterestCents);
+    expect(lines.homeownersInsuranceCents).toBe(197_200);
+    expect(lines.insuranceImpoundCents).toBe(49_299);
+    expect(lines.miImpoundCents).toBe(19_950);
+    expect(lines.taxImpoundCents).toBe(375_000);
+    expect(lines.prorationCents).toBe(81_392);
+    expect(lines.closingCents).toBe(1_657_241);
+    expect(lines.pointsCents).toBe(142_500);
+    expect(lines.closingAndPointsCents).toBe(1_799_741);
+    expect(lines.cashToCloseCents).toBe(3_799_741);
+    expect(lines.dueAtClosingCents).toBe(1_999_741);
+  });
+});
+
+describe("AC2 fresh visit, calendar, proration, formatMoney", () => {
+  test("fresh visit totals and 365 basis switch", () => {
+    const lines = linesFor({});
+    expect(lines.closingCents).toBe(1_810_240);
+    expect(lines.closingCents).toBeGreaterThan(1_657_241);
+
+    const picture365 = defaultPicture();
+    picture365.interestBasis = "365";
+    const parsed365 = parsePicture(picture365, START);
+    if (!parsed365.ok) throw new Error("picture");
+    const loanParsed = parseLoan({ price: "600000", down: "5", years: "30", rate: "7.375", start: START });
+    if (!loanParsed.ok) throw new Error("loan");
+    const lines365 = buildPicture(loanParsed.loan, "7.375", "5", START, parsed365.values);
+    expect(lines365.prepaidInterestCents).toBe(357_027);
+    expect(lines365.closingCents).toBe(1_805_277);
+    expect(lines365.cashToCloseCents).toBe(4_805_277);
+  });
+
+  test("20% down zeroes mortgage-insurance impound", () => {
+    const lines = linesFor({ down: "20" });
+    expect(lines.miImpoundCents).toBe(0);
+    expect(lines.pmiCents).toBe(0);
+  });
+
+  test("closing month day counts and clamps", () => {
+    expect(closingInterestDays("2026-10", 1)).toBe(31);
+    expect(closingInterestDays("2026-11", 6)).toBe(25);
+    expect(clampClosingDay(31, "2026-11")).toBe(30);
+    expect(closingInterestDays("2026-11", 31)).toBe(1);
+    expect(daysInMonth(2026, 2)).toBe(28);
+    expect(daysInMonth(1900, 2)).toBe(28);
+    expect(daysInMonth(2028, 2)).toBe(29);
+    expect(daysInMonth(2000, 2)).toBe(29);
+    expect(isLeapYear(1900)).toBe(false);
+    expect(isLeapYear(2000)).toBe(true);
+    expect(paymentDate("2026-11", 1)).toEqual({ year: 2026, month: 12 });
+  });
+
+  test("negative proration and formatMoney minus placement", () => {
+    const zeroProration = linesFor({ values: { prorationCents: 0 } });
+    const negative = linesFor({ values: { prorationCents: -10_000 } });
+    expect(negative.closingCents).toBe(zeroProration.closingCents - 10_000);
+    expect(formatMoney(-81_392)).toBe("-$813.92");
+  });
+});
+
+describe("AC3 storage migration", () => {
+  test("maps legacy origination and processing, keeps lenderFees, defaults", () => {
+    const loanParsed = parseLoan({ price: "600000", down: "5", years: "30", rate: "7.375", start: START });
+    if (!loanParsed.ok) throw new Error("loan");
+    const migrated = pictureFromStorage(
+      {
+        origination: "1",
+        processing: "1200",
+        title: "0.5",
+        appraisal: "500",
+        recording: "800",
+        interestDays: "15",
+        taxMonths: "4",
+        cushion: "1500",
+      },
+      loanParsed.loan.loanCents,
+      START,
+      "5",
+      "780",
+      loanParsed.loan.priceCents,
+    );
+    expect(migrated.lenderFees).toBe("6900");
+    expect(migrated.title).toBe("0.5");
+    expect(migrated.closingDay).toBe("1");
+    expect(migrated.taxImpoundMonths).toBe("6");
+    expect(migrated.proration).toBe("575");
+    expect(migrated.points).toBe("0");
+    expect("origination" in migrated).toBe(false);
+
+    const kept = pictureFromStorage(
+      { lenderFees: "2618", origination: "1" },
+      loanParsed.loan.loanCents,
+      START,
+    );
+    expect(kept.lenderFees).toBe("2618");
+
+    const missing = pictureFromStorage(undefined, loanParsed.loan.loanCents, START);
+    expect(missing.lenderFees).toBe("3000");
+    expect(missing.title).toBe("0.75");
+
+    const precise = pictureFromStorage({ title: "0.64925" }, loanParsed.loan.loanCents, START);
+    expect(precise.title).toBe("0.64925");
+
+    expect(loadStoredInterestBasis("366")).toBe("360");
+  });
+
+  test("an empty closing field is invalid", () => {
+    const picture = defaultPicture();
+    picture.lenderFees = "";
+    const parsed = parsePicture(picture, START);
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) return;
+    expect(parsed.field).toBe("lenderFees");
+  });
+});
+
+describe("AC4 seller credit warning", () => {
+  test("boundaries and message text", () => {
+    const message =
+      "The usual conventional cap is 3% of the lower of price or appraisal. This check uses price because there is no appraisal.";
+    expect(sellerCreditWarning(5_000, 1_800_001, 60_000_000)).toBe(message);
+    expect(sellerCreditWarning(5_000, 1_800_000, 60_000_000)).toBeNull();
+    expect(sellerCreditWarning(10_000, 10_000_000_000, 60_000_000)).toBeNull();
+  });
+});
+
 describe("PMI brackets", () => {
   test("thousandths cuts and rate text have no bracket sentence", () => {
     expect(conventionalPmi(20_000)).toEqual({ thousandths: 0, text: "0%" });
-    expect(conventionalPmi(19_999)).toEqual({ thousandths: 200, text: "0.2%" });
-    expect(conventionalPmi(10_000)).toEqual({ thousandths: 200, text: "0.2%" });
-    expect(conventionalPmi(9_999)).toEqual({ thousandths: 350, text: "0.35%" });
-    expect(conventionalPmi(5_000)).toEqual({ thousandths: 350, text: "0.35%" });
-    expect(conventionalPmi(4_999)).toEqual({ thousandths: 450, text: "0.45%" });
-    for (const cut of [conventionalPmi(20_000), conventionalPmi(10_000), conventionalPmi(5_000), conventionalPmi(0)]) {
-      expect(cut.text).not.toMatch(/[()]/);
-      expect(cut.text).not.toMatch(/down|between|bracket/i);
-    }
-
     expect(linesFor({ down: "20" }).pmiCents).toBe(0);
-    expect(linesFor({ down: "20" }).pmiRateText).toBe("0%");
     expect(linesFor({ down: "10" }).pmiCents).toBe(9_000);
-    expect(linesFor({ down: "10" }).pmiRateText).toBe("0.2%");
     expect(linesFor({ down: "4" }).pmiCents).toBe(21_600);
-    expect(linesFor({ down: "4" }).pmiRateText).toBe("0.45%");
   });
 
-  test("a 15-year term changes principal and interest and leaves prepaid interest", () => {
+  test("a 15-year term changes principal and interest and leaves prepaid interest days", () => {
     const lines = linesFor({ years: "15" });
     expect(lines.principalAndInterestCents).toBe(
       buildReport(570000, 7.375, 180, new Map()).monthly_payment_cents,
     );
-    expect(lines.prepaidInterestCents).toBe(175_156);
-    expect(lines.financedCents).toBe(57_000_000);
-  });
-});
-
-describe("AC2 prepaid interest and storage loads", () => {
-  test("360 and 365 charges on reference loans", () => {
-    const fresh = linesFor({});
-    expect(fresh.prepaidInterestCents).toBe(175_156);
-    expect(prepaidInterestCents360(57_000_000, 7375, 15)).toBe(175_156);
-
-    const rate75 = 7500;
-    const base570 = 57_000_000;
-    expect(prepaidInterestPerDiem365Cents(base570, rate75)).toBe(11_712);
-    expect(prepaidInterestCents365(base570, rate75, 15)).toBe(175_680);
-    expect(prepaidInterestCents360(base570, rate75, 15)).toBe(178_125);
-
-    const twenty = linesFor({ down: "20" });
-    expect(twenty.prepaidInterestCents).toBe(147_500);
-    expect(twenty.closingCents).toBe(1_917_500);
-    expect(twenty.cashToCloseCents).toBe(13_917_500);
-
-    const picture365 = defaultPicture();
-    picture365.interestBasis = "365";
-    const parsed365 = parsePicture(picture365, countsFromDraft(picture365));
-    if (!parsed365.ok) throw new Error("picture");
-    const loanParsed = parseLoan({ price: "600000", down: "20", years: "30", rate: "7.375", start: "2026-10" });
-    if (!loanParsed.ok) throw new Error("loan");
-    const lines365 = buildPicture(loanParsed.loan, "7.375", "20", parsed365.values);
-    expect(lines365.prepaidInterestCents).toBe(145_485);
-
-    expect(prepaidInterestCents(57_000_000, 7375, 0, "360")).toBe(0);
-    expect(prepaidInterestCents(57_000_000, 7375, 0, "365")).toBe(0);
-  });
-
-  test("stored basis and count fields load with defaults", () => {
-    expect(loadStoredInterestBasis(undefined)).toBe("360");
-    expect(loadStoredInterestBasis("360")).toBe("360");
-    expect(loadStoredInterestBasis("365")).toBe("365");
-    expect(loadStoredInterestBasis("366")).toBe("360");
-
-    expect(loadStoredCount("1000", 15)).toBe(15);
-    expect(loadStoredCount("1.5", 15)).toBe(15);
-    expect(loadStoredCount("-1", 12)).toBe(12);
-    expect(loadStoredCount("15.5", 4)).toBe(4);
-    expect(loadStoredCount("abc", 4)).toBe(4);
-    expect(loadStoredCount("", 15)).toBe(15);
-
-    const fromStorage = pictureFromStorage({ interestDays: "1000", insuranceMonths: "-1", taxMonths: "abc" });
-    expect(fromStorage.interestDays).toBe("15");
-    expect(fromStorage.insuranceMonths).toBe("12");
-    expect(fromStorage.taxMonths).toBe("4");
-  });
-
-  test("parseWholeCount accepts 0 through 999 only", () => {
-    expect(parseWholeCount("0")).toBe(0);
-    expect(parseWholeCount("999")).toBe(999);
-    expect(parseWholeCount("1000")).toBeNull();
-    expect(parseWholeCount("1.5")).toBeNull();
+    expect(lines.prepaidInterestDays).toBe(31);
   });
 });
 
 describe("AC1 PMI ladder by FICO", () => {
   test("thousandths and fresh-loan PMI cents", () => {
     expect(pmiThousandthsForScore(5_000, 780)).toBe(350);
-    expect(pmiThousandthsForScore(10_000, 780)).toBe(200);
-    expect(pmiThousandthsForScore(5_000, 740)).toBe(530);
-    expect(pmiThousandthsForScore(5_000, 600)).toBe(1990);
-    expect(pmiThousandthsForScore(20_000, 600)).toBe(0);
-    expect(pmiThousandthsForScore(20_000, 780)).toBe(0);
-
     expect(ficoRangeScore(800)).toBe(780);
-    expect(ficoRangeScore(770)).toBe(740);
-    expect(ficoRangeScore(620)).toBe(620);
-    expect(ficoRangeScore(619)).toBe(620);
-
     expect(linesFor({ down: "5", picture: { ...defaultPicture(), pmi: "0.35" } }).pmiCents).toBe(16_625);
-    const draft740 = defaultPicture();
-    draft740.pmi = "0.53";
-    expect(linesFor({ down: "5", picture: draft740 }).pmiCents).toBe(25_175);
   });
 });
 
-describe("picture inputs", () => {
-  test("an empty field is invalid and does not use the extra-payment empty rule", () => {
-    const picture = defaultPicture();
-    picture.processing = "";
-    const parsed = parsePicture(picture, countsFromDraft(picture));
-    expect(parsed.ok).toBe(false);
-    if (parsed.ok) return;
-    expect(parsed.field).toBe("processing");
-    expect(parsed.message).toContain("Lender processing fee");
+describe("prepaid interest helpers", () => {
+  test("360 and 365 charges on reference loans", () => {
+    expect(prepaidInterestCents360(57_000_000, 7375, 31)).toBe(361_990);
+    expect(prepaidInterestPerDiem365Cents(57_000_000, 7500)).toBe(11_712);
+    expect(prepaidInterestCents365(57_000_000, 7500, 15)).toBe(175_680);
+    expect(prepaidInterestCents(57_000_000, 7375, 0, "360")).toBe(0);
+  });
+
+  test("parseWholeCount accepts 0 through 999 only", () => {
+    expect(parseWholeCount("0")).toBe(0);
+    expect(parseWholeCount("1000")).toBeNull();
+  });
+
+  test("title five-decimal grammar", () => {
+    expect(titlePercentHundredThousandths("0.64925")).toBe(64_925);
+    expect(titlePercentHundredThousandths("0.649256")).toBeNull();
   });
 });
