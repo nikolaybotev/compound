@@ -57,7 +57,7 @@ DoD: `node --test`, `pnpm --dir apps/web test`, and `pnpm --dir apps/web test:e2
 
 ### Build notes (Phase 1)
 
-Added only after the phase lands.
+Shipped `dueDate`, `formatPayoffDate`, and the two footnote constants from `loan.ts`. Payoff footnote lives inside the `Payoff date` summary region; schedule footnote sits between the Schedule heading row and the table scroll area. No `amortize.js` change.
 
 ## Phase 2 — ARM timing
 

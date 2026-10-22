@@ -80,7 +80,7 @@ That loan (the Example Credit Union 7/1 example in the docs) pays $3,371.77 for 
 | `--index FILE` | A `month,index` CSV. |
 | `--even-yearly AMOUNT` | Dollar amount for the yearly extra used only in the monthly-extra solve (zero allowed). |
 | `--even-month N` | Calendar month 1–12 when the yearly extra lands. |
-| `--start MONTH` | Loan start month as `10` or `YYYY-MM` (only the month is used). Payment 1 is the next calendar month. |
+| `--start MONTH` | Loan start month as `10` or `YYYY-MM` (only the month is used). Payment 1 is the next calendar month, the first month interest accrues, and that payment is due on the 1st of the following month. |
 
 `--amount`, `--rate`, a term, one fixed flag, `--adjust-months`, `--margin`, `--caps`, and `--floor` are required in ARM mode. A missing flag exits non-zero and names every missing flag. `--index`, `--initial-floor`, `--round-eighth`, `--even-yearly`, `--even-month`, or `--start` without the required flags is the same error. Without any ARM flag nothing changes: the fixed-rate output is byte for byte what it was. A positive `--even-yearly` also requires `--even-month` and `--start`. `--even-month` or `--start` without `--even-yearly` names `--even-yearly`.
 
