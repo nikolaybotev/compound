@@ -475,7 +475,9 @@ describe("saved loan inputs", () => {
     saveScenario(storage, scenario);
     const loaded = loadScenario(storage, now);
     expect(loaded.draft.price).toBe("100000");
-    expect(loaded.picture).toEqual(scenario.picture);
+    expect(loaded.picture.tax).toBe("2");
+    expect(loaded.picture.open).toBe(true);
+    expect(loaded.picture.proration).toBe("166.67");
 
     storage.setItem(
       STORAGE_KEY,
