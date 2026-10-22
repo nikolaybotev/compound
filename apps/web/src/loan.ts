@@ -195,6 +195,7 @@ export function dollarsToThousandsText(dollars: string): string {
 }
 
 export function formatMoney(cents: number): string {
+  if (cents < 0) return `-$${formatGroupedCents(-cents)}`;
   return `$${formatGroupedCents(cents)}`;
 }
 
@@ -403,6 +404,7 @@ export type Scenario = {
   prefill: Prefill;
   openYears: number[] | null;
   picture: PictureDraft;
+  prorationStored: boolean;
   arm: ArmDraft;
   armStored: boolean;
 };
@@ -675,6 +677,7 @@ export function defaultScenario(now = new Date()): Scenario {
     prefill: defaultPrefill(),
     openYears: null,
     picture: defaultPicture(),
+    prorationStored: false,
     arm: defaultArm(),
     armStored: false,
   };
@@ -771,16 +774,18 @@ function pictureDraftEqual(a: PictureDraft, b: PictureDraft): boolean {
     a.tax === b.tax &&
     a.insurance === b.insurance &&
     a.pmi === b.pmi &&
-    a.origination === b.origination &&
     a.title === b.title &&
-    a.processing === b.processing &&
-    a.appraisal === b.appraisal &&
-    a.recording === b.recording &&
-    a.insuranceMonths === b.insuranceMonths &&
-    a.taxMonths === b.taxMonths &&
-    a.interestDays === b.interestDays &&
+    a.lenderFees === b.lenderFees &&
+    a.closingDay === b.closingDay &&
+    a.taxImpoundMonths === b.taxImpoundMonths &&
+    a.insuranceImpoundMonths === b.insuranceImpoundMonths &&
+    a.miImpoundMonths === b.miImpoundMonths &&
+    a.proration === b.proration &&
+    a.points === b.points &&
+    a.sellerCredit === b.sellerCredit &&
+    a.lenderCredit === b.lenderCredit &&
+    a.earnest === b.earnest &&
     a.interestBasis === b.interestBasis &&
-    a.cushion === b.cushion &&
     a.open === b.open &&
     a.closingOpen === b.closingOpen
   );
@@ -844,16 +849,37 @@ function parseScenarioRecord(record: Record<string, unknown>, now = new Date()):
   if (!extras || !prefill || openYears === undefined) return null;
   const { arm, armStored } = scenarioArm(record.arm, parsedLoan.loan);
   const applied = record.applied === undefined ? null : parseExtras(record.applied);
+  const pictureRecord = record.picture;
+  const prorationStored =
+    pictureRecord !== undefined &&
+    typeof pictureRecord === "object" &&
+    pictureRecord !== null &&
+    !Array.isArray(pictureRecord) &&
+    "proration" in pictureRecord;
   return {
     draft,
     extras,
     applied: new Map(applied ?? extras),
     prefill,
     openYears,
-    picture: pictureFromStorage(record.picture, draft.down, draft.fico),
+    picture: pictureFromStorage(
+      record.picture,
+      parsedLoan.loan.loanCents,
+      draft.start,
+      draft.down,
+      draft.fico,
+      parsedLoan.loan.priceCents,
+    ),
+    prorationStored,
     arm,
     armStored,
   };
+}
+
+function pictureToStorage(picture: PictureDraft, prorationStored: boolean): Record<string, unknown> {
+  const stored: Record<string, unknown> = { ...picture };
+  if (!prorationStored) delete stored.proration;
+  return stored;
 }
 
 function scenarioToStorageObject(scenario: Scenario): Record<string, unknown> {
@@ -868,7 +894,7 @@ function scenarioToStorageObject(scenario: Scenario): Record<string, unknown> {
     applied: [...scenario.applied.entries()],
     prefill: scenario.prefill,
     openYears: scenario.openYears,
-    picture: scenario.picture,
+    picture: pictureToStorage(scenario.picture, scenario.prorationStored),
     ...(scenario.armStored ? { arm: armToStorage(scenario.arm) } : {}),
   };
 }
@@ -1089,11 +1115,7 @@ export type ScenarioFigures = {
 export function scenarioFigures(scenario: Scenario): ScenarioFigures | null {
   const parsedLoan = parseLoan(scenario.draft);
   if (!parsedLoan.ok) return null;
-  const pictureParsed = parsePicture(scenario.picture, {
-    insuranceMonths: loadStoredCount(scenario.picture.insuranceMonths, 12),
-    taxMonths: loadStoredCount(scenario.picture.taxMonths, 4),
-    interestDays: loadStoredCount(scenario.picture.interestDays, 15),
-  });
+  const pictureParsed = parsePicture(scenario.picture, scenario.draft.start);
   if (!pictureParsed.ok) return null;
   const rateThousandths = Math.round(parsedLoan.loan.ratePercent * 1000);
   const armParsed = parseArm(scenario.arm, parsedLoan.loan.years, rateThousandths);
@@ -1108,6 +1130,7 @@ export function scenarioFigures(scenario: Scenario): ScenarioFigures | null {
     parsedLoan.loan,
     scenario.draft.rate,
     scenario.draft.down,
+    scenario.draft.start,
     pictureParsed.values,
   );
   const prevailingReport = loanReport(
@@ -1151,17 +1174,7 @@ export function saveScenario(storage: StorageLike | undefined, scenario: Scenari
       STORAGE_KEY,
       JSON.stringify({
         version: 1,
-        price: scenario.draft.price,
-        down: scenario.draft.down,
-        years: scenario.draft.years,
-        rate: scenario.draft.rate,
-        start: scenario.draft.start,
-        extras: [...scenario.extras.entries()],
-        applied: [...scenario.applied.entries()],
-        prefill: scenario.prefill,
-        openYears: scenario.openYears,
-        picture: scenario.picture,
-        ...(scenario.armStored ? { arm: armToStorage(scenario.arm) } : {}),
+        ...scenarioToStorageObject(scenario),
       }),
     );
   } catch {
