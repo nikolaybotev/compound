@@ -35,6 +35,8 @@ import {
   storageSetKey,
   STORAGE_KEY,
   thousandsToDollarString,
+  dueDate,
+  formatPayoffDate,
   yearsAndMonths,
   monthsSavedText,
 } from "../src/loan";
@@ -1116,6 +1118,22 @@ describe("loan scenarios storage and prevailing figures", () => {
     const before = storage.getItem(STORAGE_KEY);
     parseStoredSet("{", now);
     expect(storage.getItem(STORAGE_KEY)).toBe(before);
+  });
+});
+
+describe("dueDate and formatPayoffDate", () => {
+  test("payment 1 accrual month is unchanged", () => {
+    expect(paymentDate("2026-11", 1)).toEqual({ year: 2026, month: 12 });
+  });
+
+  test("dueDate shifts one month later than accrual", () => {
+    expect(dueDate("2026-11", 360)).toEqual({ year: 2056, month: 12 });
+    expect(dueDate("2026-10", 360)).toEqual({ year: 2056, month: 11 });
+  });
+
+  test("formatPayoffDate includes the 1st and the duration parenthetical", () => {
+    expect(formatPayoffDate("2026-11", 360)).toBe("December 1, 2056 (30 years)");
+    expect(formatPayoffDate("2026-10", 360)).toBe("November 1, 2056 (30 years)");
   });
 });
 

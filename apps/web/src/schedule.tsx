@@ -1,4 +1,10 @@
-import { extraInputValue, formatMoney, indexInputValue, type ScheduleYear } from "./loan";
+import {
+  extraInputValue,
+  formatMoney,
+  indexInputValue,
+  SCHEDULE_ARREARS_FOOTNOTE,
+  type ScheduleYear,
+} from "./loan";
 
 type Props = {
   years: ScheduleYear[];
@@ -40,6 +46,7 @@ export function Schedule({
           Expand all years
         </button>
       </div>
+      <p class="note schedule-footnote">{SCHEDULE_ARREARS_FOOTNOTE}</p>
       <div class="schedule-scroll">
         <table>
           <thead>

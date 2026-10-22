@@ -63,7 +63,7 @@ test("AC4 Apply $100 monthly through payoff", async ({ page }) => {
   await expect(yearSaved(page, 2026)).toHaveText("$1,167.36");
   await expect(yearSaved(page, 2027)).toHaveText("$6,678.37");
   await expect(page.getByRole("region", { name: "Interest saved" })).toContainText("$76,366.09");
-  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("June 2054");
+  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("July 1, 2054");
   await page.getByRole("button", { name: "Expand all years" }).click();
   await expect(savedByExtra(page, 332)).toHaveText("$0.00");
 });
