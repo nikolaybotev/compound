@@ -20,7 +20,7 @@ test("AC3 example loan, chart, and November 2039 card", async ({ page }) => {
   await expect(page.getByRole("region", { name: "Loan amount" })).toContainText("$570,000.00");
   await expect(page.getByRole("region", { name: "Total interest paid" })).toContainText("$795,200.72");
   await expect(page.getByRole("region", { name: "Total cost of loan" })).toContainText("$1,365,200.72");
-  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("October 2056 (30 years)");
+  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("November 1, 2056 (30 years)");
   await expect(page.getByRole("region", { name: "Monthly payment" }).locator(".note")).toHaveCount(0);
   await expect(page.getByText("The extra payment is on top of this amount.")).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Extra principal paid" })).toContainText("$0.00");
@@ -141,6 +141,15 @@ test("AC11 pinned clock loads October 2026 and an invalid price keeps the loan",
     expect(row?.clipped).toBe(false);
   }
   await expect(page.locator("[data-bar]")).toHaveCount(360);
+  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText(
+    "This is the month the last payment is due. Payments are made in arrears: that payment is due on the 1st and covers the previous month.",
+  );
+  await expect(page.getByText(
+    "Payments are made in arrears: each month's row is paid on the 1st of the following month, including any extra principal.",
+  )).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Date" })).toBeVisible();
+  const year2026 = page.locator("tbody[data-year='2026']");
+  await expect(year2026.getByText("Nov 2026")).toBeVisible();
 
   const price = page.locator("#price");
   await price.focus();
@@ -200,7 +209,7 @@ test("AC8 the start month is a page-drawn picker", async ({ page }) => {
   await expect(trigger).toHaveText("October 2026");
   await expect(trigger).toHaveAttribute("data-value", "2026-10");
   await expect(trigger).toHaveAttribute("aria-expanded", "false");
-  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("October 2056 (30 years)");
+  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("November 1, 2056 (30 years)");
 
   const dialog = page.getByRole("dialog", { name: "Choose start month" });
   await expect(dialog).toHaveCount(0);
@@ -218,7 +227,7 @@ test("AC8 the start month is a page-drawn picker", async ({ page }) => {
   await expect(trigger).toHaveAttribute("data-value", "2026-11");
   await expect(trigger).toBeFocused();
   await expect(page.locator("tbody[data-year='2026'] tr").nth(1)).toContainText("Dec 2026");
-  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("November 2056 (30 years)");
+  await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("December 1, 2056 (30 years)");
 
   await trigger.click();
   await dialog.getByRole("button", { name: "Previous year" }).click();

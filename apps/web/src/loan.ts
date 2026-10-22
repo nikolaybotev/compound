@@ -363,6 +363,24 @@ export function paymentDate(
   };
 }
 
+export function dueDate(
+  startMonth: string,
+  paymentNumber: number,
+): { year: number; month: number } {
+  return paymentDate(startMonth, paymentNumber + 1);
+}
+
+export const PAYOFF_DATE_FOOTNOTE =
+  "This is the month the last payment is due. Payments are made in arrears: that payment is due on the 1st and covers the previous month.";
+
+export const SCHEDULE_ARREARS_FOOTNOTE =
+  "Payments are made in arrears: each month's row is paid on the 1st of the following month, including any extra principal.";
+
+export function formatPayoffDate(startMonth: string, payoffMonth: number): string {
+  const due = dueDate(startMonth, payoffMonth);
+  return `${MONTH_NAMES[due.month - 1]} 1, ${due.year} (${yearsAndMonths(payoffMonth)})`;
+}
+
 export function shortDate(year: number, month: number): string {
   return `${SHORT_MONTHS[month - 1]} ${year}`;
 }

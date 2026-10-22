@@ -53,7 +53,8 @@ import {
   type LoanDraft,
   type Prefill,
   type Scenario,
-  yearsAndMonths,
+  formatPayoffDate,
+  PAYOFF_DATE_FOOTNOTE,
 } from "./loan";
 import {
   FICO_RANGES,
@@ -367,7 +368,6 @@ export function App() {
     () => groupByYear(reportLoan, report, extras, lines.financedCents, applied),
     [reportLoan, report, extras, lines.financedCents, applied],
   );
-  const payoff = paymentDate(loan.startMonth, report.payoff_month);
   const bars: ChartBar[] = report.schedule.slice(0, report.payoff_month).map((row) => {
     const date = paymentDate(loan.startMonth, row.month);
     const split = bands(report, row);
@@ -1236,9 +1236,8 @@ export function App() {
           </div>
           <div role="region" aria-label="Payoff date">
             <dt>Payoff date</dt>
-            <dd class="money">
-              {`${longDate(payoff.year, payoff.month)} (${yearsAndMonths(report.payoff_month)})`}
-            </dd>
+            <dd class="money">{formatPayoffDate(loan.startMonth, report.payoff_month)}</dd>
+            <p class="note">{PAYOFF_DATE_FOOTNOTE}</p>
           </div>
           {report.arm ? (
             <div role="region" aria-label="Highest rate">
