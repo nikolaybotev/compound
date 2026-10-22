@@ -14,7 +14,7 @@ The calculator and its skill answer an ARM question with a number: the worst-cas
 
 ## Proposed outcome
 
-A second ARM skill that explains the adjustment procedure and produces no number. It lists the parameters of a fixed-then-adjusting ARM, then walks through a change date in prose with formulas written in names: the index as of the lookback plus the margin is the fully indexed rate; the initial cap and floor bound the first change; the periodic cap bounds each later move from the rate then in effect; the lifetime ceiling and floor bound every rate; the rate charged is applied to the unpaid balance over the payments left in the term. The same text states how the parameters relate: a higher margin lifts every future fully indexed rate; a ceiling defined as start rate plus lifetime cap moves with the start rate; the periodic cap measures from the rate just before the change, not the start rate; an index for one month does not change a month that is not a change date. One sequence diagram shows the procedure. One short table shows the parameters with the Example Credit Union 7/1 sheet's values, labeled as an example. The calculator skill keeps the numbers.
+A second ARM skill that explains the adjustment procedure and produces no number for a person's loan. It lists the parameters of a fixed-then-adjusting ARM, then walks through a change date in prose with formulas written in names: the index as of the lookback plus the margin is the fully indexed rate; the initial cap and floor bound the first change; the periodic cap bounds each later move from the rate then in effect; the lifetime ceiling and floor bound every rate; the rate charged is applied to the unpaid balance over the payments left in the term. The same text states how the parameters relate: a higher margin lifts every future fully indexed rate; a ceiling defined as start rate plus lifetime cap moves with the start rate; the periodic cap measures from the rate just before the change, not the start rate; an index for one month does not change a month that is not a change date. One sequence diagram shows the procedure. One short table shows the parameters with the Example Credit Union 7/1 sheet's values, labeled as an example. The calculator skill keeps the numbers.
 
 ## Affected users and systems
 
@@ -40,7 +40,13 @@ A second ARM skill that explains the adjustment procedure and produces no number
 
 ## Open questions (carried into spec.md)
 
-None. The choices made while drafting are D1–D12 in [spec.md](spec.md).
+None. The choices made while drafting are D1–D12 in [spec.md](spec.md). D13 records the 2026-10-22 types amendment.
+
+## Amendment (2026-10-22)
+
+The same skill gains a Types section. It explains two independent axes: the rate schedule (traditional or hybrid) and the payment structure (fully amortizing, interest-only, or option). A loan has one value on each axis. The adjustment procedure stays the fully amortizing one. Interest-only and option loans are explained and are not calculated, and they are not added to the calculator, the page, or the other skills.
+
+The "not dollars" wording above still governs the procedure. Types may quote labeled illustrations and no other dollar amounts: the page's general scenario (purchase price $600,000, 5% down, loan $570,000, note rate 7.375%, and the Nashua 1.683% and Brentwood 1.32% property-tax note) and one CFPB sample ($211,000 at 4% interest-only is $703.33). Those illustrations are not a person's loan. The skill still runs nothing.
 
 ## Original prompt (verbatim)
 
