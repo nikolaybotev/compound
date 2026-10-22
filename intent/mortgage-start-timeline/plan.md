@@ -72,7 +72,7 @@ DoD: `pnpm --dir apps/web test` and `pnpm --dir apps/web test:e2e` exit 0. `node
 
 ### Build notes (Phase 2)
 
-Added only after the phase lands.
+Shipped `formatDueOnFirst`, `armTimelineLines`, and `armChangeDate` in `loan.ts`. First adjustment and Highest payment append the due clause; Highest rate does not. The five-line `.arm-timeline` list follows the monthly-extra line (or the fallback first-adjustment line). UI copy uses **initial period** and **adjustment period**; stored `fixedYears` / `fixedMonths` keys and `--fixed-years` / `--fixed-months` CLI flags are unchanged. The change-date line states that the payment due that day is still the previous amount. `amortize.js` interest math is unchanged aside from the initial-period validation message text.
 
 ## Phase 3 — Moving in
 

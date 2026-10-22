@@ -685,7 +685,7 @@ test('arm-loan AC6 conflicting and missing ARM flags exit non-zero and name the 
 
 test('arm-loan AC5 the CLI prints the library message for a rejected term', () => {
   const fixedEqualsTerm = failure(feWith('--fixed-years', '30'));
-  assert.match(fixedEqualsTerm, /^ARM fixed period \(fixedMonths\) must be at least 1 month and shorter than the 360-month term\n$/);
+  assert.match(fixedEqualsTerm, /^ARM initial period \(fixedMonths\) must be at least 1 month and shorter than the 360-month term\n$/);
 
   const floorAbove = failure(feWith('--floor', '11'));
   assert.match(floorAbove, /^ARM lifetime floor \(floorThousandths\) must not be above the ceiling/);
@@ -737,7 +737,7 @@ test('arm-loan ARM flag grammar', () => {
   assert.match(failure([...base, ...arm, '--index', '/nonexistent/index.csv']), /cannot read --index file: ENOENT/);
   const zero = run(swap('--margin', '0'));
   assert.equal(zero.status, 0, zero.stderr);
-  assert.match(failure(swap('--fixed-years', '30')), /fixed period/);
+  assert.match(failure(swap('--fixed-years', '30')), /initial period/);
 });
 
 test('arm-loan --index CSV rules mirror --extra', () => {
@@ -803,7 +803,7 @@ test('arm-loan AC7 the skill lifts the ARM refusal and states the ARM rules', ()
     'worst-case payment and interest',
     'a given index path',
     'interest-only, payment-option, or negative-amortization',
-    'the fixed period, the adjustment interval, the margin, the initial, periodic, and lifetime caps, and the lifetime floor',
+    'the initial period, the adjustment interval, the margin, the initial, periodic, and lifetime caps, and the lifetime floor',
     'The first-adjustment floor is optional',
     'uses the lifetime floor',
     'The index name and the lookback period are not required',
@@ -813,7 +813,7 @@ test('arm-loan AC7 the skill lifts the ARM refusal and states the ARM rules', ()
     'only at adjustment months',
     '"The first adjustment" is month `F + 1`',
     '"Year k" of the loan is payment `(k - 1) * 12 + 1`',
-    'On a 10/1, "year 8" is month 85, which is inside the fixed period, and the first adjustment is month 121',
+    'On a 10/1, "year 8" is month 85, which is inside the initial period, and the first adjustment is month 121',
     'ask the user which adjustment they mean',
     'Do not slide it to `F + 1`',
     '"Every adjustment" is one row for each adjustment month through the term',

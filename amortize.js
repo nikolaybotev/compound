@@ -144,7 +144,7 @@ function validateArm(arm, ratePercent, monthCount) {
   }
   const initialThousandths = Math.round(ratePercent * 1000);
   if (!Number.isSafeInteger(arm.fixedMonths) || arm.fixedMonths < 1 || arm.fixedMonths >= monthCount) {
-    throw new Error(`ARM fixed period (fixedMonths) must be at least 1 month and shorter than the ${monthCount}-month term`);
+    throw new Error(`ARM initial period (fixedMonths) must be at least 1 month and shorter than the ${monthCount}-month term`);
   }
   if (!Number.isSafeInteger(arm.adjustMonths) || arm.adjustMonths < 1) {
     throw new Error('ARM adjustment interval (adjustMonths) must be at least 1 month');
