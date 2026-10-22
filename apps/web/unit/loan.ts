@@ -37,6 +37,8 @@ import {
   thousandsToDollarString,
   dueDate,
   formatPayoffDate,
+  formatDueOnFirst,
+  armTimelineLines,
   yearsAndMonths,
   monthsSavedText,
 } from "../src/loan";
@@ -1134,6 +1136,36 @@ describe("dueDate and formatPayoffDate", () => {
   test("formatPayoffDate includes the 1st and the duration parenthetical", () => {
     expect(formatPayoffDate("2026-11", 360)).toBe("December 1, 2056 (30 years)");
     expect(formatPayoffDate("2026-10", 360)).toBe("November 1, 2056 (30 years)");
+  });
+
+  test("formatDueOnFirst for the sheet loan and a November 2026 start", () => {
+    expect(formatDueOnFirst("2026-10", 85)).toBe("December 1, 2033");
+    expect(formatDueOnFirst("2026-11", 85)).toBe("January 1, 2034");
+  });
+});
+
+describe("armTimelineLines", () => {
+  test("sheet loan October 2026 start pins notice windows and the change date", () => {
+    const lines = armTimelineLines("2026-10", 85, 12);
+    expect(lines[0]).toBe(
+      "Change date November 1, 2033. That month's schedule row is the first month at the new rate. The payment due on that date is still the previous amount.",
+    );
+    expect(lines[1]).toBe(
+      "Index read September 17, 2033, 45 days before the change date. The usual agency-note lookback. The note can set a different count.",
+    );
+    expect(lines[2]).toBe(
+      "Initial notice April 5, 2033 – May 5, 2033, 210 to 240 days before the first new payment.",
+    );
+    expect(lines[3]).toContain("August 3, 2033 – October 2, 2033, 60 to 120 days before that payment.");
+    expect(lines[4]).toBe(
+      "After that, the rate can change every 12 months, on the 1st of the accrual month, and the new payment is first due on the 1st of the next month.",
+    );
+  });
+
+  test("a 1-month adjustment interval uses 25 to 120 on the later notice", () => {
+    const lines = armTimelineLines("2026-10", 85, 1);
+    expect(lines[3]).toContain("25 to 120 days before that payment.");
+    expect(lines[2]).toContain("210 to 240");
   });
 });
 

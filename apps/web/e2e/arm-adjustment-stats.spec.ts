@@ -4,7 +4,7 @@ const origin = "http://127.0.0.1:4173";
 const leaks = new WeakMap<BrowserContext, string[]>();
 
 const FIRST_ADJUSTMENT_LINE =
-  "First adjustment November 2033 (payment 85) · -$941.16 to +$1,665.94";
+  "First adjustment November 2033 (payment 85) · -$941.16 to +$1,665.94 · new payment first due December 1, 2033";
 
 test.beforeEach(async ({ context }) => {
   await blockForeignHosts(context);
@@ -60,7 +60,7 @@ test("AC6 invalid yearly extra and zero caps", async ({ page }) => {
   await page.locator("#arm-lifetime-cap").fill("0");
   await expect(page.locator("[data-line='arm-even-out']")).toHaveText("Even-out extra $0.00");
   await expect(page.locator("[data-line='arm-first-adjustment']")).toHaveText(
-    "First adjustment November 2033 (payment 85) · -$941.16 to $0.00",
+    "First adjustment November 2033 (payment 85) · -$941.16 to $0.00 · new payment first due December 1, 2033",
   );
 });
 

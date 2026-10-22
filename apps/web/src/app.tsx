@@ -54,6 +54,8 @@ import {
   type Prefill,
   type Scenario,
   formatPayoffDate,
+  formatDueOnFirst,
+  armTimelineLines,
   PAYOFF_DATE_FOOTNOTE,
 } from "./loan";
 import {
@@ -1021,7 +1023,7 @@ export function App() {
                 {`Ceiling ${report.arm.ceiling_percent}% · Floor ${report.arm.floor_percent}%`}
               </p>
               <p class="arm-computed" data-line="arm-first-adjustment">
-                {`First adjustment ${armDateLabel(loan, report.arm.first_adjustment.month)} (payment ${report.arm.first_adjustment.month}) · ${formatAdjustmentChange(report.arm.first_adjustment.min_change_cents)} to ${formatAdjustmentChange(report.arm.first_adjustment.max_change_cents)}`}
+                {`First adjustment ${armDateLabel(loan, report.arm.first_adjustment.month)} (payment ${report.arm.first_adjustment.month}) · ${formatAdjustmentChange(report.arm.first_adjustment.min_change_cents)} to ${formatAdjustmentChange(report.arm.first_adjustment.max_change_cents)} · new payment first due ${formatDueOnFirst(loan.startMonth, report.arm.first_adjustment.month)}`}
               </p>
               <p class="arm-computed" data-line="arm-even-out">
                 {`Even-out extra ${formatMoney(report.arm.even_out_cents ?? 0)}`}
@@ -1057,6 +1059,11 @@ export function App() {
               <p class="arm-computed" data-line="arm-monthly-extra">
                 {`Monthly extra ${formatMoney(report.arm.monthly_extra_cents ?? 0)}`}
               </p>
+              <ArmTimeline
+                startMonth={loan.startMonth}
+                firstAdjustmentPayment={report.arm.first_adjustment.month}
+                adjustMonths={armParsed.values.adjustMonths}
+              />
             </>
           ) : (
             <>
@@ -1064,8 +1071,13 @@ export function App() {
                 {`Ceiling ${formatPercentThousandths(rateThousandths + armParsed.values.lifetimeCapThousandths)}%`}
               </p>
               <p class="arm-computed" data-line="arm-first-adjustment">
-                {`First adjustment ${armDateLabel(loan, armParsed.values.fixedMonths + 1)} (payment ${armParsed.values.fixedMonths + 1})`}
+                {`First adjustment ${armDateLabel(loan, armParsed.values.fixedMonths + 1)} (payment ${armParsed.values.fixedMonths + 1}) · new payment first due ${formatDueOnFirst(loan.startMonth, armParsed.values.fixedMonths + 1)}`}
               </p>
+              <ArmTimeline
+                startMonth={loan.startMonth}
+                firstAdjustmentPayment={armParsed.values.fixedMonths + 1}
+                adjustMonths={armParsed.values.adjustMonths}
+              />
             </>
           )}
         </Disclosure>
@@ -1186,7 +1198,7 @@ export function App() {
                 checked={prefill.level === true}
                 onChange={(event) => changePrefill({ level: event.currentTarget.checked })}
               />
-              Match the fixed-period total after each reset
+              Match the initial-period total after each reset
             </label>
           ) : null}
           <div class="apply-row">
@@ -1251,7 +1263,7 @@ export function App() {
             <div role="region" aria-label="Highest payment">
               <dt>Highest payment</dt>
               <dd class="money">
-                {`${formatMoney(report.arm.max_payment_cents)} from ${armDateLabel(loan, report.arm.max_payment_month)}`}
+                {`${formatMoney(report.arm.max_payment_cents)} from ${armDateLabel(loan, report.arm.max_payment_month)} · first due ${formatDueOnFirst(loan.startMonth, report.arm.max_payment_month)}`}
               </dd>
             </div>
           ) : null}
@@ -1523,6 +1535,25 @@ const ARM_FIELDS: readonly string[] = [
 
 function armFieldInvalid(field: string | null): boolean {
   return field !== null && ARM_FIELDS.includes(field);
+}
+
+function ArmTimeline(props: {
+  startMonth: string;
+  firstAdjustmentPayment: number;
+  adjustMonths: number;
+}) {
+  const lines = armTimelineLines(
+    props.startMonth,
+    props.firstAdjustmentPayment,
+    props.adjustMonths,
+  );
+  return (
+    <ul class="arm-timeline">
+      {lines.map((line) => (
+        <li key={line}>{line}</li>
+      ))}
+    </ul>
+  );
 }
 
 function armDateLabel(loan: Loan, paymentNumber: number): string {

@@ -53,7 +53,7 @@ export type ArmParseResult =
   | { ok: false; field: ArmField; message: string };
 
 export const ARM_FIELD_LABELS: Record<ArmField, string> = {
-  fixedYears: "Fixed period",
+  fixedYears: "Initial period",
   adjustMonths: "Adjusts every",
   margin: "Margin",
   initialCap: "Initial cap",
@@ -156,7 +156,7 @@ export function parseArm(
     return {
       ok: false,
       field: "fixedYears",
-      message: "Fixed period must be shorter than the term.",
+      message: "Initial period must be shorter than the term.",
     };
   }
   const adjustMonths = parseWholeField(draft.adjustMonths, "adjustMonths", "months");

@@ -25,7 +25,7 @@ Ask, and wait, when any of these is missing:
 - the term in years or months
 - the extra-principal plan (for the first run of a recast, or any non-recast question that needs extras)
 - the recast month (for a recast question)
-- for an adjustable-rate (ARM) loan: the fixed period, the adjustment interval, the margin, the initial, periodic, and lifetime caps, and the lifetime floor
+- for an adjustable-rate (ARM) loan: the initial period, the adjustment interval, the margin, the initial, periodic, and lifetime caps, and the lifetime floor
 
 The first-adjustment floor is optional for an ARM. When the user does not give it, the skill omits `--initial-floor`, so the calculator uses the lifetime floor, and says so. The index name and the lookback period are not required. When the user gives them, the skill may repeat which published figure the note reads (for Ed's terms, the most recent weekly 1-year CMT available 45 days before the change date) and does not fetch a value.
 
@@ -41,14 +41,14 @@ Write one CSV row per extra payment. The header is `month,extra`. The example qu
 
 ## Adjustable-rate (ARM) loans
 
-This section covers a fully amortizing loan with a fixed period followed by regular resets, each bounded by an initial, a periodic, and a lifetime cap and a floor. The note rate the user gives is the initial rate: pass it as `--rate`. The term is the user's term. Pass the ARM terms as `--fixed-years` or `--fixed-months` (exactly one), `--adjust-months`, `--margin`, `--caps INITIAL/PERIODIC/LIFETIME` (the order the rate sheet prints, for example `5/2/5`), and `--floor`. Do not supply a fixed period, interval, margin, cap, floor, or index value the user did not give.
+This section covers a fully amortizing loan with an initial period followed by regular resets on each adjustment period, each bounded by an initial, a periodic, and a lifetime cap and a floor. The note rate the user gives is the initial rate: pass it as `--rate`. The term is the user's term. Pass the ARM terms as `--fixed-years` or `--fixed-months` (exactly one), `--adjust-months`, `--margin`, `--caps INITIAL/PERIODIC/LIFETIME` (the order the rate sheet prints, for example `5/2/5`), and `--floor`. Do not supply an initial period, interval, margin, cap, floor, or index value the user did not give.
 
 With no index path from the user, the run is the worst case the note allows, and the answer says so in one sentence: every reset takes the maximum the caps and the lifetime ceiling permit. Do not apply a periodic cap at the first reset; the calculator uses the initial cap there, so 5/2/5 from 5.875% reaches 10.875% at the first reset.
 
 An index path is a `month,index` CSV passed with `--index`. It has one row for each adjustment month the user named, and only at adjustment months. Write the index as a percent with at most three decimals (`4.42`). Do not write the rate; the calculator adds the margin and applies the caps and floors.
 
-- "The first adjustment" is month `F + 1`, where `F` is the fixed period in months (`years * 12` for a period in years). A 7-year fixed period has its first adjustment at month 85.
-- "Year k" of the loan is payment `(k - 1) * 12 + 1`. On a 7/1, "year 8" is month 85, the first adjustment. On a 10/1, "year 8" is month 85, which is inside the fixed period, and the first adjustment is month 121.
+- "The first adjustment" is month `F + 1`, where `F` is the initial period in months (`years * 12` for a period in years). A 7-year initial period has its first adjustment at month 85.
+- "Year k" of the loan is payment `(k - 1) * 12 + 1`. On a 7/1, "year 8" is month 85, the first adjustment. On a 10/1, "year 8" is month 85, which is inside the initial period, and the first adjustment is month 121.
 - A calendar month maps to a payment number through the same first-payment formula the recast section uses: `(year2 - year1) * 12 + (month2 - month1) + 1`. Ask for the first payment month when the user names a calendar month without it.
 - If the payment number that results is not an adjustment month (`F + 1 + k * A` for `k` of 0 or more, up to the term), ask the user which adjustment they mean. Do not slide it to `F + 1`.
 - "Every adjustment" is one row for each adjustment month through the term `n` (the `--months` value, or `years * 12`). A flat index of 4.00 on a 7/1 over 30 years is 23 rows, months 85, 97, and on to 349, each with `4`.
