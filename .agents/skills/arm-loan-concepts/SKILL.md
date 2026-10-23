@@ -134,3 +134,16 @@ The sheet also prints an Upfront Buy-Down Limit of 5.50%, which is a pricing rul
 Answer from this document and quote the step, the relation, or the axis the question is about. Do not compute a payment, an interest figure, a reset rate, or an index value for a person's loan. This skill **does not fetch** an index from any publisher. When the user wants a figure for a fully amortizing loan, say that **mortgage-loan-calculator** is the skill that runs the calculator and asks for the terms, and **does not run the calculator** from here. Do not supply the example's values as the user's terms, including the 45-day lookback, which is quoted only for the example loan or when the user gave it. When asked **which published fixing** of the index a note reads, or how two fixings compare, say the skill does not say which published fixing a note uses and has **no comparison of fixings**. Say the Example Credit Union table is **one invented example** when it is shown. Do not compute a **calendar date** for a change date: the first change is the payment after the fixed period and the note's schedule names the dates. The November 2033 label in Types belongs to the page illustration with a start month of October 2026 and is not a date for another loan.
 
 The procedure is the **fully amortizing** one. **interest-only** and **payment-option** loans, including **negative-amortization**, are explained in Types and are not calculated. Do not invent adjustment steps or a payment for them. **balloon** and **payment-capped** loans are not explained here, and the agent does not invent steps for them. Dollar figures in Types are a **labeled illustration**: the page's general scenario and a **CFPB sample**. Do not present a labeled illustration as the user's loan. If the balance, the rate, or the term is not that illustration, do not scale it and do not compute a new figure.
+
+Cited consumer answers, with the rules they rest on, are in the knowledge base. They do not change the wording above. This skill still gives no payment, rate, or index for a person's loan.
+
+- [Index](../../../docs/kb/README.md)
+- [How an ARM's rate works](../../../docs/kb/arm-rate.md)
+- [Payment structures](../../../docs/kb/payment-structures.md)
+- [Qualifying, QM, HPML, and APR](../../../docs/kb/qualifying.md)
+- [Pricing and the rate lock](../../../docs/kb/pricing.md)
+- [Paying early and mortgage insurance](../../../docs/kb/prepaying.md)
+- [Loan documents](../../../docs/kb/documents.md)
+- [Questions to ask](../../../docs/kb/lender-questions.md)
+- [Glossary](../../../docs/kb/glossary.md)
+- [Sources](../../../docs/kb/sources.md)
