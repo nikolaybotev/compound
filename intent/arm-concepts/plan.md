@@ -14,6 +14,10 @@ Spec Draft 4 requirement 11, D13, AC3, AC8, AC9, and AC10 supersede the earlier 
 
 This amendment edits `.agents/skills/arm-loan-concepts/SKILL.md`, `arm_loan_concepts.test.js`, `README.md`, `AGENTS.md`, `REVIEW.md`, and this folder. It does not edit `amortize.js`, `compound_interest_monthly.js`, `origination_fees.js`, the calculator skill, the fee skill, `apps/web`, or a workflow, and it does not bump the page version. The page has no help or learn area, so the explainer stays in the concepts skill.
 
+## Amendment (2026-10-23) — consumer knowledge base
+
+The page side panel in the 0.21 plan is not built. Cited consumer answers are [`docs/kb/`](../../docs/kb/README.md), one file per part of the ARM know-how explainer. The concepts skill's existing sentences are unchanged. How to answer gains a relative-path list to those files and still contains no `http` URL, which is what AC3 checks. The skill directory remains only `SKILL.md`. Copy in `docs/kb/` names no lender and uses **initial period** and **adjustment period**. Topics this skill, [`docs/TRID_LOAN_ESTIMATE_COMPLIANCE_CITATIONS.md`](../../docs/TRID_LOAN_ESTIMATE_COMPLIANCE_CITATIONS.md), or [`intent/mortgage-start-timeline/spec.md`](../mortgage-start-timeline/spec.md) already state are linked from `docs/kb/` and not copied. This amendment does not change `amortize.js`, the CLI, the calculator tests, or the page.
+
 ## Stops
 
 None. The separate skill (D1), no number (D2), the sheet as example (D8), the Mermaid sequence diagram (D10), and the root test file (D11) are decided in the spec. No calculator, page, or deploy file changes.
