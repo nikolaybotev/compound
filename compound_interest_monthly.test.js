@@ -865,7 +865,7 @@ test('arm-loan AC7 REVIEW.md, AGENTS.md, and README.md carry the ARM items', () 
     assert.ok(readme.includes(flag), `README missing ${flag}`);
   }
   assert.ok(readme.includes('month,index'));
-  assert.ok(readme.includes('month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved,rate,payment,index'));
+  assert.ok(readme.includes('month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved,saved_by_extra,rate,payment,index'));
 });
 
 test('arm-loan the skill symlink still resolves to the calculator', () => {
