@@ -129,11 +129,7 @@
     - It answers G5 from a `--json` run with no `--schedule`. It answers G6 from a `--json --schedule` run, reading `schedule`. It does not invent a month's interest, balance, or savings, and it does not add `--schedule` for a question the summary already answers.
     - If the user describes an adjustable, interest-only, or recast loan, it says this calculator only covers a fixed payment that shortens the term, and it does not produce a schedule.
 
-11. After the skill file is in the repo, the workspace link is:
-
-    `../../github.com/nikolaybotev/compound/.agents/skills/mortgage-loan-calculator`
-
-    from `/Users/nikolay/git/.agents/skills/mortgage-loan-calculator`. That matches the existing `gold-value-normalizer` link. The link is local workspace setup; it is not a file in the git tree.
+11. After the skill file is in the repo, a workspace link may point at it. The link is local setup and is not a file in the git tree.
 
 ## 6. Acceptance criteria
 
@@ -164,7 +160,7 @@ The 2022 gist and the first commit in this repo wrapped the payment in `Math.cei
 
 **D6 — Summary is the default.** `--json` alone returns the lifetime totals and omits `schedule`. `--json --schedule` adds the month rows to that same object. `--schedule` alone prints the CSV. The sample savings question does not need the rows, so the skill leaves the flag off. A question about a month adds it. A default that always included 360 rows would make the common answer carry a table it does not use. The spec review on 2026-10-02 read the earlier "same run" sentence as requiring `--schedule` on every answer. The owner had already asked for summary output when the rows are not needed, so the intent now says the sample question uses the summary and a month question includes the schedule.
 
-**D7 — The skill lives in this repo and is linked into the workspace.** Product skills live in `.agents/skills/<name>/`. The workspace already links `gold-value-normalizer` the same way, so a mortgage question asked from `/Users/nikolay/git` can find it.
+**D7 — The skill lives in this repo and is linked into the workspace.** Product skills live in `.agents/skills/<name>/`. A local workspace link can point at the skill. The link is not a file in the git tree.
 
 **D8 — Fixed payment, shorter term.** The example pays $100 on top of a 30-year fixed loan. The required payment does not change. Recast, ARM, and escrow are out of the first release.
 
