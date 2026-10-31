@@ -1,3 +1,4 @@
+import { KNOWLEDGE_ENTRIES } from "./knowledge";
 import {
   extraInputValue,
   formatMoney,
@@ -5,6 +6,7 @@ import {
   SCHEDULE_ARREARS_FOOTNOTE,
   type ScheduleYear,
 } from "./loan";
+import { TermButton } from "./term";
 
 type Props = {
   years: ScheduleYear[];
@@ -57,8 +59,8 @@ export function Schedule({
               {arm ? <th scope="col">Payment</th> : null}
               <th scope="col">Principal</th>
               <th scope="col">Interest</th>
-              {arm ? <th scope="col">Index</th> : null}
-              <th scope="col">Extra payment</th>
+              {arm ? <th scope="col"><TermButton entry={KNOWLEDGE_ENTRIES.noteRate.id} anchor={KNOWLEDGE_ENTRIES.noteRate.anchor}>Index</TermButton></th> : null}
+              <th scope="col"><TermButton entry={KNOWLEDGE_ENTRIES.extraPrincipal.id} anchor={KNOWLEDGE_ENTRIES.extraPrincipal.anchor}>Extra payment</TermButton></th>
               <th scope="col">Saved by extra</th>
               <th scope="col">Principal balance</th>
               <th scope="col">Interest balance</th>

@@ -1107,3 +1107,258 @@ td {
 .prevailing-legend-pe {
   color: var(--prevailing-pe);
 }
+
+.title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem 1.25rem;
+}
+
+.title-row h1 {
+  min-width: 0;
+}
+
+.knowledge-open {
+  margin-top: 0.55rem;
+  flex: none;
+}
+
+button.term {
+  display: inline;
+  width: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px dotted var(--muted);
+  border-radius: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  line-height: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  vertical-align: baseline;
+}
+
+button.term:hover,
+button.term:focus-visible {
+  color: var(--principal);
+  border-bottom-color: var(--principal);
+}
+
+.field > button.term,
+dt button.term,
+.arm-check button.term,
+.arm-computed button.term,
+.arm-timeline button.term {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.field > button.term,
+.arm-check button.term {
+  text-align: left;
+}
+
+.arm-check button.term {
+  flex: 1;
+}
+
+.heading-line button.term,
+.arm-computed button.term,
+.arm-timeline button.term,
+thead th button.term,
+.picture-table th button.term,
+.moving-copy button.term {
+  font-size: inherit;
+  font-family: inherit;
+}
+
+.heading-line button.term,
+thead th button.term,
+.picture-table th button.term {
+  color: inherit;
+}
+
+.moving-copy button.term {
+  color: var(--balance);
+}
+
+.knowledge-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 39;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: rgba(23, 33, 31, 0.45);
+  cursor: pointer;
+}
+
+.knowledge-panel {
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 16;
+  width: min(26rem, 36vw);
+  height: 100%;
+  background: var(--card);
+  color: var(--ink);
+  border-left: 1px solid var(--line);
+  box-shadow: -8px 0 24px rgba(23, 33, 31, 0.06);
+}
+
+.knowledge-chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+}
+
+.knowledge-chrome p {
+  margin: 0;
+  font-weight: 700;
+}
+
+.knowledge-types {
+  margin: 0.75rem 0.9rem 0;
+  align-self: flex-start;
+}
+
+.knowledge-body {
+  overflow: auto;
+  flex: 1;
+  padding: 0.9rem 1rem 1.5rem;
+  overscroll-behavior: contain;
+}
+
+.knowledge-anchor {
+  display: block;
+  scroll-margin-top: 0.5rem;
+}
+
+.knowledge-md h2,
+.knowledge-md h3,
+.knowledge-md h4 {
+  margin: 1.1rem 0 0.45rem;
+  color: var(--ink);
+  font-weight: 700;
+  letter-spacing: normal;
+  line-height: 1.25;
+}
+
+.knowledge-md h2 {
+  font-size: 1.45rem;
+}
+
+.knowledge-md h3 {
+  font-size: 1.12rem;
+}
+
+.knowledge-md h4 {
+  font-size: 1rem;
+}
+
+.knowledge-md h2:first-child,
+.knowledge-md h3:first-child {
+  margin-top: 0;
+}
+
+.knowledge-md p,
+.knowledge-md ul,
+.knowledge-md ol,
+.knowledge-md blockquote {
+  margin: 0.55rem 0;
+}
+
+.knowledge-md ul,
+.knowledge-md ol {
+  padding-left: 1.2rem;
+}
+
+.knowledge-md li {
+  margin: 0.25rem 0;
+}
+
+.knowledge-md blockquote {
+  padding-left: 0.85rem;
+  border-left: 3px solid var(--line);
+}
+
+.knowledge-md a,
+.knowledge-md button.term {
+  color: var(--balance);
+  font-size: inherit;
+  font-family: inherit;
+}
+
+.knowledge-md code {
+  font-family: var(--mono);
+  font-size: 0.88em;
+  background: var(--paper);
+  padding: 0.05rem 0.25rem;
+}
+
+.knowledge-table-scroll {
+  overflow-x: auto;
+  margin: 0.75rem 0;
+}
+
+.knowledge-md table {
+  font-family: var(--sans);
+  font-size: 0.92rem;
+}
+
+.knowledge-md th,
+.knowledge-md td {
+  text-align: left;
+  white-space: normal;
+  vertical-align: top;
+  font-family: var(--sans);
+  color: var(--ink);
+}
+
+.knowledge-md th {
+  font-weight: 700;
+}
+
+@media (min-width: 52.01rem) {
+  body:has(.knowledge-panel) .column {
+    width: min(72rem, calc(100% - 2rem - min(26rem, 36vw)));
+    margin-right: min(26rem, 36vw);
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 52rem) {
+  .knowledge-panel {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    width: auto;
+    height: min(72vh, 40rem);
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 1rem 1rem 0 0;
+    box-shadow: 0 -12px 32px rgba(23, 33, 31, 0.18);
+  }
+
+  .knowledge-panel::before {
+    content: "";
+    display: block;
+    width: 2.5rem;
+    height: 0.25rem;
+    margin: 0.55rem auto 0;
+    border-radius: 999px;
+    background: var(--line);
+    flex: none;
+  }
+}

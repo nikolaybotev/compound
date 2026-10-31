@@ -2,7 +2,7 @@
 
 Consumer education for choosing between a 30-year fixed-rate loan and a hybrid ARM, such as a 7/1 or a 7/6. It is general education, not legal, tax, or lending advice. Every loan's own note controls.
 
-Prepared from the ARM know-how explainer of 2026-10-23. The page side panel in the 0.21 plan is not built. These files are the articles that panel would open.
+Prepared from the ARM know-how explainer of 2026-10-23. The page opens these articles beside the loan: a side panel on a wide screen and a bottom sheet on a phone. The ARM types explainer is the Types section of the concepts skill, shown from that file.
 
 The named adjustment procedure, the two-axis types, and the page's labeled illustrations stay in [`.agents/skills/arm-loan-concepts/SKILL.md`](../../.agents/skills/arm-loan-concepts/SKILL.md). Its design is [`intent/arm-concepts/`](../../intent/arm-concepts/). This knowledge base does not restate that procedure or those illustrations. The page's general scenario is a purchase price of $600,000 with 5% down, so the loan is $570,000. Nashua at 1.683% and Brentwood at 1.32% in that skill are local tax rates on the purchase price, not a note rate, an index, or a cap.
 

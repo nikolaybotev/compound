@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 import {
   ARM_FIELD_LABELS,
@@ -12,7 +12,10 @@ import {
 } from "./arm";
 import { Chart, type ChartBar } from "./chart";
 import { Disclosure } from "./disclosure";
+import { KNOWLEDGE_ENTRIES, KNOWLEDGE_SHEET_QUERY, type KnowledgeEntry, type KnowledgeFrame } from "./knowledge";
+import { KnowledgePanel } from "./knowledge-panel";
 import { MonthPicker } from "./month-picker";
+import { KnowledgeOpen, TermButton } from "./term";
 import { ScenarioBar } from "./scenarios";
 import {
   MONTH_NAMES,
@@ -182,6 +185,11 @@ export function App() {
   const [editingValue, setEditingValue] = useState("");
   const [editingIndexMonth, setEditingIndexMonth] = useState<number | null>(null);
   const [editingIndexValue, setEditingIndexValue] = useState("");
+  const [knowledgeStack, setKnowledgeStack] = useState<KnowledgeFrame[] | null>(null);
+  const knowledgeOpener = useRef<HTMLElement | null>(null);
+  const [knowledgeSheet, setKnowledgeSheet] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(KNOWLEDGE_SHEET_QUERY).matches,
+  );
   const snapshot = useRef<Scenario>({
     draft: initial.scenario.draft,
     extras: initial.scenario.extras,
@@ -193,6 +201,46 @@ export function App() {
     armStored: initial.scenario.armStored,
     prorationStored: initial.scenario.prorationStored,
   });
+
+  useEffect(() => {
+    const media = window.matchMedia(KNOWLEDGE_SHEET_QUERY);
+    const apply = () => setKnowledgeSheet(media.matches);
+    apply();
+    media.addEventListener("change", apply);
+    return () => media.removeEventListener("change", apply);
+  }, []);
+
+  const openKnowledge = useCallback((id: string, anchor?: string) => {
+    knowledgeOpener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setKnowledgeStack(id === "readme" ? [{ id: "readme" }] : [{ id: "readme" }, { id, anchor }]);
+  }, []);
+
+  const pushKnowledge = useCallback((id: string, anchor?: string) => {
+    setKnowledgeStack((current) => {
+      if (!current || current.length === 0) return [{ id, anchor }];
+      const top = current[current.length - 1];
+      if (top && top.id === id) {
+        const next = current.slice();
+        next[next.length - 1] = { id, anchor };
+        return next;
+      }
+      return [...current, { id, anchor }];
+    });
+  }, []);
+
+  const backKnowledge = useCallback(() => {
+    setKnowledgeStack((current) => {
+      if (!current || current.length <= 1) return current;
+      return current.slice(0, -1);
+    });
+  }, []);
+
+  const closeKnowledge = useCallback(() => {
+    setKnowledgeStack(null);
+    const opener = knowledgeOpener.current;
+    knowledgeOpener.current = null;
+    requestAnimationFrame(() => opener?.focus());
+  }, []);
 
   function reseedFromScenario(scenario: Scenario) {
     const parsed = parseLoan(scenario.draft);
@@ -995,11 +1043,17 @@ export function App() {
   }
 
   return (
-    <main class="column">
-      <h1>
-        Compound
-        <span class="title-tagline">A mortgage amortization calculator</span>
-      </h1>
+    <KnowledgeOpen.Provider value={openKnowledge}>
+    <main class="column" inert={knowledgeStack && knowledgeSheet ? true : undefined}>
+      <div class="title-row">
+        <h1>
+          Compound
+          <span class="title-tagline">A mortgage amortization calculator</span>
+        </h1>
+        <button type="button" class="knowledge-open" onClick={() => openKnowledge("readme")}>
+          Knowledge
+        </button>
+      </div>
       <ScenarioBar
         labels={scenarioLabels}
         figures={scenarioRows.map((row) => row.figures)}
@@ -1060,9 +1114,11 @@ export function App() {
         />
         <span>-year </span>
         {armOn && armParsed.ok ? (
-          <span class="arm-label" data-testid="arm-label">
-            {armLabel(armParsed.values.fixedMonths / 12, armParsed.values.adjustMonths)}
-          </span>
+          <TermButton entry={KNOWLEDGE_ENTRIES.types.id}>
+            <span class="arm-label" data-testid="arm-label">
+              {armLabel(armParsed.values.fixedMonths / 12, armParsed.values.adjustMonths)}
+            </span>
+          </TermButton>
         ) : null}
         {armOn ? " " : null}
         <select
@@ -1107,6 +1163,7 @@ export function App() {
             <Field
               id="arm-fixed-years"
               label={ARM_FIELD_LABELS.fixedYears}
+              term={KNOWLEDGE_ENTRIES.initialPeriod}
               value={armDraft.fixedYears}
               suffix="years"
               invalid={invalidField === "fixedYears"}
@@ -1115,6 +1172,7 @@ export function App() {
             <Field
               id="arm-adjust-months"
               label={ARM_FIELD_LABELS.adjustMonths}
+              term={KNOWLEDGE_ENTRIES.initialPeriod}
               value={armDraft.adjustMonths}
               suffix="months"
               invalid={invalidField === "adjustMonths"}
@@ -1123,6 +1181,7 @@ export function App() {
             <Field
               id="arm-margin"
               label={ARM_FIELD_LABELS.margin}
+              term={KNOWLEDGE_ENTRIES.noteRate}
               value={armDraft.margin}
               suffix="%"
               invalid={invalidField === "margin"}
@@ -1131,6 +1190,7 @@ export function App() {
             <Field
               id="arm-initial-cap"
               label={ARM_FIELD_LABELS.initialCap}
+              term={KNOWLEDGE_ENTRIES.caps}
               value={armDraft.initialCap}
               suffix="%"
               invalid={invalidField === "initialCap"}
@@ -1139,6 +1199,7 @@ export function App() {
             <Field
               id="arm-periodic-cap"
               label={ARM_FIELD_LABELS.periodicCap}
+              term={KNOWLEDGE_ENTRIES.caps}
               value={armDraft.periodicCap}
               suffix="%"
               invalid={invalidField === "periodicCap"}
@@ -1147,6 +1208,7 @@ export function App() {
             <Field
               id="arm-lifetime-cap"
               label={ARM_FIELD_LABELS.lifetimeCap}
+              term={KNOWLEDGE_ENTRIES.caps}
               value={armDraft.lifetimeCap}
               suffix="%"
               invalid={invalidField === "lifetimeCap"}
@@ -1155,6 +1217,7 @@ export function App() {
             <Field
               id="arm-floor"
               label={ARM_FIELD_LABELS.floor}
+              term={KNOWLEDGE_ENTRIES.caps}
               value={armDraft.floor}
               suffix="%"
               invalid={invalidField === "floor"}
@@ -1163,28 +1226,33 @@ export function App() {
             <Field
               id="arm-initial-floor"
               label={ARM_FIELD_LABELS.initialFloor}
+              term={KNOWLEDGE_ENTRIES.caps}
               value={armDraft.initialFloor}
               suffix="%"
               invalid={invalidField === "initialFloor"}
               onInput={(value) => updateArm("initialFloor", value)}
             />
           </div>
-          <label class="arm-check" for="arm-round-eighth">
-            <input
-              id="arm-round-eighth"
-              type="checkbox"
-              checked={armSaved.roundEighth}
-              onChange={(event) => setRoundEighth(event.currentTarget.checked)}
-            />
+          <CheckTerm
+            id="arm-round-eighth"
+            checked={armSaved.roundEighth}
+            entry={KNOWLEDGE_ENTRIES.noteRate.id}
+            anchor={KNOWLEDGE_ENTRIES.noteRate.anchor}
+            onChange={setRoundEighth}
+          >
             Round to nearest 1/8 point
-          </label>
+          </CheckTerm>
           {report.arm?.first_adjustment ? (
             <>
               <p class="arm-computed" data-line="arm-ceiling">
-                {`Ceiling ${report.arm.ceiling_percent}% · Floor ${report.arm.floor_percent}%`}
+                <TermButton entry={KNOWLEDGE_ENTRIES.caps.id} anchor={KNOWLEDGE_ENTRIES.caps.anchor}>Ceiling</TermButton>
+                {` ${report.arm.ceiling_percent}% · `}
+                <TermButton entry={KNOWLEDGE_ENTRIES.caps.id} anchor={KNOWLEDGE_ENTRIES.caps.anchor}>Floor</TermButton>
+                {` ${report.arm.floor_percent}%`}
               </p>
               <p class="arm-computed" data-line="arm-first-adjustment">
-                {`First adjustment ${armDateLabel(loan, report.arm.first_adjustment.month)} (payment ${report.arm.first_adjustment.month}) · ${formatAdjustmentChange(report.arm.first_adjustment.min_change_cents)} to ${formatAdjustmentChange(report.arm.first_adjustment.max_change_cents)} · new payment first due ${formatDueOnFirst(loan.startMonth, report.arm.first_adjustment.month)}`}
+                <TermButton entry={KNOWLEDGE_ENTRIES.initialPeriod.id} anchor={KNOWLEDGE_ENTRIES.initialPeriod.anchor}>First adjustment</TermButton>
+                {` ${armDateLabel(loan, report.arm.first_adjustment.month)} (payment ${report.arm.first_adjustment.month}) · ${formatAdjustmentChange(report.arm.first_adjustment.min_change_cents)} to ${formatAdjustmentChange(report.arm.first_adjustment.max_change_cents)} · new payment first due ${formatDueOnFirst(loan.startMonth, report.arm.first_adjustment.month)}`}
               </p>
               <p class="arm-computed" data-line="arm-even-out">
                 {`Even-out extra ${formatMoney(report.arm.even_out_cents ?? 0)}`}
@@ -1229,10 +1297,12 @@ export function App() {
           ) : (
             <>
               <p class="arm-computed" data-line="arm-ceiling">
-                {`Ceiling ${formatPercentThousandths(rateThousandths + armParsed.values.lifetimeCapThousandths)}%`}
+                <TermButton entry={KNOWLEDGE_ENTRIES.caps.id} anchor={KNOWLEDGE_ENTRIES.caps.anchor}>Ceiling</TermButton>
+                {` ${formatPercentThousandths(rateThousandths + armParsed.values.lifetimeCapThousandths)}%`}
               </p>
               <p class="arm-computed" data-line="arm-first-adjustment">
-                {`First adjustment ${armDateLabel(loan, armParsed.values.fixedMonths + 1)} (payment ${armParsed.values.fixedMonths + 1}) · new payment first due ${formatDueOnFirst(loan.startMonth, armParsed.values.fixedMonths + 1)}`}
+                <TermButton entry={KNOWLEDGE_ENTRIES.initialPeriod.id} anchor={KNOWLEDGE_ENTRIES.initialPeriod.anchor}>First adjustment</TermButton>
+                {` ${armDateLabel(loan, armParsed.values.fixedMonths + 1)} (payment ${armParsed.values.fixedMonths + 1}) · new payment first due ${formatDueOnFirst(loan.startMonth, armParsed.values.fixedMonths + 1)}`}
               </p>
               <ArmTimeline
                 startMonth={loan.startMonth}
@@ -1284,7 +1354,11 @@ export function App() {
             />
             <MoneyRow
               line="pmi"
-              label="Conventional PMI"
+              label={
+                <TermButton entry={KNOWLEDGE_ENTRIES.pmi.id} anchor={KNOWLEDGE_ENTRIES.pmi.anchor}>
+                  Conventional PMI
+                </TermButton>
+              }
               amount={lines.pmiCents}
               rate={
                 <PictureInput
@@ -1352,15 +1426,15 @@ export function App() {
             </div>
           </div>
           {armOn ? (
-            <label class="arm-check" for="extra-level">
-              <input
-                id="extra-level"
-                type="checkbox"
-                checked={prefill.level === true}
-                onChange={(event) => changePrefill({ level: event.currentTarget.checked })}
-              />
+            <CheckTerm
+              id="extra-level"
+              checked={prefill.level === true}
+              entry={KNOWLEDGE_ENTRIES.initialPeriod.id}
+              anchor={KNOWLEDGE_ENTRIES.initialPeriod.anchor}
+              onChange={(checked) => changePrefill({ level: checked })}
+            >
               Match the initial-period total after each reset
-            </label>
+            </CheckTerm>
           ) : null}
           <div class="apply-row">
             <button type="button" onClick={applyPrefill}>
@@ -1429,7 +1503,11 @@ export function App() {
             </div>
           ) : null}
           <div role="region" aria-label="Extra principal paid">
-            <dt>Extra principal paid</dt>
+            <dt>
+              <TermButton entry={KNOWLEDGE_ENTRIES.extraPrincipal.id} anchor={KNOWLEDGE_ENTRIES.extraPrincipal.anchor}>
+                Extra principal paid
+              </TermButton>
+            </dt>
             <dd class="money">{formatMoney(report.extra_applied_cents)}</dd>
           </div>
           <div role="region" aria-label="Interest saved">
@@ -1588,7 +1666,11 @@ export function App() {
             <MoneyRow line="closing" label="Closing costs" amount={lines.closingCents} />
             <MoneyRow
               line="points"
-              label="Points"
+              label={
+                <TermButton entry={KNOWLEDGE_ENTRIES.points.id} anchor={KNOWLEDGE_ENTRIES.points.anchor}>
+                  Points
+                </TermButton>
+              }
               amount={lines.pointsCents}
               rate={
                 <PictureInput
@@ -1619,7 +1701,11 @@ export function App() {
             />
             <MoneyRow
               line="lender-credit"
-              label="Lender credit"
+              label={
+                <TermButton entry={KNOWLEDGE_ENTRIES.points.id} anchor={KNOWLEDGE_ENTRIES.points.anchor}>
+                  Lender credit
+                </TermButton>
+              }
               amount={pictureValues.lenderCreditCents}
               rate={
                 <PictureInput
@@ -1674,6 +1760,7 @@ export function App() {
             <Field
               id="moving-grace-days"
               label="Grace days"
+              term={KNOWLEDGE_ENTRIES.acceleration}
               value={pictureDraft.graceDays}
               invalid={movingInvalid === "graceDays"}
               onInput={(value) =>
@@ -1687,6 +1774,7 @@ export function App() {
             <Field
               id="moving-late-charge"
               label="Late charge"
+              term={KNOWLEDGE_ENTRIES.acceleration}
               value={pictureDraft.lateChargePercent}
               suffix="%"
               invalid={movingInvalid === "lateChargePercent"}
@@ -1699,7 +1787,9 @@ export function App() {
               }
             />
           </div>
-          <p>{moving.closingDisclosure}</p>
+          <p>
+            <ClosingDisclosureSentence text={moving.closingDisclosure} />
+          </p>
           <div class="inputs">
             <div class="field">
               <label for="moving-signing-date">Signing date</label>
@@ -1778,6 +1868,21 @@ export function App() {
         onDollar={commitTaxDollar}
       />
     </main>
+    {knowledgeStack ? (
+      <>
+        {knowledgeSheet ? (
+          <button type="button" class="knowledge-scrim" tabIndex={-1} aria-hidden="true" onClick={closeKnowledge} />
+        ) : null}
+        <KnowledgePanel
+          stack={knowledgeStack}
+          sheet={knowledgeSheet}
+          onPush={pushKnowledge}
+          onBack={backKnowledge}
+          onClose={closeKnowledge}
+        />
+      </>
+    ) : null}
+    </KnowledgeOpen.Provider>
   );
 }
 
@@ -1809,9 +1914,31 @@ function ArmTimeline(props: {
   return (
     <ul class="arm-timeline">
       {lines.map((line) => (
-        <li key={line}>{line}</li>
+        <li key={line}>
+          <TimelineLine line={line} />
+        </li>
       ))}
     </ul>
+  );
+}
+
+const TIMELINE_TERMS: { prefix: string; entry: KnowledgeEntry }[] = [
+  { prefix: "Change date", entry: KNOWLEDGE_ENTRIES.initialPeriod },
+  { prefix: "Index", entry: KNOWLEDGE_ENTRIES.noteRate },
+  { prefix: "Initial notice", entry: KNOWLEDGE_ENTRIES.notices },
+  { prefix: "Later notice", entry: KNOWLEDGE_ENTRIES.notices },
+];
+
+function TimelineLine(props: { line: string }) {
+  const term = TIMELINE_TERMS.find(
+    (item) => props.line === item.prefix || props.line.startsWith(`${item.prefix} `),
+  );
+  if (!term) return <>{props.line}</>;
+  return (
+    <>
+      <TermButton entry={term.entry.id} anchor={term.entry.anchor}>{term.prefix}</TermButton>
+      {props.line.slice(term.prefix.length)}
+    </>
   );
 }
 
@@ -1820,9 +1947,48 @@ function armDateLabel(loan: Loan, paymentNumber: number): string {
   return longDate(date.year, date.month);
 }
 
+function ClosingDisclosureSentence(props: { text: string }) {
+  const needle = "Closing Disclosure";
+  const at = props.text.indexOf(needle);
+  if (at < 0) return <>{props.text}</>;
+  return (
+    <>
+      {props.text.slice(0, at)}
+      <TermButton entry={KNOWLEDGE_ENTRIES.closingDisclosure.id} anchor={KNOWLEDGE_ENTRIES.closingDisclosure.anchor}>
+        {needle}
+      </TermButton>
+      {props.text.slice(at + needle.length)}
+    </>
+  );
+}
+
+function CheckTerm(props: {
+  id: string;
+  checked: boolean;
+  entry: string;
+  anchor?: string;
+  onChange: (checked: boolean) => void;
+  children: ComponentChildren;
+}) {
+  return (
+    <div class="arm-check">
+      <input
+        id={props.id}
+        type="checkbox"
+        checked={props.checked}
+        aria-labelledby={`${props.id}-term`}
+        onChange={(event) => props.onChange(event.currentTarget.checked)}
+      />
+      <TermButton id={`${props.id}-term`} entry={props.entry} anchor={props.anchor}>
+        {props.children}
+      </TermButton>
+    </div>
+  );
+}
+
 function MoneyRow(props: {
   line: string;
-  label: string;
+  label: ComponentChildren;
   amount: number;
   note?: string;
   rate?: ComponentChildren;
@@ -1994,15 +2160,23 @@ function TaxTableSection(props: {
 function Field(props: {
   id: string;
   label: string;
+  term?: KnowledgeEntry;
   value: string;
   suffix?: string;
   invalid: boolean;
   edited?: boolean;
   onInput: (value: string) => void;
 }) {
+  const termId = `${props.id}-term`;
   return (
     <div class="field">
-      <label for={props.id}>{props.label}</label>
+      {props.term ? (
+        <TermButton id={termId} entry={props.term.id} anchor={props.term.anchor}>
+          {props.label}
+        </TermButton>
+      ) : (
+        <label for={props.id}>{props.label}</label>
+      )}
       <div class="control">
         <input
           id={props.id}
@@ -2010,6 +2184,7 @@ function Field(props: {
           autoComplete="off"
           value={props.value}
           aria-invalid={props.invalid}
+          aria-labelledby={props.term ? termId : undefined}
           data-edited={props.edited ? "true" : undefined}
           onInput={(event) => props.onInput(event.currentTarget.value)}
           onChange={(event) => props.onInput(event.currentTarget.value)}
