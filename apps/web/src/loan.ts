@@ -958,9 +958,17 @@ function pictureDraftEqual(a: PictureDraft, b: PictureDraft): boolean {
     a.lateChargePercent === b.lateChargePercent &&
     a.signingDate === b.signingDate &&
     a.lastRent === b.lastRent &&
+    a.filingStatus === b.filingStatus &&
+    a.agi === b.agi &&
+    a.magi === b.magi &&
+    a.otherSalt === b.otherSalt &&
+    a.otherItemized === b.otherItemized &&
+    a.standardOverride === b.standardOverride &&
+    a.appraisal === b.appraisal &&
     a.open === b.open &&
     a.closingOpen === b.closingOpen &&
-    a.movingOpen === b.movingOpen
+    a.movingOpen === b.movingOpen &&
+    a.taxOpen === b.taxOpen
   );
 }
 

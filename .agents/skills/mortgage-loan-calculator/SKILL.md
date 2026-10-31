@@ -39,6 +39,10 @@ Month 1 is the first payment. The start month is the funding month. Payment 1 ac
 
 Write one CSV row per extra payment. The header is `month,extra`. The example question ($570,000, 7%, 30 years, $100 extra in each of the first 12 payments) is complete: write twelve rows of `100` and do not ask for more facts. Write the file in a temporary directory. Do not commit it.
 
+## Calendar-year interest
+
+A question about interest paid in a calendar year uses the funding-year shift. The start month is the funding month. Interest paid in that year is prepaid interest when the funding date falls in the year, plus `interest_cents` on schedule rows whose payment is due in that year. The due date is the 1st of the month after the accrual month. That figure is not the schedule year-group sum. Say that this is not tax advice. Do not compute SALT, the standard deduction, PMI deductibility, or an AGI. Do not invent taxes.
+
 ## Adjustable-rate (ARM) loans
 
 This section covers a fully amortizing loan with an initial period followed by regular resets on each adjustment period, each bounded by an initial, a periodic, and a lifetime cap and a floor. The note rate the user gives is the initial rate: pass it as `--rate`. The term is the user's term. Pass the ARM terms as `--fixed-years` or `--fixed-months` (exactly one), `--adjust-months`, `--margin`, `--caps INITIAL/PERIODIC/LIFETIME` (the order the rate sheet prints, for example `5/2/5`), and `--floor`. Do not supply an initial period, interval, margin, cap, floor, or index value the user did not give.

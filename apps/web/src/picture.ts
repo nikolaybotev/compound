@@ -79,9 +79,17 @@ export type PictureDraft = {
   lateChargePercent: string;
   signingDate: string;
   lastRent: string;
+  filingStatus: string;
+  agi: string;
+  magi: string;
+  otherSalt: string;
+  otherItemized: string;
+  standardOverride: string;
+  appraisal: string;
   open: boolean;
   closingOpen: boolean;
   movingOpen: boolean;
+  taxOpen: boolean;
 };
 
 export type PictureValues = {
@@ -301,6 +309,50 @@ function loadGraceDays(value: unknown): string {
 function loadLateCharge(value: unknown): string {
   if (typeof value !== "string") return "5";
   return parseLateChargePercent(value) === null ? "5" : value.trim();
+}
+
+const FILING_STATUS_VALUES = ["single", "joint", "separate", "head"] as const;
+
+export type FilingStatus = (typeof FILING_STATUS_VALUES)[number];
+
+export function parseFilingStatus(text: string): FilingStatus | null {
+  const trimmed = text.trim();
+  for (const status of FILING_STATUS_VALUES) {
+    if (status === trimmed) return status;
+  }
+  return null;
+}
+
+export function filingStatusOrDefault(value: string, fallback: string): FilingStatus {
+  return parseFilingStatus(value) ?? parseFilingStatus(fallback) ?? "single";
+}
+
+export type OptionalDollars = { empty: true; cents: 0 } | { empty: false; cents: number };
+
+/** Empty is a stored dollar field with no amount. Invalid text is null. */
+export function parseOptionalDollars(text: string): OptionalDollars | null {
+  const trimmed = text.trim();
+  if (trimmed === "") return { empty: true, cents: 0 };
+  const cents = parsePictureDollars(trimmed);
+  if (cents === null) return null;
+  return { empty: false, cents };
+}
+
+export function optionalDollarOrDefault(value: string, fallback: string): string {
+  const trimmed = value.trim();
+  if (parseOptionalDollars(trimmed) === null) return fallback;
+  return trimmed;
+}
+
+function loadFilingStatus(value: unknown): FilingStatus {
+  if (typeof value !== "string") return "single";
+  return parseFilingStatus(value) ?? "single";
+}
+
+function loadOptionalDollar(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  return parseOptionalDollars(trimmed) === null ? "" : trimmed;
 }
 
 function loadOptionalDate(value: unknown): string {
@@ -529,9 +581,17 @@ export function pictureFromStorage(
   draft.lateChargePercent = loadLateCharge(record.lateChargePercent);
   draft.signingDate = loadOptionalDate(record.signingDate);
   draft.lastRent = loadOptionalDate(record.lastRent);
+  draft.filingStatus = loadFilingStatus(record.filingStatus);
+  draft.agi = loadOptionalDollar(record.agi);
+  draft.magi = loadOptionalDollar(record.magi);
+  draft.otherSalt = loadOptionalDollar(record.otherSalt);
+  draft.otherItemized = loadOptionalDollar(record.otherItemized);
+  draft.standardOverride = loadOptionalDollar(record.standardOverride);
+  draft.appraisal = loadOptionalDollar(record.appraisal);
   draft.open = typeof record.open === "boolean" ? record.open : false;
   draft.closingOpen = typeof record.closingOpen === "boolean" ? record.closingOpen : false;
   draft.movingOpen = typeof record.movingOpen === "boolean" ? record.movingOpen : false;
+  draft.taxOpen = typeof record.taxOpen === "boolean" ? record.taxOpen : false;
   if (record.pmi === undefined) {
     return pmiDraftForLoan(draft, downText, ficoText);
   }
@@ -562,9 +622,17 @@ export function defaultPicture(): PictureDraft {
     lateChargePercent: "5",
     signingDate: "",
     lastRent: "",
+    filingStatus: "single",
+    agi: "",
+    magi: "",
+    otherSalt: "",
+    otherItemized: "",
+    standardOverride: "",
+    appraisal: "",
     open: false,
     closingOpen: false,
     movingOpen: false,
+    taxOpen: false,
   };
 }
 
