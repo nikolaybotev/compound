@@ -3,10 +3,14 @@ import type { ComponentChildren } from "preact";
 import {
   ARM_FIELD_LABELS,
   armLabel,
+  currentIndexFieldInvalid,
   dropIndexBeyond,
   formatPercentThousandths,
+  formatTeaserHint,
   parseArm,
   resetMonths,
+  retainedCurrentIndexThousandths,
+  teaserGapFromRetained,
   type ArmDraft,
   type ArmField,
 } from "./arm";
@@ -181,6 +185,12 @@ export function App() {
     return parsed.ok ? dollarsToCents(parsed.dollars) : 0;
   });
   const [evenYearlyError, setEvenYearlyError] = useState(false);
+  const [currentIndexValidThousandths, setCurrentIndexValidThousandths] = useState(() =>
+    retainedCurrentIndexThousandths(initial.scenario.arm.currentIndex),
+  );
+  const [currentIndexError, setCurrentIndexError] = useState(() =>
+    currentIndexFieldInvalid(initial.scenario.arm.currentIndex),
+  );
   const [editingMonth, setEditingMonth] = useState<number | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [editingIndexMonth, setEditingIndexMonth] = useState<number | null>(null);
@@ -268,6 +278,8 @@ export function App() {
     const yearlyParsed = parseDollarField(scenario.arm.evenYearly);
     setEvenYearlyCents(yearlyParsed.ok ? dollarsToCents(yearlyParsed.dollars) : 0);
     setEvenYearlyError(false);
+    setCurrentIndexValidThousandths(retainedCurrentIndexThousandths(scenario.arm.currentIndex));
+    setCurrentIndexError(currentIndexFieldInvalid(scenario.arm.currentIndex));
     setError(null);
     setInvalidField(null);
     setPictureError(null);
@@ -452,6 +464,14 @@ export function App() {
     [armSaved, loan.years, rateThousandths],
   );
   const armOn = armSaved.enabled && armParsed.ok;
+  const teaserShown = useMemo(() => {
+    if (!armSaved.enabled || !armParsed.ok) return null;
+    return teaserGapFromRetained(
+      currentIndexValidThousandths,
+      armParsed.values.marginThousandths,
+      rateThousandths,
+    );
+  }, [armSaved.enabled, armParsed, currentIndexValidThousandths, rateThousandths]);
   const reportLoan = useMemo<Loan>(
     () =>
       armSaved.enabled && armParsed.ok
@@ -767,6 +787,26 @@ export function App() {
 
   function updateEvenMonth(month: number) {
     persistEvenArm({ ...armSaved, evenMonth: month });
+  }
+
+  function updateCurrentIndex(value: string) {
+    const nextArm = { ...armSaved, currentIndex: value };
+    setArmDraft({ ...armDraft, currentIndex: value });
+    setArmSaved(nextArm);
+    persist({ arm: nextArm, armStored: true });
+    const trimmed = value.trim();
+    if (trimmed === "") {
+      setCurrentIndexValidThousandths(null);
+      setCurrentIndexError(false);
+      return;
+    }
+    const thousandths = retainedCurrentIndexThousandths(value);
+    if (thousandths === null) {
+      setCurrentIndexError(true);
+      return;
+    }
+    setCurrentIndexError(false);
+    setCurrentIndexValidThousandths(thousandths);
   }
 
   function onPriceInput(value: string) {
@@ -1102,6 +1142,16 @@ export function App() {
           onInput={(event) => update("rate", event.currentTarget.value)}
         />
         <span>% </span>
+        {teaserShown ? (
+          <button
+            type="button"
+            id="teaser"
+            class="teaser-hint"
+            onClick={() => openKnowledge("arm-rate", "teaser")}
+          >
+            {`teaser ${formatTeaserHint(teaserShown.gapThousandths, teaserShown.fullyThousandths)}`}
+          </button>
+        ) : null}
         <input
           id="years"
           aria-label="Term"
@@ -1188,6 +1238,15 @@ export function App() {
               onInput={(value) => updateArm("margin", value)}
             />
             <Field
+              id="arm-current-index"
+              label="Current index"
+              term={KNOWLEDGE_ENTRIES.noteRate}
+              value={armDraft.currentIndex}
+              suffix="%"
+              invalid={currentIndexError}
+              onInput={(value) => updateCurrentIndex(value)}
+            />
+            <Field
               id="arm-initial-cap"
               label={ARM_FIELD_LABELS.initialCap}
               term={KNOWLEDGE_ENTRIES.caps}
@@ -1233,6 +1292,11 @@ export function App() {
               onInput={(value) => updateArm("initialFloor", value)}
             />
           </div>
+          {currentIndexError ? (
+            <p class="error" role="alert">
+              Current index must be a percent with at most three decimal places.
+            </p>
+          ) : null}
           <CheckTerm
             id="arm-round-eighth"
             checked={armSaved.roundEighth}

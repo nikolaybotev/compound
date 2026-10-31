@@ -386,6 +386,26 @@ dd {
   text-align: right;
 }
 
+.heading-line button.teaser-hint {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 0.72em;
+  font-family: var(--mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  border: 0;
+  border-bottom: 1px dotted var(--muted);
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  text-align: left;
+  line-height: inherit;
+  white-space: normal;
+}
+
 .disclosure {
   margin: 0 0 1.25rem;
 }

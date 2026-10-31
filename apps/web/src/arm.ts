@@ -28,6 +28,7 @@ export type ArmDraft = {
   index: ArmIndexEntry[];
   evenYearly: string;
   evenMonth: number;
+  currentIndex: string;
 };
 
 export type ArmValues = {
@@ -79,11 +80,63 @@ export function defaultArm(): ArmDraft {
     index: [],
     evenYearly: "",
     evenMonth: 1,
+    currentIndex: "",
   };
 }
 
 export function formatPercentThousandths(thousandths: number): string {
   return String(thousandths / 1000);
+}
+
+export function teaserGap(
+  currentIndexText: string,
+  marginThousandths: number,
+  rateThousandths: number,
+): { gapThousandths: number; fullyThousandths: number } | null {
+  const trimmed = currentIndexText.trim();
+  if (trimmed === "") return null;
+  const indexThousandths = percentThousandths(trimmed);
+  if (indexThousandths === null) return null;
+  const fullyThousandths = indexThousandths + marginThousandths;
+  if (!Number.isSafeInteger(fullyThousandths)) return null;
+  if (fullyThousandths <= rateThousandths) return null;
+  return {
+    gapThousandths: fullyThousandths - rateThousandths,
+    fullyThousandths,
+  };
+}
+
+export function teaserGapFromRetained(
+  currentIndexThousandths: number | null,
+  marginThousandths: number,
+  rateThousandths: number,
+): { gapThousandths: number; fullyThousandths: number } | null {
+  if (currentIndexThousandths === null) return null;
+  const fullyThousandths = currentIndexThousandths + marginThousandths;
+  if (!Number.isSafeInteger(fullyThousandths)) return null;
+  if (fullyThousandths <= rateThousandths) return null;
+  return {
+    gapThousandths: fullyThousandths - rateThousandths,
+    fullyThousandths,
+  };
+}
+
+export function formatTeaserHint(gapThousandths: number, fullyThousandths: number): string {
+  const gap = formatPercentThousandths(gapThousandths);
+  const fully = formatPercentThousandths(fullyThousandths);
+  const pointWord = gapThousandths === 1000 ? "point" : "points";
+  return `${gap} ${pointWord} below the fully indexed rate of ${fully}%`;
+}
+
+export function retainedCurrentIndexThousandths(text: string): number | null {
+  const trimmed = text.trim();
+  if (trimmed === "") return null;
+  return percentThousandths(trimmed);
+}
+
+export function currentIndexFieldInvalid(text: string): boolean {
+  const trimmed = text.trim();
+  return trimmed !== "" && percentThousandths(trimmed) === null;
 }
 
 export function armLabel(fixedYears: number, adjustMonths: number): string {
@@ -271,6 +324,7 @@ export function armFromStorage(value: unknown): { arm: ArmDraft; stored: boolean
   draft.roundEighth = record.roundEighth;
   draft.index = index;
   draft.evenYearly = typeof record.evenYearly === "string" ? record.evenYearly : "";
+  draft.currentIndex = typeof record.currentIndex === "string" ? record.currentIndex : "";
   const evenMonth = record.evenMonth;
   draft.evenMonth =
     typeof evenMonth === "number" && Number.isInteger(evenMonth) && evenMonth >= 1 && evenMonth <= 12
@@ -295,5 +349,6 @@ export function armToStorage(arm: ArmDraft): ArmDraft {
     index: arm.index.map(([month, percent]) => [month, percent]),
     evenYearly: arm.evenYearly,
     evenMonth: arm.evenMonth,
+    currentIndex: arm.currentIndex,
   };
 }
