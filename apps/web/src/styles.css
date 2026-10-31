@@ -493,8 +493,52 @@ dd {
   white-space: nowrap;
 }
 
-.moving-copy p {
+.moving-copy p,
+.tax-copy p {
   margin: 0 0 0.75rem;
+}
+
+.tax-copy .note {
+  margin: 0.35rem 0 0.85rem;
+}
+
+.tax-pmi {
+  margin: 0 0 0.85rem;
+  padding-left: 1.2rem;
+}
+
+.tax-scroll {
+  overflow-x: auto;
+  margin: 0.85rem 0 1rem;
+}
+
+.tax-grid th:nth-child(n),
+.tax-grid td:nth-child(n) {
+  text-align: right;
+  vertical-align: top;
+}
+
+.tax-grid th:first-child,
+.tax-grid td:first-child,
+.tax-grid td.tax-compare {
+  text-align: left;
+}
+
+.tax-grid td {
+  white-space: normal;
+}
+
+.tax-grid td.tax-compare {
+  min-width: 16rem;
+}
+
+.tax-label {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 0.75rem;
+  line-height: 1.3;
 }
 
 .moving-in input[type="date"] {

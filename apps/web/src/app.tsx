@@ -70,21 +70,46 @@ import {
   defaultProrationCents,
   ficoBand,
   ficoRangeScore,
+  filingStatusOrDefault,
   movingFieldOrDefault,
+  optionalDollarOrDefault,
   parseClosingDay,
   parseFicoScore,
   parseGraceDays,
   parseLateChargePercent,
+  parseOptionalDollars,
   parsePicture,
   parseWholeCount,
   percentThousandths,
   pmiDraftForLoan,
   sellerCreditWarning,
   titlePercentHundredThousandths,
+  type FilingStatus,
   type PictureDraft,
   type PictureInputField,
   type PictureValues,
 } from "./picture";
+import {
+  buildTaxTable,
+  FILING_STATUS_OPTIONS,
+  insuranceNotDeductibleLine,
+  TAX_ACQUISITION,
+  TAX_BOX5,
+  TAX_DOLLAR_LABELS,
+  TAX_FIELD_NOTE,
+  TAX_MI_SERVICER,
+  TAX_MI_UNVERIFIED,
+  TAX_NOT_ADVICE,
+  TAX_OVERALL_LIMIT,
+  TAX_POINTS_NOTE,
+  TAX_PROPERTY_NOTE,
+  TAX_SALT_CAP,
+  TAX_SALT_LESSER,
+  TAX_STATE,
+  taxDollarMessage,
+  type TaxDollarField,
+  type TaxTable,
+} from "./tax";
 import { PrevailingBar } from "./prevailing-bar";
 import { Schedule } from "./schedule";
 import { dollarsToCents } from "../../../amortize.js";
@@ -138,6 +163,8 @@ export function App() {
   const [movingInvalid, setMovingInvalid] = useState<
     "graceDays" | "lateChargePercent" | "signingDate" | "lastRent" | null
   >(null);
+  const [taxError, setTaxError] = useState<string | null>(null);
+  const [taxInvalid, setTaxInvalid] = useState<TaxDollarField | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [openYears, setOpenYears] = useState<Set<number>>(() =>
     initial.scenario.openYears
@@ -199,6 +226,8 @@ export function App() {
     setPictureInvalid(null);
     setMovingError(null);
     setMovingInvalid(null);
+    setTaxError(null);
+    setTaxInvalid(null);
     setApplyError(null);
     setEditingMonth(null);
     setEditingIndexMonth(null);
@@ -395,6 +424,35 @@ export function App() {
     () => loanReport(reportLoan, extras, lines.financedCents, scheduleAdjustmentStats),
     [reportLoan, extras, lines.financedCents, scheduleAdjustmentStats],
   );
+  const taxTable = useMemo(() => {
+    const agi = parseOptionalDollars(pictureSaved.agi);
+    const magi = parseOptionalDollars(pictureSaved.magi);
+    const otherSalt = parseOptionalDollars(pictureSaved.otherSalt);
+    const otherItemized = parseOptionalDollars(pictureSaved.otherItemized);
+    const standardOverride = parseOptionalDollars(pictureSaved.standardOverride);
+    const appraisal = parseOptionalDollars(pictureSaved.appraisal);
+    const status: FilingStatus = filingStatusOrDefault(pictureSaved.filingStatus, "single");
+    return buildTaxTable({
+      loan: reportLoan,
+      financedCents: lines.financedCents,
+      schedule: report,
+      appliedExtras: applied,
+      priceCents: loan.priceCents,
+      prepaidInterestCents: lines.prepaidInterestCents,
+      pointsCents: lines.pointsCents,
+      pmiMonthlyCents: lines.pmiCents,
+      propertyTaxMonthlyCents: lines.taxCents,
+      prorationCents: lines.prorationCents,
+      insuranceAnnualCents: lines.homeownersInsuranceCents,
+      filingStatus: status,
+      agiCents: !agi || agi.empty ? null : agi.cents,
+      magiCents: !magi || magi.empty ? null : magi.cents,
+      otherSaltCents: !otherSalt || otherSalt.empty ? 0 : otherSalt.cents,
+      otherItemizedCents: !otherItemized || otherItemized.empty ? 0 : otherItemized.cents,
+      standardOverrideCents: !standardOverride || standardOverride.empty ? null : standardOverride.cents,
+      appraisalCents: !appraisal || appraisal.empty ? null : appraisal.cents,
+    });
+  }, [reportLoan, lines, report, applied, loan.priceCents, pictureSaved]);
   const years = useMemo(
     () => groupByYear(reportLoan, report, extras, lines.financedCents, applied),
     [reportLoan, report, extras, lines.financedCents, applied],
@@ -784,6 +842,13 @@ export function App() {
       ),
       signingDate: movingFieldOrDefault("signingDate", picture.signingDate, pictureSaved.signingDate),
       lastRent: movingFieldOrDefault("lastRent", picture.lastRent, pictureSaved.lastRent),
+      filingStatus: filingStatusOrDefault(picture.filingStatus, pictureSaved.filingStatus),
+      agi: optionalDollarOrDefault(picture.agi, pictureSaved.agi),
+      magi: optionalDollarOrDefault(picture.magi, pictureSaved.magi),
+      otherSalt: optionalDollarOrDefault(picture.otherSalt, pictureSaved.otherSalt),
+      otherItemized: optionalDollarOrDefault(picture.otherItemized, pictureSaved.otherItemized),
+      standardOverride: optionalDollarOrDefault(picture.standardOverride, pictureSaved.standardOverride),
+      appraisal: optionalDollarOrDefault(picture.appraisal, pictureSaved.appraisal),
     };
   }
 
@@ -805,6 +870,39 @@ export function App() {
     const saved = withDisclosureFlags({ ...pictureSaved, movingOpen: open });
     setPictureSaved(saved);
     setPictureDraft({ ...pictureDraft, movingOpen: open });
+    persist({ picture: saved });
+  }
+
+  function setTaxOpen(open: boolean) {
+    const saved = withDisclosureFlags({ ...pictureSaved, taxOpen: open });
+    setPictureSaved(saved);
+    setPictureDraft({ ...pictureDraft, taxOpen: open });
+    persist({ picture: saved });
+  }
+
+  function commitFilingStatus(value: string) {
+    const kept = filingStatusOrDefault(value, pictureSaved.filingStatus);
+    const saved = withDisclosureFlags({ ...pictureSaved, filingStatus: kept });
+    setPictureSaved(saved);
+    setPictureDraft(saved);
+    setTaxError(null);
+    setTaxInvalid(null);
+    persist({ picture: saved });
+  }
+
+  function commitTaxDollar(field: TaxDollarField, value: string) {
+    const kept = optionalDollarOrDefault(value, pictureSaved[field]);
+    if (kept !== value.trim()) {
+      setPictureDraft({ ...pictureDraft, [field]: value });
+      setTaxError(taxDollarMessage(field));
+      setTaxInvalid(field);
+      return;
+    }
+    setPictureDraft({ ...pictureDraft, [field]: kept });
+    const saved = withDisclosureFlags({ ...pictureSaved, [field]: kept });
+    setPictureSaved(saved);
+    setTaxError(null);
+    setTaxInvalid(null);
     persist({ picture: saved });
   }
 
@@ -1669,6 +1767,16 @@ export function App() {
         }}
         onIndexCommit={commitIndex}
       />
+      <TaxTableSection
+        table={taxTable}
+        draft={pictureDraft}
+        open={pictureDraft.taxOpen}
+        error={taxError}
+        invalid={taxInvalid}
+        onToggle={setTaxOpen}
+        onStatus={commitFilingStatus}
+        onDollar={commitTaxDollar}
+      />
     </main>
   );
 }
@@ -1757,6 +1865,129 @@ function PictureInput(props: {
       />
       {props.suffix ? <span class="picture-affix">{props.suffix}</span> : null}
     </span>
+  );
+}
+
+function TaxTableSection(props: {
+  table: TaxTable;
+  draft: PictureDraft;
+  open: boolean;
+  error: string | null;
+  invalid: TaxDollarField | null;
+  onToggle: (open: boolean) => void;
+  onStatus: (value: string) => void;
+  onDollar: (field: TaxDollarField, value: string) => void;
+}) {
+  const dollars: TaxDollarField[] = [
+    "agi",
+    "magi",
+    "otherSalt",
+    "otherItemized",
+    "standardOverride",
+    "appraisal",
+  ];
+  return (
+    <Disclosure className="tax-table" title="Tax table" open={props.open} onToggle={props.onToggle}>
+      <div class="tax-copy">
+        <p>{TAX_NOT_ADVICE}</p>
+        <p>{TAX_STATE}</p>
+        <p>{TAX_OVERALL_LIMIT}</p>
+        <p>{insuranceNotDeductibleLine(props.table.insuranceAnnualCents)}</p>
+        <p>{TAX_MI_UNVERIFIED}</p>
+        <p>{TAX_BOX5}</p>
+        <p>{TAX_SALT_CAP}</p>
+        <p>{TAX_ACQUISITION}</p>
+        <p class="tax-interest">{props.table.fundingInterestLine}</p>
+        <ul class="tax-pmi">
+          {props.table.pmiLines.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+        <div class="inputs">
+          <div class="field">
+            <label for="tax-filing-status">Filing status</label>
+            <select
+              id="tax-filing-status"
+              value={props.draft.filingStatus}
+              onChange={(event) => props.onStatus(event.currentTarget.value)}
+            >
+              {FILING_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {dollars.map((field) => (
+            <Field
+              key={field}
+              id={`tax-${field.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`}
+              label={TAX_DOLLAR_LABELS[field]}
+              value={props.draft[field]}
+              invalid={props.invalid === field}
+              onInput={(value) => props.onDollar(field, value)}
+            />
+          ))}
+        </div>
+        <p class="note">{TAX_FIELD_NOTE}</p>
+        {props.error ? (
+          <p class="error" role="alert">
+            {props.error}
+          </p>
+        ) : null}
+        {props.open ? (
+        <div class="tax-scroll">
+          <table class="tax-grid">
+            <thead>
+              <tr>
+                <th scope="col">Tax year</th>
+                <th scope="col">Mortgage interest paid</th>
+                <th scope="col">Points</th>
+                <th scope="col">MI paid</th>
+                <th scope="col">MI deductible</th>
+                <th scope="col">Property tax</th>
+                <th scope="col">Other SALT</th>
+                <th scope="col">SALT allowed</th>
+                <th scope="col">Housing items</th>
+                <th scope="col">Standard deduction</th>
+                <th scope="col">Comparison</th>
+              </tr>
+            </thead>
+            <tbody>
+              {props.table.rows.map((row) => (
+                <tr key={row.year} data-tax-year={row.year}>
+                  <th scope="row">{row.year}</th>
+                  <td>{formatMoney(row.mortgageInterestCents)}</td>
+                  <td>{formatMoney(row.pointsCents)}</td>
+                  <td>{formatMoney(row.miPaidCents)}</td>
+                  <td>
+                    {formatMoney(row.miDeductibleCents)}
+                    {row.miPhaseoutNote ? <span class="tax-label">{row.miPhaseoutNote}</span> : null}
+                  </td>
+                  <td>{formatMoney(row.propertyTaxCents)}</td>
+                  <td>{formatMoney(row.otherSaltCents)}</td>
+                  <td>
+                    {formatMoney(row.saltAllowedCents)}
+                    {row.saltPhaseDownNote ? <span class="tax-label">{row.saltPhaseDownNote}</span> : null}
+                  </td>
+                  <td>{formatMoney(row.housingItemsCents)}</td>
+                  <td>
+                    {formatMoney(row.standardCents)}
+                    {row.standardLabel ? <span class="tax-label">{row.standardLabel}</span> : null}
+                  </td>
+                  <td class="tax-compare">{row.comparison}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        ) : null}
+        <p class="note">{TAX_POINTS_NOTE}</p>
+        <p class="note">{TAX_MI_SERVICER}</p>
+        <p class="note">{TAX_PROPERTY_NOTE}</p>
+        <p class="note">{TAX_SALT_LESSER}</p>
+      </div>
+    </Disclosure>
   );
 }
 
