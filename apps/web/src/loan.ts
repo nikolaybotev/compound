@@ -10,6 +10,7 @@ import {
   savedByExtraCents as librarySavedByExtraCents,
   type Report,
 } from "../../../amortize.js";
+import { buildAprReport, formatAprPercent } from "../../../apr.js";
 import {
   paymentDate as calendarPaymentDate,
   dueDate as calendarDueDate,
@@ -25,6 +26,7 @@ import {
   dropIndexBeyond,
   toBuildReportArm,
   type ArmDraft,
+  type ArmValues,
   type LoanArm,
   armLabel,
 } from "./arm";
@@ -371,6 +373,72 @@ export function loanReport(
     loan.termYears,
     armWithStats,
   );
+}
+
+export type LoanAprSummary =
+  | { kind: "percent"; text: string }
+  | { kind: "prompt" };
+
+export function prepaidFinanceChargeCentsForApr(lines: {
+  pointsCents: number;
+  lenderFeesCents: number;
+  prepaidInterestCents: number;
+  lenderCreditCents: number;
+}): number {
+  return Math.max(
+    0,
+    (lines.pointsCents ?? 0)
+      + lines.lenderFeesCents
+      + lines.prepaidInterestCents
+      - lines.lenderCreditCents,
+  );
+}
+
+export function loanAprSummary(input: {
+  financedCents: number;
+  ratePercent: number;
+  monthCount: number;
+  termYears?: number;
+  prepaidFinanceChargeCents: number;
+  pmiMonthlyCents: number;
+  originalValueCents: number;
+  armEnabled: boolean;
+  armValues: ArmValues | null;
+  currentIndexThousandths: number | null;
+}): LoanAprSummary {
+  if (input.armEnabled && (input.currentIndexThousandths === null || input.armValues === null)) {
+    return { kind: "prompt" };
+  }
+  const arm = input.armEnabled && input.armValues
+    ? {
+        fixedMonths: input.armValues.fixedMonths,
+        adjustMonths: input.armValues.adjustMonths,
+        marginThousandths: input.armValues.marginThousandths,
+        initialCapThousandths: input.armValues.initialCapThousandths,
+        periodicCapThousandths: input.armValues.periodicCapThousandths,
+        lifetimeCapThousandths: input.armValues.lifetimeCapThousandths,
+        floorThousandths: input.armValues.floorThousandths,
+        initialFloorThousandths: input.armValues.initialFloorThousandths,
+        roundEighth: input.armValues.roundEighth,
+        indexByMonth: new Map<number, number>(),
+      }
+    : undefined;
+
+  const report = buildAprReport(
+    centsToDollars(input.financedCents),
+    input.ratePercent,
+    input.monthCount,
+    input.prepaidFinanceChargeCents,
+    input.pmiMonthlyCents,
+    {
+      originalValueCents: input.originalValueCents,
+      oddDays: 0,
+      arm,
+      currentIndexThousandths: input.armEnabled ? input.currentIndexThousandths ?? undefined : undefined,
+      yearsForJson: input.termYears,
+    },
+  );
+  return { kind: "percent", text: formatAprPercent(report.apr_thousandths) };
 }
 
 function armArgument(loan: Loan) {

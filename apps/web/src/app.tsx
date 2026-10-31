@@ -40,6 +40,8 @@ import {
   isTrailingDotThousands,
   loadStored,
   loanReport,
+  loanAprSummary,
+  prepaidFinanceChargeCentsForApr,
   loanStartMonthNumber,
   longDate,
   monthsSavedText,
@@ -572,6 +574,38 @@ export function App() {
       appraisalCents: !appraisal || appraisal.empty ? null : appraisal.cents,
     });
   }, [reportLoan, lines, report, applied, loan.priceCents, pictureSaved]);
+  const aprSummary = useMemo(() => {
+    const appraisal = parseOptionalDollars(pictureSaved.appraisal);
+    const originalValueCents = !appraisal || appraisal.empty ? loan.priceCents : appraisal.cents;
+    return loanAprSummary({
+      financedCents: lines.financedCents,
+      ratePercent: loan.ratePercent,
+      monthCount: loan.monthCount,
+      termYears: loan.termYears,
+      prepaidFinanceChargeCents: prepaidFinanceChargeCentsForApr({
+        pointsCents: lines.pointsCents,
+        lenderFeesCents: lines.lenderFeesCents,
+        prepaidInterestCents: lines.prepaidInterestCents,
+        lenderCreditCents: pictureValues.lenderCreditCents,
+      }),
+      pmiMonthlyCents: lines.pmiCents,
+      originalValueCents,
+      armEnabled: armOn,
+      armValues: armParsed.ok ? armParsed.values : null,
+      currentIndexThousandths: armOn ? currentIndexValidThousandths : null,
+    });
+  }, [
+    lines,
+    pictureValues.lenderCreditCents,
+    loan.priceCents,
+    loan.ratePercent,
+    loan.monthCount,
+    loan.termYears,
+    pictureSaved.appraisal,
+    armOn,
+    armParsed,
+    currentIndexValidThousandths,
+  ]);
   const years = useMemo(
     () => groupByYear(reportLoan, report, extras, lines.financedCents, applied),
     [reportLoan, report, extras, lines.financedCents, applied],
@@ -1716,6 +1750,17 @@ export function App() {
           <div role="region" aria-label="Total cost of loan">
             <dt>Total cost of loan</dt>
             <dd class="money">{formatMoney(report.amount_cents + report.interest_cents)}</dd>
+          </div>
+          <div role="region" aria-label="Annual percentage rate">
+            <dt>Annual percentage rate</dt>
+            {aprSummary.kind === "percent" ? (
+              <dd class="money" id="apr">{aprSummary.text}</dd>
+            ) : (
+              <dd id="apr">{aprSummary.kind === "prompt" ? "Enter the current index to calculate the APR." : ""}</dd>
+            )}
+            {aprSummary.kind === "percent" ? (
+              <p class="note">This is not your interest rate.</p>
+            ) : null}
           </div>
           <div role="region" aria-label="Payoff date">
             <dt>Payoff date</dt>
