@@ -124,6 +124,18 @@ The figure assumes equal monthly payments and a first payment one full month out
 
 [`.agents/skills/mortgage-origination-fees/SKILL.md`](.agents/skills/mortgage-origination-fees/SKILL.md) is the front end. It asks for a missing note rate, APR, or loan size. When the term is omitted it passes `--years 30` and says so. It runs `scripts/origination_fees.js`, a symlink to this script, and answers from `--json`. The design is [intent/origination-fees/](intent/origination-fees/intent.md).
 
+## Regulation Z APR
+
+`apr.js` solves the actuarial APR under Regulation Z Appendix J from the note amount, prepaid finance charges under 12 CFR 1026.4, and the scheduled payment stream including mortgage insurance. `regulation_z_apr.js` is the command-line front end.
+
+```bash
+node regulation_z_apr.js --amount 162000 --rate 3.875 --years 30 --price 180000 --mi 82.35
+```
+
+On the published fixed-rate Closing Disclosure sample that run reports APR 4.174%, finance charge $118,830.27, and 80 months of insurance in the stream. `--charge` repeats with finance-charge kinds; third-party fees under 1026.4(c)(7) are excluded. `--json` writes integer cents and `apr_thousandths`. The design is [intent/regulation-z-apr/](intent/regulation-z-apr/intent.md).
+
+[`.agents/skills/regulation-z-apr/SKILL.md`](.agents/skills/regulation-z-apr/SKILL.md) runs `scripts/regulation_z_apr.js`, a symlink to this script, and answers from `--json`.
+
 The workspace link is local setup and is not a file in this repo.
 
 ## Skill
