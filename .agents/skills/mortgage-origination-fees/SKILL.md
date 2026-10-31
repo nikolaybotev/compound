@@ -22,6 +22,8 @@ The note rate sets the level principal-and-interest payment on the full note amo
 
 The figure assumes a fixed, fully amortizing loan, equal monthly payments, and a first payment one full month after the loan is made. It does not add a separate monthly mortgage-insurance premium or odd-days interest. If the user says the disclosed APR includes either of those, say so: they are inside this one number and are not split out. Title, taxes, escrow, and other costs that are not part of the APR are not in the number.
 
+Odd-days interest stays outside this figure; the amortization page's standard rule is a first payment on the 1st of the second month after the funding month, with those days in closing costs instead.
+
 ## Ask before answering
 
 Ask, and wait, when any of these is missing:

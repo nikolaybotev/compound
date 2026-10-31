@@ -1,22 +1,35 @@
 import { describe, expect, test } from "vitest";
 import { buildReport } from "../../../amortize.js";
-import { downPaymentCents, formatMoney, parseLoan, paymentDate } from "../src/loan";
+import {
+  downPaymentCents,
+  formatMoney,
+  movingInCopy,
+  MOVING_DISCLOSURE_RULE,
+  MOVING_INTEREST_CREDIT_SENTENCE,
+  MOVING_STATEMENT_SENTENCE,
+  parseLoan,
+  paymentDate,
+} from "../src/loan";
 import {
   buildPicture,
   centsToProrationField,
   clampClosingDay,
+  closingDisclosureDeadline,
   closingInterestDays,
   conventionalPmi,
   defaultPicture,
   defaultProrationCents,
   daysInMonth,
+  isClosingBusinessDay,
   isLeapYear,
-  pmiPercentInputFromThousandths,
+  lateChargeCents,
   loadStoredInterestBasis,
+  movingFieldOrDefault,
   parsePicture,
   parseWholeCount,
   percentOfCents,
   pictureFromStorage,
+  pmiPercentInputFromThousandths,
   prepaidInterestCents,
   prepaidInterestCents360,
   prepaidInterestCents365,
@@ -300,5 +313,133 @@ describe("prepaid interest helpers", () => {
   test("title five-decimal grammar", () => {
     expect(titlePercentHundredThousandths("0.64925")).toBe(64_925);
     expect(titlePercentHundredThousandths("0.649256")).toBeNull();
+  });
+});
+
+describe("Moving in", () => {
+  test("signing on 2026-11-12 is received by 2026-11-07", () => {
+    expect(closingDisclosureDeadline("2026-11-12")).toBe("2026-11-07");
+    expect(isClosingBusinessDay("2026-11-11")).toBe(false);
+    expect(isClosingBusinessDay("2026-11-08")).toBe(false);
+    expect(isClosingBusinessDay("2026-11-07")).toBe(true);
+    expect(isClosingBusinessDay("2026-06-19")).toBe(false);
+    expect(isClosingBusinessDay("2026-07-04")).toBe(false);
+    expect(isClosingBusinessDay("2026-07-03")).toBe(false);
+    expect(closingDisclosureDeadline("2022-01-03")).toBe("2021-12-28");
+    expect(closingDisclosureDeadline("2022-12-27")).toBe("2022-12-22");
+  });
+
+  test("invalid grace, late charge, and dates keep the last valid value", () => {
+    expect(movingFieldOrDefault("graceDays", "32", "15")).toBe("15");
+    expect(movingFieldOrDefault("graceDays", "0", "15")).toBe("0");
+    expect(movingFieldOrDefault("lateChargePercent", "100.01", "5")).toBe("5");
+    expect(movingFieldOrDefault("lateChargePercent", "5.5", "5")).toBe("5.5");
+    expect(movingFieldOrDefault("signingDate", "2026-02-31", "")).toBe("");
+    expect(movingFieldOrDefault("signingDate", "", "2026-11-12")).toBe("");
+    expect(movingFieldOrDefault("lastRent", "2026-10-15", "")).toBe("2026-10-15");
+    expect(lateChargeCents(1, 5_000)).toBe(1);
+    expect(lateChargeCents(393_685, 500)).toBe(19_684);
+  });
+
+  test("fresh October 2026 lines and a missing key do not change closing cents", () => {
+    const lines = linesFor({});
+    const copy = movingInCopy({
+      startMonth: START,
+      closingDay: 1,
+      prepaidDays: lines.prepaidInterestDays,
+      prepaidCents: lines.prepaidInterestCents,
+      basis: "360",
+      principalAndInterestCents: lines.principalAndInterestCents,
+      taxCents: lines.taxCents,
+      insuranceCents: lines.insuranceCents,
+      pmiCents: lines.pmiCents,
+      graceDays: 15,
+      lateChargeHundredths: 500,
+      signingDate: "",
+      lastRent: "",
+    });
+    expect(copy.funding).toBe("Funding date Thursday, October 1, 2026. Interest starts this day.");
+    expect(copy.prepaid).toBe(
+      "Prepaid interest 31 days, $3,619.90, 360-day basis. These days are paid at closing, not on the schedule.",
+    );
+    expect(copy.noPayment).toBe(
+      "No mortgage payment is due in November 2026. Payments are made in arrears: the December 1, 2026 payment covers November 2026.",
+    );
+    expect(copy.firstPayment).toBe(
+      "First payment due December 1, 2026. Principal and interest is $3,936.85. Property tax, home insurance, and mortgage insurance are on top of that amount.",
+    );
+    expect(copy.grace).toContain("A late charge of 5% of principal and interest ($196.84 on the initial payment)");
+    expect(copy.grace).toContain("end of day 15 after the due date");
+    expect(copy.closingDisclosure).toBe(MOVING_DISCLOSURE_RULE);
+    expect(copy.lastRent).toBeNull();
+    expect(copy.statement).toBe(MOVING_STATEMENT_SENTENCE);
+    expect(copy.interestCredit).toBe(MOVING_INTEREST_CREDIT_SENTENCE);
+    expect(copy.interestCredit).toContain("This page uses the standard rule.");
+
+    const signed = movingInCopy({
+      startMonth: START,
+      closingDay: 1,
+      prepaidDays: 31,
+      prepaidCents: lines.prepaidInterestCents,
+      basis: "360",
+      principalAndInterestCents: lines.principalAndInterestCents,
+      taxCents: 0,
+      insuranceCents: 0,
+      pmiCents: 0,
+      graceDays: 15,
+      lateChargeHundredths: 500,
+      signingDate: "2026-11-12",
+      lastRent: "2026-10-01",
+    });
+    expect(signed.closingDisclosure).toBe(
+      "For a signing on November 12, 2026, the Closing Disclosure has to be received by November 7, 2026.",
+    );
+    expect(signed.firstPayment).toBe(
+      "First payment due December 1, 2026. Principal and interest is $3,936.85.",
+    );
+    expect(signed.lastRent).toBe(
+      "Last rent October 1, 2026. Rent is paid in advance; the mortgage is paid in arrears. Those days are covered by both the rent and the prepaid interest.",
+    );
+    const laterRent = movingInCopy({
+      startMonth: START,
+      closingDay: 1,
+      prepaidDays: 31,
+      prepaidCents: 0,
+      basis: "365",
+      principalAndInterestCents: 0,
+      taxCents: lines.taxCents,
+      insuranceCents: 0,
+      pmiCents: 0,
+      graceDays: 15,
+      lateChargeHundredths: 500,
+      signingDate: "",
+      lastRent: "2026-11-01",
+    });
+    expect(laterRent.prepaid).toContain("365-day basis");
+    expect(laterRent.lastRent).toBe(
+      "Last rent November 1, 2026. Rent is paid in advance; the mortgage is paid in arrears.",
+    );
+    expect(laterRent.firstPayment).toContain("Property tax is on top of that amount.");
+
+    const loanParsed = parseLoan({ price: "600000", down: "5", years: "30", rate: "7.375", start: START });
+    if (!loanParsed.ok) throw new Error("loan");
+    const stored = pictureFromStorage(
+      { lenderFees: "3000", tax: "1.15", insurance: "0.35", pmi: "0.35", title: "0.75" },
+      loanParsed.loan.loanCents,
+      START,
+      "5",
+      "780",
+      loanParsed.loan.priceCents,
+    );
+    expect(stored.graceDays).toBe("15");
+    expect(stored.lateChargePercent).toBe("5");
+    expect(stored.signingDate).toBe("");
+    expect(stored.lastRent).toBe("");
+    expect(stored.movingOpen).toBe(false);
+    expect(pictureFromStorage({ graceDays: "32", lateChargePercent: "nope", signingDate: "2026-02-31" }, loanParsed.loan.loanCents, START).graceDays).toBe("15");
+    const withDefaults = linesFor({ picture: stored });
+    expect(withDefaults.closingCents).toBe(lines.closingCents);
+    expect(withDefaults.principalAndInterestCents).toBe(lines.principalAndInterestCents);
+    expect(formatMoney(withDefaults.principalAndInterestCents)).toBe("$3,936.85");
   });
 });

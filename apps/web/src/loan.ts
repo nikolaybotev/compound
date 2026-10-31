@@ -19,16 +19,24 @@ import {
 } from "./arm";
 import {
   buildPicture,
+  clampClosingDay,
+  closingDisclosureDeadline,
+  closingMonthParts,
   defaultPicture,
+  formatLateChargePercent,
   formatWholeDollars,
   headingDollarsFromCents,
+  lastRentOverlapsPrepaid,
+  lateChargeCents,
   loadStoredCount,
   parseFicoScore,
+  parseIsoDate,
   parsePicture,
   percentThousandths,
   pictureFromStorage,
   pmiDraftForLoan,
   ficoBand,
+  utcWeekdayName,
   type PictureDraft,
 } from "./picture";
 
@@ -390,6 +398,96 @@ export function formatCalendarDay(date: CalendarDate): string {
 export function formatDueOnFirst(startMonth: string, paymentNumber: number): string {
   const due = dueDate(startMonth, paymentNumber);
   return formatCalendarDay({ year: due.year, month: due.month, day: 1 });
+}
+
+export const MOVING_STATEMENT_SENTENCE =
+  "The note makes the first payment due even if a statement has not arrived.";
+
+export const MOVING_INTEREST_CREDIT_SENTENCE =
+  "Some lenders credit the first days of a month and set the first payment one month earlier. This page uses the standard rule.";
+
+export const MOVING_DISCLOSURE_RULE =
+  "The Closing Disclosure has to be received at least three business days before you sign. Sundays and federal legal public holidays are not business days for this count. A mailed disclosure is presumed received three business days after it is mailed.";
+
+export type MovingInCopy = {
+  funding: string;
+  prepaid: string;
+  noPayment: string;
+  firstPayment: string;
+  grace: string;
+  closingDisclosure: string;
+  lastRent: string | null;
+  statement: string;
+  interestCredit: string;
+};
+
+function onTopOfPrincipal(taxCents: number, insuranceCents: number, pmiCents: number): string {
+  const names: string[] = [];
+  if (taxCents !== 0) names.push("property tax");
+  if (insuranceCents !== 0) names.push("home insurance");
+  if (pmiCents !== 0) names.push("mortgage insurance");
+  if (names.length === 0) return "";
+  const list =
+    names.length === 1
+      ? names[0]
+      : names.length === 2
+        ? `${names[0]} and ${names[1]}`
+        : `${names[0]}, ${names[1]}, and ${names[2]}`;
+  const verb = names.length === 1 ? "is" : "are";
+  const sentence = `${list} ${verb} on top of that amount.`;
+  return sentence.charAt(0).toUpperCase() + sentence.slice(1);
+}
+
+export function movingInCopy(input: {
+  startMonth: string;
+  closingDay: number;
+  prepaidDays: number;
+  prepaidCents: number;
+  basis: "360" | "365";
+  principalAndInterestCents: number;
+  taxCents: number;
+  insuranceCents: number;
+  pmiCents: number;
+  graceDays: number;
+  lateChargeHundredths: number;
+  signingDate: string;
+  lastRent: string;
+}): MovingInCopy {
+  const { year, month } = closingMonthParts(input.startMonth);
+  const day = clampClosingDay(input.closingDay, input.startMonth);
+  const weekday = utcWeekdayName(year, month, day);
+  const noPaymentMonth = paymentDate(input.startMonth, 1);
+  const firstDue = dueDate(input.startMonth, 1);
+  const firstDueText = formatCalendarDay({ year: firstDue.year, month: firstDue.month, day: 1 });
+  const rowMonth = longDate(noPaymentMonth.year, noPaymentMonth.month);
+  const charge = lateChargeCents(input.principalAndInterestCents, input.lateChargeHundredths);
+  const onTop = onTopOfPrincipal(input.taxCents, input.insuranceCents, input.pmiCents);
+  const principalLine = `First payment due ${firstDueText}. Principal and interest is ${formatMoney(input.principalAndInterestCents)}.`;
+  const signing = parseIsoDate(input.signingDate);
+  const deadlineIso = signing ? closingDisclosureDeadline(input.signingDate) : null;
+  const deadline = deadlineIso ? parseIsoDate(deadlineIso) : null;
+  const rent = parseIsoDate(input.lastRent);
+  let lastRent: string | null = null;
+  if (rent) {
+    lastRent = `Last rent ${formatCalendarDay(rent)}. Rent is paid in advance; the mortgage is paid in arrears.`;
+    if (lastRentOverlapsPrepaid(input.startMonth, input.closingDay, input.lastRent)) {
+      lastRent += " Those days are covered by both the rent and the prepaid interest.";
+    }
+  }
+  return {
+    funding: `Funding date ${weekday}, ${MONTH_NAMES[month - 1]} ${day}, ${year}. Interest starts this day.`,
+    prepaid: `Prepaid interest ${input.prepaidDays} days, ${formatMoney(input.prepaidCents)}, ${input.basis}-day basis. These days are paid at closing, not on the schedule.`,
+    noPayment: `No mortgage payment is due in ${rowMonth}. Payments are made in arrears: the ${firstDueText} payment covers ${rowMonth}.`,
+    firstPayment: onTop ? `${principalLine} ${onTop}` : principalLine,
+    grace: `Due on the 1st. A late charge of ${formatLateChargePercent(input.lateChargeHundredths)}% of principal and interest (${formatMoney(charge)} on the initial payment) applies if the payment is not received by the end of day ${input.graceDays} after the due date. Credit reporting is a separate 30-day rule.`,
+    closingDisclosure:
+      signing && deadline
+        ? `For a signing on ${formatCalendarDay(signing)}, the Closing Disclosure has to be received by ${formatCalendarDay(deadline)}.`
+        : MOVING_DISCLOSURE_RULE,
+    lastRent,
+    statement: MOVING_STATEMENT_SENTENCE,
+    interestCredit: MOVING_INTEREST_CREDIT_SENTENCE,
+  };
 }
 
 function subtractUtcDays(from: CalendarDate, days: number): CalendarDate {
@@ -856,8 +954,13 @@ function pictureDraftEqual(a: PictureDraft, b: PictureDraft): boolean {
     a.lenderCredit === b.lenderCredit &&
     a.earnest === b.earnest &&
     a.interestBasis === b.interestBasis &&
+    a.graceDays === b.graceDays &&
+    a.lateChargePercent === b.lateChargePercent &&
+    a.signingDate === b.signingDate &&
+    a.lastRent === b.lastRent &&
     a.open === b.open &&
-    a.closingOpen === b.closingOpen
+    a.closingOpen === b.closingOpen &&
+    a.movingOpen === b.movingOpen
   );
 }
 

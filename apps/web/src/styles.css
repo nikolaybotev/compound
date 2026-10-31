@@ -493,6 +493,14 @@ dd {
   white-space: nowrap;
 }
 
+.moving-copy p {
+  margin: 0 0 0.75rem;
+}
+
+.moving-in input[type="date"] {
+  color: var(--ink);
+}
+
 .picture-input {
   width: 6.5rem;
   text-align: right;

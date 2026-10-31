@@ -75,8 +75,13 @@ export type PictureDraft = {
   lenderCredit: string;
   earnest: string;
   interestBasis: string;
+  graceDays: string;
+  lateChargePercent: string;
+  signingDate: string;
+  lastRent: string;
   open: boolean;
   closingOpen: boolean;
+  movingOpen: boolean;
 };
 
 export type PictureValues = {
@@ -232,6 +237,77 @@ export function loadStoredCount(value: unknown, fallback: number): number {
   if (typeof value !== "string") return fallback;
   const parsed = parseWholeCount(value);
   return parsed === null ? fallback : parsed;
+}
+
+export function parseGraceDays(text: string): number | null {
+  const trimmed = text.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const value = Number(trimmed);
+  if (!Number.isSafeInteger(value) || value < 0 || value > 31) return null;
+  return value;
+}
+
+/** Hundredths of a percent: 5% is 500, 5.25% is 525, 100% is 10000. */
+export function parseLateChargePercent(text: string): number | null {
+  const trimmed = text.trim();
+  if (!/^(?:\d+)(?:\.\d{1,2})?$/.test(trimmed)) return null;
+  const [whole, frac = ""] = trimmed.split(".");
+  const hundredths = Number(whole) * 100 + Number(`${frac}00`.slice(0, 2));
+  if (!Number.isSafeInteger(hundredths) || hundredths < 0 || hundredths > 10_000) return null;
+  return hundredths;
+}
+
+export function formatLateChargePercent(hundredths: number): string {
+  const whole = Math.trunc(hundredths / 100);
+  const frac = hundredths % 100;
+  if (frac === 0) return String(whole);
+  if (frac % 10 === 0) return `${whole}.${frac / 10}`;
+  return `${whole}.${String(frac).padStart(2, "0")}`;
+}
+
+export type IsoDateParts = { year: number; month: number; day: number };
+
+export function parseIsoDate(text: string): IsoDateParts | null {
+  const trimmed = text.trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (year < 1000 || year > 9999) return null;
+  if (month < 1 || month > 12) return null;
+  if (day < 1 || day > daysInMonth(year, month)) return null;
+  return { year, month, day };
+}
+
+export type MovingField = "graceDays" | "lateChargePercent" | "signingDate" | "lastRent";
+
+/** Keeps `fallback` when `value` is not a valid live edit. An empty date is valid. */
+export function movingFieldOrDefault(field: MovingField, value: string, fallback: string): string {
+  if (field === "graceDays") return parseGraceDays(value) === null ? fallback : value.trim();
+  if (field === "lateChargePercent") {
+    return parseLateChargePercent(value) === null ? fallback : value.trim();
+  }
+  const trimmed = value.trim();
+  if (trimmed === "") return "";
+  return parseIsoDate(trimmed) ? trimmed : fallback;
+}
+
+function loadGraceDays(value: unknown): string {
+  if (typeof value !== "string") return "15";
+  return parseGraceDays(value) === null ? "15" : value.trim();
+}
+
+function loadLateCharge(value: unknown): string {
+  if (typeof value !== "string") return "5";
+  return parseLateChargePercent(value) === null ? "5" : value.trim();
+}
+
+function loadOptionalDate(value: unknown): string {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (trimmed === "") return "";
+  return parseIsoDate(trimmed) ? trimmed : "";
 }
 
 export function loadStoredInterestBasis(value: unknown): "360" | "365" {
@@ -449,8 +525,13 @@ export function pictureFromStorage(
   draft.lenderCredit = storedText(record.lenderCredit, (text) => parsePictureDollars(text) !== null, "0");
   draft.earnest = storedText(record.earnest, (text) => parsePictureDollars(text) !== null, "0");
   draft.interestBasis = loadStoredInterestBasis(record.interestBasis);
+  draft.graceDays = loadGraceDays(record.graceDays);
+  draft.lateChargePercent = loadLateCharge(record.lateChargePercent);
+  draft.signingDate = loadOptionalDate(record.signingDate);
+  draft.lastRent = loadOptionalDate(record.lastRent);
   draft.open = typeof record.open === "boolean" ? record.open : false;
   draft.closingOpen = typeof record.closingOpen === "boolean" ? record.closingOpen : false;
+  draft.movingOpen = typeof record.movingOpen === "boolean" ? record.movingOpen : false;
   if (record.pmi === undefined) {
     return pmiDraftForLoan(draft, downText, ficoText);
   }
@@ -477,8 +558,13 @@ export function defaultPicture(): PictureDraft {
     lenderCredit: "0",
     earnest: "0",
     interestBasis: "360",
+    graceDays: "15",
+    lateChargePercent: "5",
+    signingDate: "",
+    lastRent: "",
     open: false,
     closingOpen: false,
+    movingOpen: false,
   };
 }
 
@@ -745,4 +831,116 @@ export function buildPicture(
     cashToCloseCents,
     dueAtClosingCents,
   };
+}
+
+export function lateChargeCents(principalAndInterestCents: number, hundredths: number): number {
+  if (!Number.isSafeInteger(principalAndInterestCents) || !Number.isSafeInteger(hundredths)) {
+    throw new Error("picture amount is too large");
+  }
+  const numerator = principalAndInterestCents * hundredths;
+  if (!Number.isSafeInteger(numerator)) throw new Error("picture amount is too large");
+  return halfUpQuotient(numerator, 10_000);
+}
+
+const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
+
+export function utcWeekdayName(year: number, month: number, day: number): string {
+  return WEEKDAY_NAMES[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
+}
+
+function isoDate(date: IsoDateParts): string {
+  return `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
+}
+
+function addUtcDays(date: IsoDateParts, days: number): IsoDateParts {
+  const time = Date.UTC(date.year, date.month - 1, date.day) + days * 86_400_000;
+  const next = new Date(time);
+  return { year: next.getUTCFullYear(), month: next.getUTCMonth() + 1, day: next.getUTCDate() };
+}
+
+function utcWeekdayIndex(date: IsoDateParts): number {
+  return new Date(Date.UTC(date.year, date.month - 1, date.day)).getUTCDay();
+}
+
+function nthWeekday(year: number, month: number, weekday: number, n: number): IsoDateParts {
+  const firstWeekday = new Date(Date.UTC(year, month - 1, 1)).getUTCDay();
+  const delta = (weekday - firstWeekday + 7) % 7;
+  return { year, month, day: 1 + delta + (n - 1) * 7 };
+}
+
+function lastWeekday(year: number, month: number, weekday: number): IsoDateParts {
+  const lastDay = daysInMonth(year, month);
+  const lastIndex = new Date(Date.UTC(year, month - 1, lastDay)).getUTCDay();
+  const delta = (lastIndex - weekday + 7) % 7;
+  return { year, month, day: lastDay - delta };
+}
+
+const holidayCache = new Map<number, Set<string>>();
+
+function holidaysForYear(year: number): Set<string> {
+  const cached = holidayCache.get(year);
+  if (cached) return cached;
+  const set = new Set<string>();
+  const fixed: Array<[number, number]> = [
+    [1, 1],
+    [6, 19],
+    [7, 4],
+    [11, 11],
+    [12, 25],
+  ];
+  for (const [month, day] of fixed) {
+    const actual = { year, month, day };
+    set.add(isoDate(actual));
+    const weekday = utcWeekdayIndex(actual);
+    if (weekday === 6) set.add(isoDate(addUtcDays(actual, -1)));
+    if (weekday === 0) set.add(isoDate(addUtcDays(actual, 1)));
+  }
+  set.add(isoDate(nthWeekday(year, 1, 1, 3)));
+  set.add(isoDate(nthWeekday(year, 2, 1, 3)));
+  set.add(isoDate(lastWeekday(year, 5, 1)));
+  set.add(isoDate(nthWeekday(year, 9, 1, 1)));
+  set.add(isoDate(nthWeekday(year, 10, 1, 2)));
+  set.add(isoDate(nthWeekday(year, 11, 4, 4)));
+  holidayCache.set(year, set);
+  return set;
+}
+
+function isLegalPublicHoliday(date: IsoDateParts): boolean {
+  const iso = isoDate(date);
+  return (
+    holidaysForYear(date.year).has(iso) ||
+    holidaysForYear(date.year - 1).has(iso) ||
+    holidaysForYear(date.year + 1).has(iso)
+  );
+}
+
+/** A Closing Disclosure business day is not a Sunday and not a 5 U.S.C. 6103(a) holiday. Saturday counts. */
+export function isClosingBusinessDay(iso: string): boolean {
+  const date = parseIsoDate(iso);
+  if (!date) return false;
+  if (utcWeekdayIndex(date) === 0) return false;
+  return !isLegalPublicHoliday(date);
+}
+
+/** Three business days before `signingDate`, counting backward from the day before it. */
+export function closingDisclosureDeadline(signingDate: string): string | null {
+  const signing = parseIsoDate(signingDate);
+  if (!signing) return null;
+  let cursor = addUtcDays(signing, -1);
+  let counted = 0;
+  for (let step = 0; step < 40 && counted < 3; step += 1) {
+    if (isClosingBusinessDay(isoDate(cursor))) counted += 1;
+    if (counted === 3) return isoDate(cursor);
+    cursor = addUtcDays(cursor, -1);
+  }
+  return null;
+}
+
+export function lastRentOverlapsPrepaid(startMonth: string, closingDay: number, lastRent: string): boolean {
+  const rent = parseIsoDate(lastRent);
+  if (!rent) return false;
+  const { year, month } = closingMonthParts(startMonth);
+  if (rent.year !== year || rent.month !== month) return false;
+  const lastPrepaidDay = daysInMonth(year, month);
+  return rent.day <= lastPrepaidDay && closingDay >= 1;
 }

@@ -39,6 +39,7 @@ import {
   formatPayoffDate,
   formatDueOnFirst,
   armTimelineLines,
+  serializeStoredSet,
   yearsAndMonths,
   monthsSavedText,
 } from "../src/loan";
@@ -1106,6 +1107,48 @@ describe("loan scenarios storage and prevailing figures", () => {
     delete (JSON.parse(v2).scenarios[0] as { version?: number }).version;
     expect(parseStoredSet(v2, now).ok).toBe(true);
     expect(parseStoredSet("{", now).ok).toBe(false);
+    const withoutMovingKeys = parseStoredSet(
+      JSON.stringify({
+        version: 2,
+        active: 0,
+        scenarios: [
+          {
+            price: "600000",
+            down: "5",
+            years: "30",
+            rate: "7.375",
+            start: "2026-10",
+            fico: "780",
+            extras: [],
+            applied: [],
+            picture: { lenderFees: "3000", tax: "1.15", insurance: "0.35", pmi: "0.35", title: "0.75" },
+          },
+        ],
+      }),
+      now,
+    );
+    expect(withoutMovingKeys.ok).toBe(true);
+    if (withoutMovingKeys.ok) {
+      const scenario = withoutMovingKeys.set.scenarios[0];
+      expect(scenario.draft.price).toBe("600000");
+      expect(scenario.draft.down).toBe("5");
+      expect(scenario.draft.rate).toBe("7.375");
+      expect(scenario.picture.graceDays).toBe("15");
+      expect(scenario.picture.signingDate).toBe("");
+      expect(scenario.picture.movingOpen).toBe(false);
+      const fresh = freshConventional(now);
+      fresh.draft.fico = "780";
+      expect(scenarioFigures(scenario)?.totalCents).toBe(scenarioFigures(fresh)?.totalCents);
+      expect(scenarioFigures(scenario)?.modalPaymentCents).toBe(scenarioFigures(fresh)?.modalPaymentCents);
+      const roundTrip = JSON.parse(serializeStoredSet(withoutMovingKeys.set)) as {
+        version: number;
+        scenarios: Array<{ price: string; picture: { graceDays: string; signingDate: string } }>;
+      };
+      expect(roundTrip.version).toBe(2);
+      expect(roundTrip.scenarios[0].price).toBe("600000");
+      expect(roundTrip.scenarios[0].picture.graceDays).toBe("15");
+      expect(roundTrip.scenarios[0].picture.signingDate).toBe("");
+    }
     expect(parseStoredSet(JSON.stringify({ version: 2, scenarios: [] }), now).ok).toBe(false);
     expect(
       parseStoredSet(

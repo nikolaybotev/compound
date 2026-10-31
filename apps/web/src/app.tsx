@@ -56,6 +56,7 @@ import {
   formatPayoffDate,
   formatDueOnFirst,
   armTimelineLines,
+  movingInCopy,
   PAYOFF_DATE_FOOTNOTE,
 } from "./loan";
 import {
@@ -69,8 +70,11 @@ import {
   defaultProrationCents,
   ficoBand,
   ficoRangeScore,
+  movingFieldOrDefault,
   parseClosingDay,
   parseFicoScore,
+  parseGraceDays,
+  parseLateChargePercent,
   parsePicture,
   parseWholeCount,
   percentThousandths,
@@ -130,6 +134,10 @@ export function App() {
   const [invalidField, setInvalidField] = useState<string | null>(null);
   const [pictureError, setPictureError] = useState<string | null>(null);
   const [pictureInvalid, setPictureInvalid] = useState<PictureInputField | null>(null);
+  const [movingError, setMovingError] = useState<string | null>(null);
+  const [movingInvalid, setMovingInvalid] = useState<
+    "graceDays" | "lateChargePercent" | "signingDate" | "lastRent" | null
+  >(null);
   const [applyError, setApplyError] = useState<string | null>(null);
   const [openYears, setOpenYears] = useState<Set<number>>(() =>
     initial.scenario.openYears
@@ -189,6 +197,8 @@ export function App() {
     setInvalidField(null);
     setPictureError(null);
     setPictureInvalid(null);
+    setMovingError(null);
+    setMovingInvalid(null);
     setApplyError(null);
     setEditingMonth(null);
     setEditingIndexMonth(null);
@@ -325,6 +335,25 @@ export function App() {
   );
   const closingDayCountText =
     closingDayCount === 1 ? "1 day" : `${closingDayCount} days`;
+  const moving = useMemo(
+    () =>
+      movingInCopy({
+        startMonth: draft.start,
+        closingDay: pictureValues.closingDay,
+        prepaidDays: lines.prepaidInterestDays,
+        prepaidCents: lines.prepaidInterestCents,
+        basis: pictureValues.interestBasis,
+        principalAndInterestCents: lines.principalAndInterestCents,
+        taxCents: lines.taxCents,
+        insuranceCents: lines.insuranceCents,
+        pmiCents: lines.pmiCents,
+        graceDays: parseGraceDays(pictureSaved.graceDays) ?? 15,
+        lateChargeHundredths: parseLateChargePercent(pictureSaved.lateChargePercent) ?? 500,
+        signingDate: pictureSaved.signingDate,
+        lastRent: pictureSaved.lastRent,
+      }),
+    [draft.start, pictureValues, lines, pictureSaved],
+  );
   const titlePresetValue = useMemo(() => {
     const units = titlePercentHundredThousandths(pictureDraft.title);
     if (units === null) return "";
@@ -438,11 +467,13 @@ export function App() {
         };
       }
     }
+    let pictureToStore: PictureDraft | undefined;
     if (pictureNext) {
+      pictureToStore = withDisclosureFlags(pictureNext);
       const pictureParsed = parsePicture(pictureNext, next.start);
       if (pictureParsed.ok) {
         setPictureDraft(pictureNext);
-        setPictureSaved({ ...pictureNext, open: pictureDraft.open, closingOpen: pictureDraft.closingOpen });
+        setPictureSaved(pictureToStore);
         setPictureValues(pictureParsed.values);
       }
     }
@@ -452,14 +483,14 @@ export function App() {
             draft: next,
             extras: kept,
             applied: keptApplied,
-            ...(pictureNext ? { picture: { ...pictureNext, open: pictureDraft.open, closingOpen: pictureDraft.closingOpen } } : {}),
+            ...(pictureToStore ? { picture: pictureToStore } : {}),
           }
         : {
             draft: next,
             extras: kept,
             applied: keptApplied,
             arm: nextArm,
-            ...(pictureNext ? { picture: { ...pictureNext, open: pictureDraft.open, closingOpen: pictureDraft.closingOpen } } : {}),
+            ...(pictureToStore ? { picture: pictureToStore } : {}),
           },
     );
   }
@@ -476,27 +507,15 @@ export function App() {
       pictureNext = pmiDraftForLoan(pictureDraft, validText.down, String(score));
       const pictureParsed = parsePicture(pictureNext, draft.start);
       if (pictureParsed.ok) {
+        const saved = withDisclosureFlags(pictureNext);
         setPictureDraft(pictureNext);
-        setPictureSaved({
-          ...pictureNext,
-          open: pictureDraft.open,
-          closingOpen: pictureDraft.closingOpen,
-        });
+        setPictureSaved(saved);
         setPictureValues(pictureParsed.values);
+        persist({ draft: next, picture: saved });
+        return;
       }
     }
-    persist({
-      draft: next,
-      ...(pictureNext
-        ? {
-            picture: {
-              ...pictureNext,
-              open: pictureDraft.open,
-              closingOpen: pictureDraft.closingOpen,
-            },
-          }
-        : {}),
-    });
+    persist({ draft: next });
   }
 
   function commitArm(next: ArmDraft) {
@@ -723,7 +742,7 @@ export function App() {
       setPictureInvalid(parsed.field);
       return;
     }
-    const saved = { ...next, open: pictureDraft.open, closingOpen: pictureDraft.closingOpen };
+    const saved = withDisclosureFlags(next);
     setPictureValues(parsed.values);
     setPictureSaved(saved);
     setPictureError(null);
@@ -748,23 +767,67 @@ export function App() {
     setPictureDraft(next);
     const parsed = parsePicture(next, draft.start);
     if (!parsed.ok) return;
-    const saved = { ...next, open: pictureDraft.open, closingOpen: pictureDraft.closingOpen };
+    const saved = withDisclosureFlags(next);
     setPictureValues(parsed.values);
     setPictureSaved(saved);
     persist({ picture: saved });
   }
 
+  function withDisclosureFlags(picture: PictureDraft): PictureDraft {
+    return {
+      ...picture,
+      graceDays: movingFieldOrDefault("graceDays", picture.graceDays, pictureSaved.graceDays),
+      lateChargePercent: movingFieldOrDefault(
+        "lateChargePercent",
+        picture.lateChargePercent,
+        pictureSaved.lateChargePercent,
+      ),
+      signingDate: movingFieldOrDefault("signingDate", picture.signingDate, pictureSaved.signingDate),
+      lastRent: movingFieldOrDefault("lastRent", picture.lastRent, pictureSaved.lastRent),
+    };
+  }
+
   function setTaxesOpen(open: boolean) {
-    const saved = { ...pictureSaved, open };
+    const saved = withDisclosureFlags({ ...pictureSaved, open });
     setPictureSaved(saved);
     setPictureDraft({ ...pictureDraft, open });
     persist({ picture: saved });
   }
 
   function setClosingOpen(open: boolean) {
-    const saved = { ...pictureSaved, closingOpen: open };
+    const saved = withDisclosureFlags({ ...pictureSaved, closingOpen: open });
     setPictureSaved(saved);
     setPictureDraft({ ...pictureDraft, closingOpen: open });
+    persist({ picture: saved });
+  }
+
+  function setMovingOpen(open: boolean) {
+    const saved = withDisclosureFlags({ ...pictureSaved, movingOpen: open });
+    setPictureSaved(saved);
+    setPictureDraft({ ...pictureDraft, movingOpen: open });
+    persist({ picture: saved });
+  }
+
+  function commitMovingField(
+    field: "graceDays" | "lateChargePercent" | "signingDate" | "lastRent",
+    value: string,
+    message: string,
+  ) {
+    const kept = movingFieldOrDefault(field, value, pictureSaved[field]);
+    const trimmed = value.trim();
+    const valid =
+      field === "signingDate" || field === "lastRent" ? trimmed === "" || kept === trimmed : kept === trimmed;
+    if (!valid) {
+      setPictureDraft({ ...pictureDraft, [field]: value });
+      setMovingError(message);
+      setMovingInvalid(field);
+      return;
+    }
+    setPictureDraft({ ...pictureDraft, [field]: kept });
+    const saved = withDisclosureFlags({ ...pictureSaved, [field]: kept });
+    setPictureSaved(saved);
+    setMovingError(null);
+    setMovingInvalid(null);
     persist({ picture: saved });
   }
 
@@ -1496,6 +1559,94 @@ export function App() {
             {pictureError}
           </p>
         ) : null}
+      </Disclosure>
+      <Disclosure
+        className="moving-in"
+        title="Moving in"
+        open={pictureDraft.movingOpen}
+        onToggle={setMovingOpen}
+      >
+        <div class="moving-copy">
+          <p>{moving.funding}</p>
+          <p>{moving.prepaid}</p>
+          <p>{moving.noPayment}</p>
+          <p>{moving.firstPayment}</p>
+          <p>{moving.grace}</p>
+          <div class="inputs">
+            <Field
+              id="moving-grace-days"
+              label="Grace days"
+              value={pictureDraft.graceDays}
+              invalid={movingInvalid === "graceDays"}
+              onInput={(value) =>
+                commitMovingField(
+                  "graceDays",
+                  value,
+                  "Grace days must be a whole number from 0 through 31.",
+                )
+              }
+            />
+            <Field
+              id="moving-late-charge"
+              label="Late charge"
+              value={pictureDraft.lateChargePercent}
+              suffix="%"
+              invalid={movingInvalid === "lateChargePercent"}
+              onInput={(value) =>
+                commitMovingField(
+                  "lateChargePercent",
+                  value,
+                  "Late charge must be a percent from 0 through 100, with at most two decimal places.",
+                )
+              }
+            />
+          </div>
+          <p>{moving.closingDisclosure}</p>
+          <div class="inputs">
+            <div class="field">
+              <label for="moving-signing-date">Signing date</label>
+              <input
+                id="moving-signing-date"
+                type="date"
+                autoComplete="off"
+                value={pictureDraft.signingDate}
+                aria-invalid={movingInvalid === "signingDate"}
+                onInput={(event) =>
+                  commitMovingField(
+                    "signingDate",
+                    event.currentTarget.value,
+                    "Signing date must be a calendar date.",
+                  )
+                }
+              />
+            </div>
+            <div class="field">
+              <label for="moving-last-rent">Last rent</label>
+              <input
+                id="moving-last-rent"
+                type="date"
+                autoComplete="off"
+                value={pictureDraft.lastRent}
+                aria-invalid={movingInvalid === "lastRent"}
+                onInput={(event) =>
+                  commitMovingField(
+                    "lastRent",
+                    event.currentTarget.value,
+                    "Last rent must be a calendar date.",
+                  )
+                }
+              />
+            </div>
+          </div>
+          {moving.lastRent ? <p>{moving.lastRent}</p> : null}
+          <p>{moving.statement}</p>
+          <p>{moving.interestCredit}</p>
+          {movingError ? (
+            <p class="error" role="alert">
+              {movingError}
+            </p>
+          ) : null}
+        </div>
       </Disclosure>
       <Schedule
         years={years}
