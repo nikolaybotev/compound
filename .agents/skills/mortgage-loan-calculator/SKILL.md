@@ -66,7 +66,7 @@ Answer a floor, a first-adjustment range, an even-out extra, or a yearly-extra q
 
 Extra principal works on an ARM through the same `month,extra` CSV. Each reset re-amortizes the actual unpaid balance over the payments left, so extra principal lowers the next reset payment and may shorten the term by little or nothing. Report `interest_saved_cents` and `months_saved` as the calculator gives them.
 
-A recast question on an ARM is declined in one sentence: the two-run recast procedure is for a fixed rate, and an ARM already re-amortizes at each reset.
+A recast question on an ARM is declined in one sentence: a recast is for a fixed rate, and an ARM already re-amortizes at each reset.
 
 ## Servicer recast (fixed rate only)
 
@@ -74,9 +74,9 @@ A servicer recast here means: after a principal curtailment, the monthly payment
 
 A servicer may round the contractual payment to the cent before posting; the script's payment can differ by about a cent. Report the script's integer cents unchanged.
 
-## Recast procedure (two runs)
+## Recast procedure (one run)
 
-Perform a recast as two script runs. Do not answer with the first run's `monthly_payment_cents`, `remaining_interest_cents`, `interest_saved_cents`, or `months_saved`. The first schedule's remaining interest is what is still due if the loan is not recast.
+Perform a recast in one script run. Pass `--recast-month M` with the original loan, the user's `--extra` CSV if any, and exactly one of `--years` or `--months`. Read the recast payment from `recast.monthly_payment_cents`. Read the interest if only that payment is made from `recast.interest_cents`. When the question asks for interest through the recast month or lifetime interest with the recast, read `recast.interest_through_cents` and `recast.lifetime_interest_cents`. Do not add those cents yourself and do not launch a second process for the recast payment.
 
 Map the recast timing:
 
@@ -86,21 +86,23 @@ Map the recast timing:
 
 A calendar recast needs the first payment month. Payment number is `(year2 - year1) * 12 + (month2 - month1) + 1`, with months numbered January = 1. If the first payment month is missing and the recast is named as a calendar month, ask. If the user names a funding month or a first-payment due date without saying which calendar month payment 1 accrues in, ask using the funding-month and due-date rules above.
 
-A lump sum paid with the recast is an extra row on the recast month in the first run's CSV (duplicate months sum).
+A lump sum paid with the recast is an extra row on the recast month in the same run's CSV (duplicate months sum).
 
-**First run:** original loan with `--json --schedule`, the user's extra CSV if any, and exactly one of `--years` or `--months` for the original term.
+If `M` is not an integer from 1 through `n - 1`, tell the user there is no positive remaining term to re-amortize. If month `M` has `remaining_principal_cents` of 0 on the schedule, tell the user the loan is already paid off. Keep those two cases distinct in wording.
 
-Let `M` be the recast month. Let `n` be the first run's JSON `months` (do not multiply years again). The second run's term is `n - M`, passed with `--months` even when that count is a multiple of 12.
+If, and only if, the owner also asks about extra principal after the recast, run the remaining loan again with a new CSV whose month 1 is the first payment after the recast. The required recast payment itself stays `recast.monthly_payment_cents`, with no extras on that answer.
 
-If `M` is not an integer from 1 through `n - 1`, tell the user there is no positive remaining term to re-amortize and do not run a second loan. If month `M` has `remaining_principal_cents` of 0 on the schedule, tell the user the loan is already paid off and do not run a second loan. Keep those two cases distinct in wording.
+## Level extras on an ARM
 
-**Second run:** `--amount` is that row's `remaining_principal_cents` written as dollars with exactly two decimal places, the same `--rate`, `--months` set to `n - M`, no `--extra`, and `--json` with no `--schedule`. The second run's `amount_cents` must equal that `remaining_principal_cents`; if it does not, fix the dollar string and run again. Do not invent the payment.
+When the owner asks to hold the initial-period total after each reset, write the form extras to `month,extra` and pass `--level` with the ARM flags. Do not solve for the extra amount yourself.
 
-The recast payment is the second run's `monthly_payment_cents`. The interest that loan costs if only the new payment is made is the second run's `interest_cents`.
+## Savings on the schedule
 
-Lifetime interest with the recast, only when the question asks for it, is the sum of `interest_cents` on schedule rows 1 through `M` plus the second run's `interest_cents` (add printed cents; do not re-amortize).
+Read `interest_saved_cents` as Interest saved and `saved_by_extra_cents` on a schedule row as Saved by extra. The sum of Saved by extra is not Interest saved.
 
-If, and only if, the owner also asks about extra principal after the recast, run the recast loan again with a new CSV whose month 1 is the first payment after the recast. The required recast payment itself stays the second run, with no extras.
+## Payoff date and picture inputs
+
+When the user gave a funding month and asked for a payoff date, pass `--funding YYYY-MM` and read `payoff_date` from JSON. Pass tax, insurance, PMI, and closing flags only when the user gave those inputs; ask when a required companion flag is missing. Do not invent picture rates or closing figures.
 
 ## Loans this calculator will not run
 
