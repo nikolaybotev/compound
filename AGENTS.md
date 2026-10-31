@@ -24,6 +24,7 @@ A zero-dependency Node.js calculator for a fixed monthly mortgage payment and it
 - The human summary formats money in US locale with two decimal places, from integer cents. `--json` reports money as integer cents. The `--schedule` CSV money columns stay two decimal places with no grouping separators. In ARM mode the CSV adds `rate`, `payment`, and `index`: `payment` is money like the others, while `rate` and `index` print from thousandths with trailing zeros removed (`5.875`, `6.92`, `10.875`), never as two decimals, and `index` is empty when none was given.
 - The note rate is percent per year (`6.99` means 6.99%), and the monthly rate is that percent divided by 12.
 - There is no default loan. A missing or invalid `--amount`, `--rate`, or term flag exits non-zero and explains the reason on stderr. Exactly one of `--years` or `--months` is required; both or neither fails. No arguments names `--amount`, `--rate`, `--years`, and `--months`. `--json` always includes `months`; `years` appears only when `--years` was passed.
+- Check intents, specs, plans, examples, fixtures, docs, commit messages, and pull-request text for personal data, and replace it with a neutral placeholder, including when it came from Nikolay's own words or a brief. Personal data is a street name or address, a parcel number (APN), a loan, account, or other financial figure, an employer, family, or contact detail, and an IP, key, or hostname tied to his home. A real value that must stay goes only in an untracked local file or a secret. The published page scenario stays: purchase price $600,000, 5% down, a $570,000 loan, and the Example Credit Union sheet rates used as product examples. Do not rewrite git history for this rule unless he approves that rewrite.
 
 ## Architecture
 
@@ -57,6 +58,7 @@ A zero-dependency Node.js calculator for a fixed monthly mortgage payment and it
 
 ## Things agents get wrong
 
+- Do not write a street name, address, parcel number, home IP, hostname, key, employer, family or contact detail, or a personal loan figure into the repo, including from Nikolay's own words or a brief. The published page scenario ($600,000, 5% down, $570,000, and the Example Credit Union sheet rates) stays. A real value that must stay goes in an untracked local file or a secret. Do not rewrite git history for this rule unless Nikolay approves that rewrite.
 - Do not put the $855,000 / 6.99% / 30-year gist loan back as constants that run when arguments are missing. That scenario is only `--amount 855000 --rate 6.99 --years 30`.
 - Charging stops when the principal reaches zero. Do not keep accruing interest after payoff. The schedule still lists the later months through the no-extra payoff, with zeros, so the last `interest_saved` matches the summary.
 - `Extra principal paid` is `extra_applied_cents`, the dollars that reduced principal. $100 on every month of the $570,000 / 7% / 30-year loan is `$33,200.00` (the loan is gone in month 332), not `$36,000.00`.
