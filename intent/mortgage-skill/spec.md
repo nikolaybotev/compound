@@ -174,7 +174,7 @@ The 2022 gist and the first commit in this repo wrapped the payment in `Math.cei
 
 **D13 — The schedule's interest-saved column is cumulative, and the table runs through the no-extra payoff.** Lifetime interest saved is the difference between two finished schedules, so a single month cannot be assigned its own savings without a convention. The column is interest the no-extra loan has charged through that month, minus interest this loan has charged through that month. Checked 2026-10-02 on the $570,000 / 7% / 30-year loan with $100 extra in months 1–12: month 1 saves $0.00, because the extra is applied after that month's interest; month 12 has saved $39.26 of the eventual $8,137.70; month 358, when this loan ends, has saved $8,071.85; months 359 and 360, with this loan already at zero, bring the column to $8,137.70. The CSV keeps those last rows so the final figure is on the sheet.
 
-**D12 — CI uses Node.js 24.** Checked 2026-10-02 on the [Node.js Release schedule](https://github.com/nodejs/Release): 24.x is Active LTS, and 26.x is Current until 2026-10-28. The fixture arithmetic was run locally on Node v26.8.2. `node --test` is the test runner. The repo has no npm dependencies and gains none.
+**D12 — CI uses the Node.js version in `mise.toml`.** Checked 2026-10-02 on the [Node.js Release schedule](https://github.com/nodejs/Release): the pinned line was Active LTS. `node --test` is the test runner. The repo has no npm dependencies and gains none.
 
 ## 8. Open questions
 

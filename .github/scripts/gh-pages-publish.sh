@@ -108,7 +108,8 @@ apply_feature_sha() {
 apply_feature_pointer() {
   local pr_number="${1:?pr number}"
   local sha_id="${2:?12-char sha}"
-  local target="/compound/feat/${sha_id}/"
+  local repo_name="${PAGES_REPO_NAME:?}"
+  local target="/${repo_name}/feat/${sha_id}/"
   mkdir -p "${WORKDIR}/feat"
   rm -rf "${WORKDIR}/feat/${pr_number}"
   mkdir -p "${WORKDIR}/feat/${pr_number}"

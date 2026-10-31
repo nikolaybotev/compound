@@ -35,10 +35,10 @@ Files: `compound_interest_monthly.js`, `compound_interest_monthly.test.js`, `.gi
 2. Compute the schedule from the exact payment and exact 30/360 monthly interest, per requirements 5 and 6. Charging stops at payoff. Round half up to the cent once, at output (P6). Do not round with `Math.round(dollars * 100) / 100`. There are no extra payments in this phase; the extra step is zero.
 3. Implement `--json` and the human summary. `--json` alone omits `schedule`. `--json --schedule` includes it per requirement 8, with `extra_cents` and `interest_saved_cents` at 0 in this phase. `--schedule` alone prints the same rows as CSV. JSON field names match requirement 8, with saved fields at 0 and the baseline equal to the run.
 4. Add `node --test` cases for AC1, the no-extra part of AC2, and AC5, asserting the cent amounts in the coverage table.
-5. Add a GitHub Actions workflow that runs `node --test` on Node.js 24 for pull requests and pushes.
+5. Add a GitHub Actions workflow that runs `node --test` on the Node.js version in `mise.toml` for pull requests and pushes.
 6. Update `README.md` and `AGENTS.md` so the documented command is the new one, including the explicit 855000 / 6.99 / 30 example. Keep the README footnote that this walk matches Bankrate's schedule ($795,200.72 on $570,000 at 7% for 30 years), not the summary card ($795,201) and not a cent-rounded lender posting (about $795,203.90).
 
-DoD: `node --test` exits 0 and covers the cent amounts in AC1, the no-extra part of AC2, and AC5. `node compound_interest_monthly.js` with no arguments exits non-zero, stderr says an argument is missing, and neither stream contains `855000` or `855,000`. `.github/workflows/test.yml` runs `node --test` on Node.js 24.
+DoD: `node --test` exits 0 and covers the cent amounts in AC1, the no-extra part of AC2, and AC5. `node compound_interest_monthly.js` with no arguments exits non-zero, stderr says an argument is missing, and neither stream contains `855000` or `855,000`. `.github/workflows/test.yml` runs `node --test` on the Node.js version in `mise.toml`.
 
 ## Phase 1 — Extra principal CSV and interest saved
 

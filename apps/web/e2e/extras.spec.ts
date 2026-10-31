@@ -1,7 +1,7 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { configuredOrigin, LEGACY_KEY, SET_KEY } from "./configured";
 import { setStartMonth } from "./start-month";
 
-const origin = "http://127.0.0.1:4173";
 const leaks = new WeakMap<BrowserContext, string[]>();
 
 test.beforeEach(async ({ context }) => {
@@ -100,10 +100,10 @@ test("AC8 reload keeps the edited cell, the prefill, and an open 2027", async ({
   await expect(page.locator("#extra-monthly")).toHaveValue("100");
   await expect(page.locator("#extra-yearly-month")).toHaveValue("1");
 
-  await page.evaluate(() => {
-    localStorage.setItem("compound-amortization-v1", "{");
-    localStorage.removeItem("compound-amortization-v2");
-  });
+  await page.evaluate(({ legacyKey, setKey }) => {
+    localStorage.setItem(legacyKey, "{");
+    localStorage.removeItem(setKey);
+  }, { legacyKey: LEGACY_KEY, setKey: SET_KEY });
   await page.reload();
   await expect(page.locator("#start")).toHaveAttribute("data-value", "2026-10");
   await expect(page.locator("#start")).toHaveText("October 2026");
@@ -256,14 +256,15 @@ function extra(page: Page, month: number) {
 }
 
 async function storedMonths(page: Page): Promise<number[]> {
-  return page.evaluate(() => {
-    const raw = localStorage.getItem("compound-amortization-v1");
+  return page.evaluate((legacyKey) => {
+    const raw = localStorage.getItem(legacyKey);
     const saved = JSON.parse(raw ?? "{}") as { extras?: [number, number][] };
     return (saved.extras ?? []).map(([month]) => month);
-  });
+  }, LEGACY_KEY);
 }
 
 async function blockForeignHosts(context: BrowserContext) {
+  const origin = configuredOrigin();
   const leaked: string[] = [];
   leaks.set(context, leaked);
   await context.route("**/*", (route) => {

@@ -79,7 +79,7 @@ The example loan is purchase price $570,000, 0% down, 30 years, 7%, start month 
 | AC3 | With $100 in months 1–12 and nowhere else, the page shows $697.61 on month 1, $648.18 on month 12, $0.00 on month 13, and summary Interest saved $8,137.70. |
 | AC4 | Apply of $100 monthly on the example loan shows $585.67 on month 1 and summary Interest saved $76,366.09. The payoff row's Saved by extra is $0.00. |
 | AC5 | `node --test` exits 0. A `--json --schedule` run of the example loan has the same keys as before this change. The `--schedule` CSV header is unchanged. The web CI job exits 0 and runs AC1–AC4 and AC7. |
-| AC6 | After the merge, /compound/ with start month October 2026 and only month 1's extra set to $100 shows $706.94 in Saved by extra. |
+| AC6 | After the merge, the Pages site with start month October 2026 and only month 1's extra set to $100 shows $706.94 in Saved by extra. |
 
 ## 7. Design decisions
 

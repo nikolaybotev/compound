@@ -1,7 +1,8 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const port = 4173;
-const origin = `http://127.0.0.1:${port}`;
+const host = "127.0.0.1";
+const origin = `http://${host}:${port}`;
 
 export default defineConfig({
   testDir: "e2e",
@@ -20,7 +21,7 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], hasTouch: true } }],
   webServer: {
-    command: "pnpm build && pnpm exec vite preview --host 127.0.0.1 --port 4173 --strictPort",
+    command: `pnpm build && pnpm exec vite preview --host ${host} --port ${port} --strictPort`,
     url: origin,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

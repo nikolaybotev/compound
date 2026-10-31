@@ -1,7 +1,7 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { configuredOrigin, LEGACY_KEY, SET_KEY } from "./configured";
 import { setStartMonth } from "./start-month";
 
-const origin = "http://127.0.0.1:4173";
 const leaks = new WeakMap<BrowserContext, string[]>();
 
 test.beforeEach(async ({ context }) => {
@@ -193,9 +193,9 @@ test("AC7 seller credit warning and picture migration", async ({ page }) => {
   await expect(page.locator(".picture-closing .note")).toHaveCount(0);
   await page.locator("#down").fill("5");
 
-  await page.evaluate(() => {
+  await page.evaluate((legacyKey) => {
     localStorage.setItem(
-      "compound-amortization-v1",
+      legacyKey,
       JSON.stringify({
         version: 1,
         price: "570000",
@@ -205,7 +205,7 @@ test("AC7 seller credit warning and picture migration", async ({ page }) => {
         start: "2026-10",
       }),
     );
-  });
+  }, LEGACY_KEY);
   await page.reload();
   await page.locator("summary", { hasText: "Closing Costs" }).click();
   await expect(page.locator("#picture-lender-fees")).toHaveValue("3000");
@@ -290,9 +290,9 @@ test("AC5 summaries have no border and a picture edit survives Apply", async ({ 
 test("AC6 a saved version-1 loan keeps its payment and shows thousands", async ({ page }) => {
   await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
   await page.goto("/");
-  await page.evaluate(() => {
+  await page.evaluate((legacyKey) => {
     localStorage.setItem(
-      "compound-amortization-v1",
+      legacyKey,
       JSON.stringify({
         version: 1,
         price: "570000",
@@ -302,7 +302,7 @@ test("AC6 a saved version-1 loan keeps its payment and shows thousands", async (
         start: "2026-10",
       }),
     );
-  });
+  }, LEGACY_KEY);
   await page.reload();
   await expect(page.locator("#price")).toHaveValue("570");
   await expect(page.getByRole("region", { name: "Loan amount" })).toContainText("$570,000.00");
@@ -336,9 +336,7 @@ test("AC11 FICO range and PMI ladder", async ({ page }) => {
 
   await page.locator("#fico").selectOption("740");
   await page.locator("#picture-pmi").fill("0.5");
-  await page.evaluate(() => {
-    const legacyKey = "compound-amortization-v1";
-    const setKey = "compound-amortization-v2";
+  await page.evaluate(({ legacyKey, setKey }) => {
     const legacy = JSON.parse(localStorage.getItem(legacyKey) ?? "{}");
     legacy.fico = "770";
     localStorage.setItem(legacyKey, JSON.stringify(legacy));
@@ -348,7 +346,7 @@ test("AC11 FICO range and PMI ladder", async ({ page }) => {
       set.scenarios[set.active].fico = "770";
       localStorage.setItem(setKey, JSON.stringify(set));
     }
-  });
+  }, { legacyKey: LEGACY_KEY, setKey: SET_KEY });
   await page.reload();
   await expect(page.locator("#fico")).toHaveValue("740");
   await expect(page.locator("#fico option:checked")).toHaveText("740–779");
@@ -404,6 +402,7 @@ function savedByExtra(page: Page, month: number) {
 }
 
 async function blockForeignHosts(context: BrowserContext) {
+  const origin = configuredOrigin();
   const leaked: string[] = [];
   leaks.set(context, leaked);
   await context.route("**/*", (route) => {

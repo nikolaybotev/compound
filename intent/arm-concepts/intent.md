@@ -50,7 +50,7 @@ The "not dollars" wording above still governs the procedure. Types may quote lab
 
 ## Original prompt (verbatim)
 
-> Write the spec and plan for a new ARM concept skill in nikolaybotev/compound, and open a pull request. Do not merge. Do not push to main. Do not implement a calculator change.
+> Write the spec and plan for a new ARM concept skill in this repo, and open a pull request. Do not merge. Do not push to main. Do not implement a calculator change.
 >
 > Read the skill guide and AGENTS.md. New intent folder intent/arm-concepts/ linking to intent/arm-loan/. Branch from latest origin/main. The pull request holds intent.md, spec.md, and plan.md. The usual checks should run.
 >

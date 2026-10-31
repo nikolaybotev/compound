@@ -1,4 +1,4 @@
-# compound
+# This repo
 
 A zero-dependency Node.js calculator for a fixed-rate, fully amortizing mortgage, or a fixed-then-adjusting ARM. It reports the scheduled monthly payment, the interest the loan costs, and, when asked, a month-by-month schedule.
 
@@ -10,11 +10,11 @@ A skill at [`.agents/skills/mortgage-loan-calculator/SKILL.md`](.agents/skills/m
 
 A third skill, [`.agents/skills/arm-loan-concepts/SKILL.md`](.agents/skills/arm-loan-concepts/SKILL.md), explains how a fixed-then-adjusting ARM's rate adjusts at change dates, and explains ARM types on two axes in that same file. It does not compute a payment, rate, or index for a person's loan and runs nothing. Its design is [intent/arm-concepts/](intent/arm-concepts/). Cited consumer answers are in [docs/kb/](docs/kb/README.md). The skill links there and does not absorb them.
 
-A local amortization page on the same calculator is [apps/web](apps/web). Its design is [intent/amortization-app/](intent/amortization-app/intent.md). From this directory, `pnpm --dir apps/web dev` serves it, `pnpm --dir apps/web build` writes a static `apps/web/dist` (Vite base `./` unless `VITE_BASE` is set), and `pnpm --dir apps/web preview` serves that build. The page calls `buildReport` in `amortize.js`. The published page is [/compound/](/compound/). A push to `main` publishes it; `gh workflow run deploy-pages.yml` publishes it again. That build sets `VITE_BASE=/compound/` and does not run on a schedule.
+A local amortization page on the same calculator is [apps/web](apps/web). Its design is [intent/amortization-app/](intent/amortization-app/intent.md). From this directory, `pnpm --dir apps/web dev` serves it, `pnpm --dir apps/web build` writes a static `apps/web/dist` (Vite base `./` unless `VITE_BASE` is set), and `pnpm --dir apps/web preview` serves that build. The page calls `buildReport` in `amortize.js`. The published page is this repo's GitHub Pages site. A push to `main` publishes it; `gh workflow run deploy-pages.yml` publishes it again. That build sets `VITE_BASE` from the repository name and does not run on a schedule.
 
 ## Requirements
 
-- [Node.js](https://nodejs.org/) 24 or later. Continuous integration runs the tests on Node.js 24.
+- [Node.js](https://nodejs.org/) at the version in `package.json` `engines` and `mise.toml`. Continuous integration uses that version.
 - Optional: [mise](https://mise.jdx.dev/). From this directory, `mise install` installs the Node version pinned in `mise.toml`.
 
 ## Run

@@ -11,8 +11,8 @@ Spec wins. Update this file when execution departs from it.
 ## Implementation (merged via PR #20)
 
 - `apps/web/package.json` version **0.6.0** (release **0.6**, complete-loan-picture). Not **0.7**.
-- `publish-gh-pages-production.yml` sets `PAGES_POINT_VERSION: "0.6"`.
-- `gh-pages-publish.sh` path-scoped publishes and production tag `0.6` when absent.
+- `publish-gh-pages-production.yml` sets `PAGES_POINT_VERSION` from `apps/web/package.json` `version`.
+- `gh-pages-publish.sh` path-scoped publishes and tags `PAGES_POINT_VERSION` when that tag is absent.
 - `deploy-feature-preview.yml` sha folders + persistent PR redirect pointers.
 - `test.yml` ignores `gh-pages` pushes.
 - `deploy-gh-pages-branch.yml` on `main`: `workflow_dispatch` only; uploads `gh-pages` with no build; concurrency `pages`.
@@ -27,8 +27,8 @@ Execute in order. Record dates and SHAs in the execution log at the bottom.
 ### Step 1 — Backup live site (before seed or source switch)
 
 1. Download the **real** published bytes (not a local build):
-   - `/compound/`
-   - `/compound/prototype/`
+   - the Pages site
+   - prototype/ on the Pages site
 2. Use `wget` with page requisites (`-p`) so CSS `url()` assets (fonts, etc.) are included.
 3. Verify before pushing backup:
    - Production root: `index.html` and **six** files under `assets/` (two CSS/JS bundles plus four font files in the current deployment).
@@ -50,7 +50,7 @@ Execute in order. Record dates and SHAs in the execution log at the bottom.
 ### Step 4 — Seed orphan `gh-pages`
 
 1. Check out `main` at the merge commit.
-2. Build production: `VITE_BASE=/compound/ pnpm --dir apps/web build`.
+2. Build production with `VITE_BASE` set from the repository name: `pnpm --dir apps/web build`.
 3. Assemble seed tree:
    - Production dist at root (`index.html`, `assets/`).
    - Copy **`prototype/`** from the **backup branch** (live bytes), unchanged.
@@ -73,8 +73,8 @@ Execute in order. Record dates and SHAs in the execution log at the bottom.
 
 Load:
 
-- `/compound/` — production loan picture (fresh visit: heading like `600K | 5% down | 7.375% fixed = $4,853 / month`, summary P&I about **$3,936.85**).
-- `/compound/prototype/` — unchanged previous prototype build from backup (`index-D-QChoyJ.js` era).
+- the Pages site — production loan picture (fresh visit: heading like `600K | 5% down | 7.375% fixed = $4,853 / month`, summary P&I about **$3,936.85**).
+- prototype/ on the Pages site — unchanged previous prototype build from backup (`index-D-QChoyJ.js` era).
 
 If either URL is wrong: **rollback** per spec §4.9 (run **`deploy-pages.yml`**, confirm URLs), fix `gh-pages`, stop.
 

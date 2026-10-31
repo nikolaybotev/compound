@@ -1064,7 +1064,7 @@ describe("loan scenarios storage and prevailing figures", () => {
   });
 
   test("legacy key without -v1 uses -scenarios suffix", () => {
-    expect(storageSetKey("compound-amortization")).toBe("compound-amortization-scenarios");
+    expect(storageSetKey("sample-key")).toBe("sample-key-scenarios");
   });
 
   test("saveStored restores keys when legacy write throws", () => {

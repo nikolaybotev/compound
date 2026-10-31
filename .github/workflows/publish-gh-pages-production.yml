@@ -3,7 +3,8 @@ name: publish-gh-pages-production
 # Commits production root files onto orphan gh-pages. Live traffic is published
 # by deploy-gh-pages-branch.yml (workflow_dispatch), including after each push
 # here. Does not build, copy, update, or delete prototype/ or feat/.
-# deploy-pages.yml is manual rollback only. Tags production gh-pages commits 0.11.
+# deploy-pages.yml is manual rollback only. Tags a production gh-pages
+# commit with PAGES_POINT_VERSION when that tag is not already on the remote.
 
 on:
   push:
@@ -37,12 +38,20 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 12.6.0
+          package_json_file: main/package.json
 
-      - name: Set up Node.js 24
+      - name: Read Node.js version
+        id: node
+        run: |
+          set -euo pipefail
+          version=$(awk -F'"' '/^node = / { print $2; exit }' main/mise.toml)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ steps.node.outputs.version }}
           cache: pnpm
           cache-dependency-path: main/pnpm-lock.yaml
 
@@ -52,31 +61,42 @@ jobs:
 
       - name: Build production
         working-directory: main
-        env:
-          VITE_BASE: /compound/
-        run: pnpm --dir apps/web build
+        run: |
+          set -euo pipefail
+          repo="${{ github.repository }}"
+          name="${repo##*/}"
+          VITE_BASE="/${name}/" pnpm --dir apps/web build
 
       - name: Assemble staging
         run: |
           set -euo pipefail
+          repo="${{ github.repository }}"
+          name="${repo##*/}"
+          base="/${name}/"
+          prototype="/${name}/prototype/"
           mkdir -p staging
           cp -a main/apps/web/dist/. staging/
           test -f staging/index.html
           test -d staging/assets
-          grep -q '/compound/' staging/index.html
-          if grep -q '/compound/prototype/' staging/index.html; then
-            echo "production index references /compound/prototype/" >&2
+          grep -q "$base" staging/index.html
+          if grep -q "$prototype" staging/index.html; then
+            echo "production index references ${prototype}" >&2
             exit 1
           fi
 
       - name: Publish production root to gh-pages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PAGES_POINT_VERSION: "0.19"
           GH_PAGES_PUSH_MARKER: ${{ runner.temp }}/gh-pages-pushed
         run: |
           set -euo pipefail
           rm -f "${GH_PAGES_PUSH_MARKER}"
+          version="$(node -p "require('./main/apps/web/package.json').version")"
+          if [[ "$version" =~ ^([0-9]+\.[0-9]+)\.[0-9]+$ ]]; then
+            export PAGES_POINT_VERSION="${BASH_REMATCH[1]}"
+          else
+            export PAGES_POINT_VERSION="$version"
+          fi
           MSG="Production publish from main ${{ github.sha }}"
           bash main/.github/scripts/gh-pages-publish.sh production "${MSG}" "${GITHUB_WORKSPACE}/staging"
 

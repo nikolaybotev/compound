@@ -1,6 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { configuredOrigin, LEGACY_KEY } from "./configured";
 
-const origin = "http://127.0.0.1:4173";
 const leaks = new WeakMap<BrowserContext, string[]>();
 
 const ARM_NOTE =
@@ -28,7 +28,9 @@ test("AC9 a fresh visit is the fixed heading with eight columns", async ({ page 
   await expectNoFixedNote(page);
   await expect(page.getByRole("region", { name: "Highest payment" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Highest rate" })).toHaveCount(0);
-  expect(await page.evaluate(() => localStorage.getItem("compound-amortization-v1")?.includes('"arm"'))).toBeFalsy();
+  expect(
+    await page.evaluate((key) => localStorage.getItem(key)?.includes('"arm"'), LEGACY_KEY),
+  ).toBeFalsy();
 });
 
 test("AC9 selecting ARM at the default rate shows the 12.375% ceiling", async ({ page }) => {
@@ -190,8 +192,9 @@ test("switching to fixed and back keeps the terms and a closed disclosure stays 
   await expect(page.getByRole("region", { name: "Highest payment" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Total interest paid" })).toContainText("$643,835.49");
   await expectNoFixedNote(page);
-  const stored = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem("compound-amortization-v1") ?? "{}"),
+  const stored = await page.evaluate((key) =>
+    JSON.parse(localStorage.getItem(key) ?? "{}"),
+    LEGACY_KEY,
   );
   expect(stored.arm.enabled).toBe(false);
   expect(stored.arm.margin).toBe("3");
@@ -225,20 +228,21 @@ test("a rate edit before the first switch does not store a closed disclosure", a
   await openFresh(page);
   await page.locator("#rate").fill("5.875");
   expect(
-    await page.evaluate(() => "arm" in JSON.parse(localStorage.getItem("compound-amortization-v1") ?? "{}")),
+    await page.evaluate((key) => "arm" in JSON.parse(localStorage.getItem(key) ?? "{}"), LEGACY_KEY),
   ).toBe(false);
   await page.locator("#product").selectOption("arm");
   await expect(page.locator("summary", { hasText: "ARM terms" })).toHaveAttribute("aria-expanded", "true");
-  const stored = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem("compound-amortization-v1") ?? "{}"),
+  const stored = await page.evaluate((key) =>
+    JSON.parse(localStorage.getItem(key) ?? "{}"),
+    LEGACY_KEY,
   );
   expect(stored.arm).toMatchObject({ enabled: true, open: true, fixedYears: "7", margin: "2.5", index: [] });
 });
 
 test("a broken stored arm never puts the page into ARM mode", async ({ page }) => {
-  await page.addInitScript(() => {
+  await page.addInitScript((key) => {
     localStorage.setItem(
-      "compound-amortization-v1",
+      key,
       JSON.stringify({
         version: 1,
         price: "600000",
@@ -249,7 +253,7 @@ test("a broken stored arm never puts the page into ARM mode", async ({ page }) =
         arm: { enabled: true, open: true, fixedYears: 7 },
       }),
     );
-  });
+  }, LEGACY_KEY);
   await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
   await page.goto("/");
   expect(await headingText(page)).toBe(
@@ -348,8 +352,9 @@ test("AC10 an index at the first adjustment recomputes the path", async ({ page 
   await expect(page.getByRole("region", { name: "Highest payment" })).toContainText(
     "$4,978.20 from November 2035",
   );
-  const stored = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem("compound-amortization-v1") ?? "{}"),
+  const stored = await page.evaluate((key) =>
+    JSON.parse(localStorage.getItem(key) ?? "{}"),
+    LEGACY_KEY,
   );
   expect(stored.arm.index).toEqual([[85, 4.42]]);
 
@@ -394,8 +399,9 @@ test("a term change drops index entries that are no longer adjustment months", a
   await setIndex(page, 85, "4.42");
   await page.locator("#arm-fixed-years").fill("10");
   await expect(page.getByLabel("Index for month 85")).toHaveCount(0);
-  const stored = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem("compound-amortization-v1") ?? "{}"),
+  const stored = await page.evaluate((key) =>
+    JSON.parse(localStorage.getItem(key) ?? "{}"),
+    LEGACY_KEY,
   );
   expect(stored.arm.index).toEqual([]);
   await page.locator("#arm-fixed-years").fill("7");
@@ -485,6 +491,7 @@ async function headingText(page: Page): Promise<string> {
 }
 
 async function blockForeignHosts(context: BrowserContext) {
+  const origin = configuredOrigin();
   const leaked: string[] = [];
   leaks.set(context, leaked);
   await context.route("**/*", (route) => {

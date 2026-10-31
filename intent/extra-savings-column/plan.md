@@ -36,7 +36,7 @@ Files: `apps/web/**`, `AGENTS.md`, `intent/extra-savings-column/plan.md` if a de
 4. Add the AC1 unit test and the AC2–AC4 and AC7 Playwright checks. Keep `node --test` green. Assert the example loan's `--json --schedule` object does not grow a key and that the `--schedule` CSV header is unchanged (AC5).
 5. Document the column in `AGENTS.md`: it is the marginal lifetime savings of that month's requested extra, and it is not `interest_saved_cents`.
 
-DoD: `node --test` exits 0. The web unit tests and Playwright exit 0 and show $706.94, $697.61, $648.18, $585.67, and $0.00 on the payoff row of the $100-every-month loan. Typing `100` without committing leaves the cell at $0.00. The header is Saved by extra and the cell is not an input. The 2026 year cell is empty. Pull-request CI does not fetch the production URL. The phase is not done until, after the squash merge to `main`, the deploy run is green and /compound/ shows $706.94 in Saved by extra for month 1 at $100 with the start month set to October 2026.
+DoD: `node --test` exits 0. The web unit tests and Playwright exit 0 and show $706.94, $697.61, $648.18, $585.67, and $0.00 on the payoff row of the $100-every-month loan. Typing `100` without committing leaves the cell at $0.00. The header is Saved by extra and the cell is not an input. The 2026 year cell is empty. Pull-request CI does not fetch the production URL. The phase is not done until, after the squash merge to `main`, the deploy run is green and the Pages site shows $706.94 in Saved by extra for month 1 at $100 with the start month set to October 2026.
 
 ### Build notes (Phase 0)
 

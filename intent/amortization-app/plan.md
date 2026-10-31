@@ -10,7 +10,7 @@ Spec wins. Update this file in the same change whenever implementation departs f
 
 ## Stops
 
-None before Phase 3. Phase 3 needs GitHub Pages with the source set to GitHub Actions. Checked 2026-10-02: Pages is not enabled on `nikolaybotev/compound`. The phase creates that setting with the API. If the API refuses, stop and tell the owner. Do not switch the site to another host.
+None before Phase 3. Phase 3 needs GitHub Pages with the source set to GitHub Actions. Checked 2026-10-02: Pages is not enabled on `this repo`. The phase creates that setting with the API. If the API refuses, stop and tell the owner. Do not switch the site to another host.
 
 ## Acceptance-criteria coverage
 
@@ -58,7 +58,7 @@ Files: `apps/web/**`, `pnpm-lock.yaml`, `pnpm-workspace.yaml` if a workspace fil
 4. Draw the piggy bank and the hooded figure as SVG in the repo. Show both on the hover card and on the indicated bar, including when the band is shorter than the icon.
 5. Unit-test the date map, the down-payment cents, and the four band amounts against AC2's month 157 without a second walk: bands come from a `buildReport` result.
 6. Playwright, against `vite preview`, for AC3, AC4, AC9, AC11, and AC12. Pin the clock to 2026-10-15 for AC11. Set the start month in AC3. Block every host other than the preview origin. Fail if `apps/web/dist` assets contain `bankrate.com`.
-7. Add a Node.js 24 CI job that installs with pnpm and runs the unit tests and Playwright. Leave the existing `node --test` job with no install step.
+7. Add a CI job, on the Node.js version in `mise.toml`, that installs with pnpm and runs the unit tests and Playwright. Leave the existing `node --test` job with no install step.
 8. Document `pnpm --dir apps/web dev`, the build, and the preview in `AGENTS.md` and `README.md`.
 
 DoD: `node --test` exits 0. The web unit tests and Playwright exit 0. Playwright sees $3,792.22, the November 2026 row, 360 bars, and the November 2039 card cents and both icons from AC3. The 20% and 3.5% loans match AC4. A letter in the price leaves that payment and the chart, and says what is wrong. ArrowRight moves the card to December 2039. Expand all years shows January 2027. With the clock pinned to 2026-10-15 and empty storage, the example loan appears without typing the start month. No request leaves the preview origin. A font file whose license is not the SIL Open Font License fails the build.
@@ -79,8 +79,8 @@ DoD: `node --test` and the web tests exit 0. Apply of $100 monthly shows interes
 
 Files: `.github/workflows/deploy-pages.yml`, `AGENTS.md`, `README.md`
 
-1. Add the workflow in requirement 18. No cron. The workflow's build sets `VITE_BASE=/compound/` and uploads that artifact. The default `./` build stays the one `vite preview` serves. Do not commit the build.
+1. Add the workflow in requirement 18. No cron. The workflow's build sets `VITE_BASE` from the repository name and uploads that artifact. The default `./` build stays the one `vite preview` serves. Do not commit the build.
 2. If Pages is still off, create it with the GitHub API as a workflow-built site. If that call fails, stop and tell the owner. Do not deploy somewhere else instead.
-3. After the merge to `main`, wait for the deploy run. Open `/compound/`, set the start month to October 2026, and confirm the monthly payment is $3,792.22. The phase is not done on a green pull-request job alone. Pull-request CI does not fetch the production URL, because that URL is what this merge publishes.
+3. After the merge to `main`, wait for the deploy run. Open the Pages site, set the start month to October 2026, and confirm the monthly payment is $3,792.22. The phase is not done on a green pull-request job alone. Pull-request CI does not fetch the production URL, because that URL is what this merge publishes.
 
 DoD: the workflow file has no `schedule` key. The deploy run on `main` is green. The production page shows $3,792.22 for the example loan with start month October 2026. `AGENTS.md` records the URL and `gh workflow run deploy-pages.yml`. A local `vite build` with `VITE_BASE` unset still uses base `./`.
