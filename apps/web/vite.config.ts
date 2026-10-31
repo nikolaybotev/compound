@@ -26,7 +26,7 @@ export default defineConfig({
   build: {
     target: "safari16",
     commonjsOptions: {
-      include: [/amortize\.js/, /node_modules/],
+      include: [/amortize\.js/, /apr\.js/, /node_modules/],
     },
   },
   test: {

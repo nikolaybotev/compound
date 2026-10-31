@@ -76,4 +76,4 @@ DoD: `node --test`, `pnpm --dir apps/web test`, and `pnpm --dir apps/web test:e2
 
 ### Build notes (Phase 2)
 
-<Added only after the phase lands.>
+Page prepaid finance charges use `pictureValues.lenderCreditCents` because closing lines omit lender credit. `loanAprSummary` and `prepaidFinanceChargeCentsForApr` live in `loan.ts` for unit tests. Version `0.23.0` / point version `0.23` from `apps/web/package.json` only.
