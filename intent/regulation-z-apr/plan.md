@@ -61,7 +61,7 @@ DoD: `node --test` exits 0. The skill file contains the AC7 sentences. `apps/web
 
 ### Build notes (Phase 1)
 
-<Added only after the phase lands.>
+Landed with ARM `--current-index` required whenever ARM mode is on (including when only that flag would trigger mode). Charge parsing rejects kinds outside requirement 2 before `classifyCharges`. `buildCliReport` is exported for tests.
 
 ## Phase 2 — Page
 
