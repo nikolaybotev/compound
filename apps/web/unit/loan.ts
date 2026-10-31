@@ -1044,6 +1044,32 @@ describe("loan scenarios storage and prevailing figures", () => {
     expect(loadScenario(storage, now).arm.evenYearly).toBe("nope");
   });
 
+  test("currentIndex round-trip on stored ARM scenarios", () => {
+    const storage = memoryStorage();
+    const scenario = freshConventional(now);
+    scenario.arm = defaultArm();
+    scenario.arm.enabled = true;
+    scenario.armStored = true;
+    expect(scenario.arm.currentIndex).toBe("");
+    saveScenario(storage, scenario);
+    let loaded = loadScenario(storage, now);
+    expect(loaded.arm.currentIndex).toBe("");
+    expect(loaded.armStored).toBe(true);
+
+    scenario.arm.currentIndex = "2.04";
+    saveScenario(storage, scenario);
+    loaded = loadScenario(storage, now);
+    expect(loaded.arm.currentIndex).toBe("2.04");
+
+    const set = { active: 0, scenarios: [scenario] };
+    expect(saveStored(storage, set)).toBe(true);
+    const setRaw = storage.getItem(storageSetKey(STORAGE_KEY));
+    expect(setRaw).toContain('"version":2');
+    const legacy = JSON.parse(storage.getItem(STORAGE_KEY)!);
+    expect(legacy.version).toBe(1);
+    expect(legacy.arm.currentIndex).toBe("2.04");
+  });
+
   test("missing storage returns one fresh scenario", () => {
     expect(loadStored(undefined, now).scenarios).toHaveLength(1);
   });

@@ -3,11 +3,14 @@ import { buildReport } from "../../../amortize.js";
 import {
   armFromStorage,
   armLabel,
+  armToStorage,
   defaultArm,
   dropIndexBeyond,
   formatPercentThousandths,
+  formatTeaserHint,
   parseArm,
   resetMonths,
+  teaserGap,
   toBuildReportArm,
   type ArmDraft,
   type ArmValues,
@@ -69,6 +72,52 @@ describe("ARM terms", () => {
     expect(armFromStorage({ ...base, evenMonth: 99 }).arm.evenMonth).toBe(1);
   });
 
+  test("armFromStorage loads currentIndex leniently", () => {
+    const base = { ...defaultArm(), enabled: true, open: true };
+    expect(armFromStorage({ ...base, currentIndex: 2 }).arm.currentIndex).toBe("");
+    expect(armFromStorage({ ...base, currentIndex: "2.04" }).arm.currentIndex).toBe("2.04");
+    expect(armFromStorage({ ...base }).arm.currentIndex).toBe("");
+    const loaded = armFromStorage({ ...base, currentIndex: "2" });
+    expect(loaded.stored).toBe(true);
+    expect(loaded.arm.margin).toBe("2.5");
+    expect(loaded.arm.index).toEqual([]);
+  });
+
+  test("teaserGap and formatTeaserHint", () => {
+    expect(teaserGap("2", 2500, 3000)).toEqual({
+      gapThousandths: 1500,
+      fullyThousandths: 4500,
+    });
+    expect(teaserGap("2", 2500, 4500)).toBeNull();
+    expect(teaserGap("2", 2500, 5000)).toBeNull();
+    expect(teaserGap("", 2500, 3000)).toBeNull();
+    expect(teaserGap("2.5555", 2500, 3000)).toBeNull();
+    expect(teaserGap("-1", 2500, 3000)).toBeNull();
+    expect(teaserGap("0", 2500, 2000)).toEqual({
+      gapThousandths: 500,
+      fullyThousandths: 2500,
+    });
+    expect(teaserGap("2.04", 2500, 4500)).toEqual({
+      gapThousandths: 40,
+      fullyThousandths: 4540,
+    });
+    expect(formatTeaserHint(1500, 4500)).toBe(
+      "1.5 points below the fully indexed rate of 4.5%",
+    );
+    expect(formatTeaserHint(1000, 2000)).toBe("1 point below the fully indexed rate of 2%");
+  });
+
+  test("armToStorage round-trips currentIndex", () => {
+    const draft = { ...defaultArm(), currentIndex: "2.04" };
+    expect(armToStorage(draft).currentIndex).toBe("2.04");
+  });
+
+  test("toBuildReportArm has no current-index field", () => {
+    const values = feValues({ currentIndex: "2" });
+    const arm = toBuildReportArm(values, []);
+    expect("currentIndex" in arm).toBe(false);
+  });
+
   test("defaults are the sheet's values", () => {
     expect(defaultArm()).toEqual({
       enabled: false,
@@ -85,6 +134,7 @@ describe("ARM terms", () => {
       index: [],
       evenYearly: "",
       evenMonth: 1,
+      currentIndex: "",
     });
   });
 
@@ -363,6 +413,7 @@ describe("ARM storage", () => {
         "roundEighth",
         "evenYearly",
         "evenMonth",
+        "currentIndex",
       ].sort(),
     );
     expect(loadScenario(storage, now)).toEqual(scenario);

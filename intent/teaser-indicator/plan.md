@@ -40,4 +40,6 @@ DoD: AC1–AC5. No change to `amortize.js`, the CLIs, skill wording, or `.github
 
 ### Build notes (Phase 0)
 
-<Added only after the phase lands.>
+- Added `teaserGap`, `teaserGapFromRetained`, `formatTeaserHint`, `retainedCurrentIndexThousandths`, and `currentIndexFieldInvalid` in `apps/web/src/arm.ts`; the heading uses `teaserGapFromRetained` on component state, not `teaserGap` on invalid live text.
+- Plan step 2 listed only `teaserGap` and `formatTeaserHint`; the extra exports are implementation helpers for the app and tests.
+- Landed: `currentIndex` on the ARM draft; `#arm-current-index` and `#teaser`; version `0.22.0`; unit tests in `apps/web/unit/arm.ts` and `apps/web/unit/loan.ts`; e2e `apps/web/e2e/teaser.spec.ts`; doc updates per spec requirement 7.

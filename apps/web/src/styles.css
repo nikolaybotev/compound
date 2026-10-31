@@ -386,6 +386,21 @@ dd {
   text-align: right;
 }
 
+.heading-line button.teaser-hint {
+  font-size: 0.72em;
+  font-family: var(--mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  border: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  text-align: left;
+  line-height: inherit;
+}
+
 .disclosure {
   margin: 0 0 1.25rem;
 }
