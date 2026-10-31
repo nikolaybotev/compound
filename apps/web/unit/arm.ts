@@ -80,6 +80,9 @@ describe("ARM terms", () => {
     const loaded = armFromStorage({ ...base, currentIndex: "2" });
     expect(loaded.stored).toBe(true);
     expect(loaded.arm.margin).toBe("2.5");
+    expect(loaded.arm.initialCap).toBe("5");
+    expect(loaded.arm.periodicCap).toBe("2");
+    expect(loaded.arm.lifetimeCap).toBe("5");
     expect(loaded.arm.index).toEqual([]);
   });
 
@@ -101,6 +104,7 @@ describe("ARM terms", () => {
       gapThousandths: 40,
       fullyThousandths: 4540,
     });
+    expect(teaserGap("1", Number.MAX_SAFE_INTEGER, 0)).toBeNull();
     expect(formatTeaserHint(1500, 4500)).toBe(
       "1.5 points below the fully indexed rate of 4.5%",
     );

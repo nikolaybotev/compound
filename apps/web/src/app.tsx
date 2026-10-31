@@ -1243,7 +1243,7 @@ export function App() {
               term={KNOWLEDGE_ENTRIES.noteRate}
               value={armDraft.currentIndex}
               suffix="%"
-              invalid={false}
+              invalid={currentIndexError}
               onInput={(value) => updateCurrentIndex(value)}
             />
             <Field
