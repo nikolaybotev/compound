@@ -45,7 +45,7 @@ DoD: `node --test` exits 0. `amortize.js` has no diff. `apps/web/package.json` s
 
 ### Build notes (Phase 0)
 
-<Added only after the phase lands.>
+Landed with `buildAprReport` options bag for optional original value, insurance months, odd days, ARM terms, and consummation index. Exported `withinTolerance`, `disclosedAprThousandths`, and `formatAprPercent` for the command-line phase. APR thousandths use bigint half-up on `monthlyRate * 12 * 100 * 1000` at 1e12 scale.
 
 ## Phase 1 — Command line and skill
 
