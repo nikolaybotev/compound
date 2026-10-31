@@ -72,7 +72,8 @@ DoD: AC4. `node --test` exits 0. `apps/web/package.json` is still `0.22.0`.
 
 ### Build notes (Phase 2)
 
-## Phase 3 — Page
+Skill AC6 assertions now expect `--recast-month` and parity flags instead of the two-run recast wording.
+
 
 Files: `apps/web/src/loan.ts`, `apps/web/src/picture.ts`, `apps/web/src/arm.ts`, `apps/web/src/tax.ts`, `apps/web/src/app.tsx`, `apps/web/src/styles.css`, the unit tests under `apps/web/unit/`, the Playwright tests under `apps/web/e2e/`, `apps/web/package.json`, `AGENTS.md`, `REVIEW.md`, `README.md`.
 
