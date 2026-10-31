@@ -58,6 +58,8 @@ DoD: `node --test` exits 0. AC2 and AC3. `apps/web/package.json` is still `0.22.
 
 ### Build notes (Phase 1)
 
+`armTermsOn` treats `--level` separately so a default `level: false` does not turn on ARM parsing. Schedule CSV and JSON digests changed; summary and JSON without `--schedule` stay pinned. The page unit test that shells the calculator expects `saved_by_extra` on the schedule. The page itself is unchanged.
+
 ## Phase 2 — Skill
 
 Files: `.agents/skills/mortgage-loan-calculator/SKILL.md`, and the skill assertions in `compound_interest_monthly.test.js` if they still require the two-run wording.

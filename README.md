@@ -37,8 +37,8 @@ node compound_interest_monthly.js --amount 570000 --rate 7 --years 30 --json --s
 
 - With no output flags, stdout is a short summary: monthly payment, payoff month, total interest, extra applied, extra unapplied, interest saved, and months saved. Money uses US grouping and two decimal places.
 - `--json` writes one JSON object and nothing else. Money fields are integer cents. The object always includes `months`, the payment count. It includes `years` only when the term was passed with `--years`. The object has no `schedule` key unless `--schedule` is also set.
-- `--json --schedule` adds `schedule`: one object per month from 1 through the no-extra payoff. With no extra principal, `extra_cents` and `interest_saved_cents` are 0.
-- `--schedule` alone prints a CSV of those same months and nothing else. The header is `month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved`.
+- `--json --schedule` adds `schedule`: one object per month from 1 through the no-extra payoff. With no extra principal, `extra_cents`, `interest_saved_cents`, and `saved_by_extra_cents` are 0.
+- `--schedule` alone prints a CSV of those same months and nothing else. The header is `month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved,saved_by_extra`.
 
 Reported amounts are rounded half up to the cent once, at output.
 
@@ -46,7 +46,7 @@ Reported amounts are rounded half up to the cent once, at output.
 
 `--extra` is an optional UTF-8 CSV. The header row is `month,extra`. Each data row is one extra principal payment. `month` is the payment number, from 1 through the payment count `n` (the `--months` value, or `--years` times 12). `extra` is a positive dollar amount. Rows for the same month are summed. A file with only the header is no extras. A month outside the term, a non-numeric or negative amount, or a missing column exits non-zero.
 
-The extra is applied after that month's interest, so it does not reduce the interest charged that month. The scheduled payment stays the same. Extra principal shortens the loan. Interest stops when the principal reaches zero. The schedule still lists the later months through the no-extra payoff, with interest, principal, extra, remaining principal, and remaining interest at zero. `interest_saved` on each row is cumulative: interest the no-extra loan has charged through that month, minus interest this loan has charged through that month. The last row matches the summary's interest saved.
+The extra is applied after that month's interest, so it does not reduce the interest charged that month. The scheduled payment stays the same. Extra principal shortens the loan. Interest stops when the principal reaches zero. The schedule still lists the later months through the no-extra payoff, with interest, principal, extra, remaining principal, and remaining interest at zero. `interest_saved` on each row is cumulative: interest the no-extra loan has charged through that month, minus interest this loan has charged through that month. The last row matches the summary's interest saved. `saved_by_extra` is the lifetime interest that month's own extra removes given the rest of the map. Adding that column up is not the interest saved.
 
 `fixtures/first-year-100.csv` is $100 of extra principal in each of months 1–12. On a $570,000 loan at 7% for 30 years, that saves $8,137.70 of interest and pays the loan off in month 358, two months early:
 
@@ -54,6 +54,18 @@ The extra is applied after that month's interest, so it does not reduce the inte
 node compound_interest_monthly.js --amount 570000 --rate 7 --years 30 \
   --extra fixtures/first-year-100.csv --json
 ```
+
+## Level extras, recast, dates, and housing
+
+`--level` rewrites the `--extra` map on an ARM so that, after the initial period, principal and interest plus extra matches that month's initial-period total, floored at zero. An omitted `--extra` file is an empty form map. On a fixed-rate loan the run stops.
+
+`--recast-month N` re-amortizes the unpaid principal after payment N over the payments left, at the same note rate, and appends the recast lines. `--json` adds `recast`. An ARM run stops instead of printing a recast payment.
+
+`--funding YYYY-MM` is the funding month. Payment 1 accrues the next calendar month and is due on the 1st of the month after that. The summary appends the payoff due date. The schedule adds `accrual`. The payment and the interest do not change. `--start` remains the even-out month.
+
+`--prevailing` prints prevailing principal and interest and prevailing extra. `--tax` and `--insurance` are annual percents of `--price`. `--pmi` is an annual percent of the loan amount. `--fico` uses the same PMI ladder as the page and needs a down payment. `--closing` prices the closing stack when its inputs are passed. A missing companion is named, and a rate that was not passed is left out.
+
+The design is [intent/library-cli-parity/](intent/library-cli-parity/intent.md).
 
 ## Adjustable-rate
 
@@ -82,7 +94,7 @@ That loan (the Example Credit Union 7/1 example in the docs) pays $3,371.77 for 
 | `--even-month N` | Calendar month 1–12 when the yearly extra lands. |
 | `--start MONTH` | Loan start month as `10` or `YYYY-MM` (only the month is used). Payment 1 is the next calendar month, the first month interest accrues, and that payment is due on the 1st of the following month. |
 
-`--amount`, `--rate`, a term, one fixed flag, `--adjust-months`, `--margin`, `--caps`, and `--floor` are required in ARM mode. A missing flag exits non-zero and names every missing flag. `--index`, `--initial-floor`, `--round-eighth`, `--even-yearly`, `--even-month`, or `--start` without the required flags is the same error. Without any ARM flag nothing changes: the fixed-rate output is byte for byte what it was. A positive `--even-yearly` also requires `--even-month` and `--start`. `--even-month` or `--start` without `--even-yearly` names `--even-yearly`.
+`--amount`, `--rate`, a term, one fixed flag, `--adjust-months`, `--margin`, `--caps`, and `--floor` are required in ARM mode. A missing flag exits non-zero and names every missing flag. `--index`, `--initial-floor`, `--round-eighth`, `--even-yearly`, `--even-month`, or `--start` without the required flags is the same error. Without any ARM flag the human summary, and `--json` without `--schedule`, stay byte for byte what they were. A positive `--even-yearly` also requires `--even-month` and a calendar month from `--start`, or from `--funding` when `--start` is omitted. `--even-month` or `--start` without `--even-yearly` names `--even-yearly`.
 
 **Worst case.** With no index, the first reset moves the rate up by the initial cap and every later reset moves it up by the periodic cap, each time stopping at the ceiling. On 5/2/5 from 5.875% the first reset is 10.875% and every later reset stays there. On 2/2/5 the resets are 7.875%, 9.875%, 10.875%.
 
@@ -92,7 +104,7 @@ That loan (the Example Credit Union 7/1 example in the docs) pays $3,371.77 for 
 
 `--json` adds `arm`: `fixed_months`, `adjust_months`, `margin_percent`, `initial_cap_percent`, `periodic_cap_percent`, `lifetime_cap_percent`, `floor_percent`, `initial_floor_percent`, `ceiling_percent`, `round_eighth`, `max_rate_percent`, `max_rate_month`, `max_payment_cents`, `max_payment_month`, and `adjustments` (`month`, `index_percent`, `fully_indexed_percent`, `rate_percent`, `payment_cents` for every reset through the payoff month). `monthly_payment_cents` and `rate_percent` stay the initial payment and the initial rate. With `--schedule`, each row also has `rate_percent`, `payment_cents`, and `index_percent`.
 
-`--schedule` alone prints a ten-column CSV: `month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved,rate,payment,index`. Money columns have two decimals and no grouping. `rate` and `index` print as percents with trailing zeros removed (`5.875`, `6.92`), and `index` is empty when none was given.
+`--schedule` alone prints `month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved,saved_by_extra,rate,payment,index`. Money columns have two decimals and no grouping. `rate` and `index` print as percents with trailing zeros removed (`5.875`, `6.92`), and `index` is empty when none was given.
 
 The design is [intent/arm-loan/](intent/arm-loan/intent.md). An ARM is not covered by `origination_fees.js` or by the recast procedure.
 

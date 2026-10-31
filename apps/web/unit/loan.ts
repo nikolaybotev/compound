@@ -234,7 +234,7 @@ describe("saved by extra", () => {
 });
 
 describe("CLI contract", () => {
-  test("AC5 json schedule keys and CSV header are unchanged", () => {
+  test("AC5 json schedule includes saved_by_extra and no arm fields", () => {
     const json = JSON.parse(
       execSync(
         "node compound_interest_monthly.js --amount 570000 --rate 7 --years 30 --json --schedule",
@@ -249,13 +249,14 @@ describe("CLI contract", () => {
       "principal_cents",
       "remaining_interest_cents",
       "remaining_principal_cents",
+      "saved_by_extra_cents",
     ]);
     const csv = execSync(
       "node compound_interest_monthly.js --amount 570000 --rate 7 --years 30 --schedule",
       { cwd: repoRoot, encoding: "utf8" },
     );
     expect(csv.trim().split("\n")[0]).toBe(
-      "month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved",
+      "month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved,saved_by_extra",
     );
   });
 });

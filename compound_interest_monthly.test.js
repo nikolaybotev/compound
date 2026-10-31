@@ -102,12 +102,13 @@ test('AC2 $570,000 at 7% for 30 years, no extras', () => {
   const lines = csv.stdout.trim().split('\n');
   assert.equal(
     lines[0],
-    'month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved',
+    'month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved,saved_by_extra',
   );
   assert.equal(lines.length, 361);
   assert.equal(lines[1].split(',')[1], '3325.00');
   assert.equal(lines[1].split(',')[5], '0.00');
   assert.equal(lines[1].split(',')[6], '0.00');
+  assert.equal(lines[1].split(',')[7], '0.00');
 });
 
 test('AC5 no arguments exit non-zero and do not run the gist loan', () => {
@@ -291,7 +292,7 @@ test('AC8 schedule rows for the first-year $100 extra', () => {
   const lines = csv.stdout.trim().split('\n');
   assert.equal(
     lines[0],
-    'month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved',
+    'month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved,saved_by_extra',
   );
   assert.equal(lines.length, 361);
   const cells = (line) => line.split(',');
@@ -534,14 +535,15 @@ test('arm-loan AC1 the fixed-rate summary, JSON, and CSV are byte-identical', ()
   const csv = run([...base, '--schedule']);
   assert.equal(csv.status, 0);
   assert.equal(csv.stdout.split('\n')[0],
-    'month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved');
-  assert.equal(sha256(csv.stdout), 'd3129f7e97827934a05d350a599c3b375c2296a604ca0ec076ff2c3920cea620');
+    'month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved,saved_by_extra');
+  assert.equal(sha256(csv.stdout), '4a26679f618341979988166ad319cf2f64020b1447cbf488ff43dc415e60b30f');
 
   const json = run([...base, '--json', '--schedule']);
   assert.equal(json.status, 0);
-  assert.equal(sha256(json.stdout), '8a214dc5815a70c16721113f23c186b90340d7ec633c017209f1915860819292');
+  assert.equal(sha256(json.stdout), '5faf989f76d28a5c97cd9e194db427e0981699c0e3a1db4f251ebb2ff34db10b');
   const parsed = JSON.parse(json.stdout);
   assert.equal('arm' in parsed, false);
+  assert.equal(parsed.schedule[0].saved_by_extra_cents, 0);
   assert.equal('rate_percent' in parsed.schedule[0], false);
 });
 
@@ -615,14 +617,14 @@ test('arm-loan AC6 --schedule prints the ten-column header and formatted columns
   const lines = result.stdout.trimEnd().split('\n');
   assert.equal(lines.length, 361);
   assert.equal(lines[0],
-    'month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved,rate,payment,index');
-  assert.equal(lines[84], '84,2500.14,871.62,509796.12,880611.93,0.00,0.00,5.875,3371.77,');
-  assert.equal(lines[85], '85,4620.03,417.68,509378.44,875991.90,0.00,0.00,10.875,5037.71,');
+    'month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved,saved_by_extra,rate,payment,index');
+  assert.equal(lines[84], '84,2500.14,871.62,509796.12,880611.93,0.00,0.00,0.00,5.875,3371.77,');
+  assert.equal(lines[85], '85,4620.03,417.68,509378.44,875991.90,0.00,0.00,0.00,10.875,5037.71,');
 
   const indexed = run([...feArgs, '--index', indexFixture, '--schedule']);
   assert.equal(indexed.status, 0, indexed.stderr);
   const row = indexed.stdout.trimEnd().split('\n')[85];
-  assert.match(row, /,6\.92,3695\.72,4\.42$/);
+  assert.match(row, /,0\.00,6\.92,3695\.72,4\.42$/);
 });
 
 test('arm-loan AC6 the index fixture reproduces F5', () => {
@@ -863,7 +865,7 @@ test('arm-loan AC7 REVIEW.md, AGENTS.md, and README.md carry the ARM items', () 
     assert.ok(readme.includes(flag), `README missing ${flag}`);
   }
   assert.ok(readme.includes('month,index'));
-  assert.ok(readme.includes('month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved,rate,payment,index'));
+  assert.ok(readme.includes('month,interest,principal,remaining_principal,remaining_interest,extra,interest_saved,saved_by_extra,rate,payment,index'));
 });
 
 test('arm-loan the skill symlink still resolves to the calculator', () => {
@@ -1046,6 +1048,41 @@ test('arm-adjustment-stats AC1 F1 through F10 and validation on buildReport', ()
     startMonth: 13,
   });
   assert.equal(zeroMonths.arm.monthly_extra_cents, 82321);
+});
+
+test('library-cli-parity AC2 summary and json without schedule stay pinned', () => {
+  const base = ['--amount', '570000', '--rate', '7', '--years', '30'];
+  const json = run([...base, '--json']);
+  assert.equal(json.status, 0);
+  assert.equal(sha256(json.stdout), '7c59cdf637313c70c13a5735b1ef6c6f365e8a260ac311df4eee2ecb6bb45108');
+});
+
+test('library-cli-parity level and recast flags', () => {
+  assert.match(failure(['--amount', '570000', '--rate', '7', '--years', '30', '--level']), /level extras require an ARM/);
+  const armRecast = failure([
+    ...feArgs, '--recast-month', '24',
+  ]);
+  assert.match(armRecast, /a recast is for a fixed rate/);
+  withCsv(buildRecastSampleExtraCsv(), (file) => {
+    const recast = jsonRun([
+      '--amount', '570000', '--rate', '7.375', '--years', '30',
+      '--extra', file, '--recast-month', '24', '--json',
+    ]);
+    assert.equal(recast.recast.monthly_payment_cents, 319568);
+  });
+});
+
+test('library-cli-parity funding and picture flags', () => {
+  const funded = jsonRun(['--amount', '570000', '--rate', '7', '--years', '30', '--funding', '2026-10', '--json']);
+  assert.equal(funded.payoff_date, 'November 1, 2056 (30 years)');
+  assert.equal(funded.monthly_payment_cents, 379222);
+  const csv = run(['--amount', '570000', '--rate', '7', '--years', '30', '--funding', '2026-10', '--schedule']);
+  assert.equal(csv.stdout.split('\n')[0].split(',')[1], 'accrual');
+  assert.equal(csv.stdout.split('\n')[1].split(',')[1], '2026-11');
+
+  const tax = jsonRun(['--amount', '570000', '--rate', '7', '--years', '30', '--tax', '1.15', '--price', '600000', '--json']);
+  assert.equal(tax.picture.property_tax_cents, 57500);
+  assert.equal('insurance_cents' in tax.picture, false);
 });
 
 const expectedEvenOutGridCents = require('./fixtures/even-out-grid-expected-cents');
