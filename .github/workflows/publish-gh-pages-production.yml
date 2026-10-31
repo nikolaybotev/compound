@@ -1,8 +1,10 @@
 name: publish-gh-pages-production
 
 # Commits production root files onto orphan gh-pages. Live traffic is published
-# by deploy-gh-pages-branch.yml (workflow_dispatch), including after each push
-# here. Does not build, copy, update, or delete prototype/ or feat/.
+# by deploy-gh-pages-branch.yml (workflow_dispatch). Every push to main
+# dispatches that workflow after publish, with this workflow's GITHUB_TOKEN,
+# whether or not the gh-pages tree changed. Does not build, copy, update, or
+# delete prototype/ or feat/.
 # deploy-pages.yml is manual rollback only. Tags a production gh-pages
 # commit with PAGES_POINT_VERSION when that tag is not already on the remote.
 
@@ -100,20 +102,9 @@ jobs:
           MSG="Production publish from main ${{ github.sha }}"
           bash main/.github/scripts/gh-pages-publish.sh production "${MSG}" "${GITHUB_WORKSPACE}/staging"
 
-      - name: Bootstrap deploy when deploy workflow changes on main
-        id: bootstrap_deploy
-        if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
-        working-directory: main
-        run: |
-          set -euo pipefail
-          if git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" \
-            | grep -qF '.github/workflows/deploy-gh-pages-branch.yml'; then
-            echo "force=1" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Deploy gh-pages tree to GitHub Pages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_PAGES_PUSH_MARKER: ${{ runner.temp }}/gh-pages-pushed
-          FORCE_GH_PAGES_DEPLOY: ${{ steps.bootstrap_deploy.outputs.force == '1' || (github.event_name == 'workflow_dispatch' && inputs.deploy_gh_pages) && '1' || '' }}
+          FORCE_GH_PAGES_DEPLOY: ${{ (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_gh_pages)) && '1' || '' }}
         run: bash main/.github/scripts/dispatch-deploy-gh-pages-branch.sh
