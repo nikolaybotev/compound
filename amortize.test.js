@@ -4,7 +4,8 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const test = require('node:test');
-const { buildReport } = require('./amortize.js');
+const { buildReport, levelArmExtras, recastFixed, savedByExtraCents, savedByExtraByMonth, modalPaymentCents, prevailingExtraCents } = require('./amortize.js');
+const { paymentDate } = require('./calendar.js');
 
 function digest(report) {
   return crypto.createHash('sha256').update(JSON.stringify(report)).digest('hex');
@@ -412,4 +413,86 @@ test('max payment month is 1 when no reset payment exceeds the initial payment',
   assert.equal(report.arm.max_payment_cents, 337177);
   assert.equal(report.arm.max_rate_month, 1);
   assert.equal(report.arm.max_rate_percent, 5.875);
+});
+
+function buildPrefillMap(monthCount, startMonth, monthly, yearly, yearlyMonth) {
+  const extras = new Map();
+  for (let month = 1; month <= monthCount; month += 1) {
+    const date = paymentDate(startMonth, month);
+    const amount = monthly + (date.month === yearlyMonth ? yearly : 0);
+    if (amount > 0) extras.set(month, amount);
+  }
+  return extras;
+}
+
+function recastSampleExtras() {
+  const map = new Map();
+  for (let month = 1; month <= 360; month += 1) map.set(month, 2400);
+  for (let month = 5; month <= 360; month += 12) {
+    map.set(month, map.get(month) + 20000);
+  }
+  return map;
+}
+
+test('library-cli recastFixed sample cents', () => {
+  const recast = recastFixed(570000, 7.375, 360, recastSampleExtras(), 24);
+  assert.equal(recast.remaining_principal_cents, 45361449);
+  assert.equal(recast.months, 336);
+  assert.equal(recast.monthly_payment_cents, 319568);
+  assert.equal(recast.interest_cents, 62013361);
+  assert.equal(recast.interest_through_cents, 7569885);
+  assert.equal(recast.lifetime_interest_cents, 69583246);
+});
+
+test('library-cli saved by extra fixed loan', () => {
+  const extras = firstYearExtras();
+  const report = buildReport(570000, 7, 360, extras);
+  const column = savedByExtraByMonth(570000, 7, 360, extras);
+  assert.equal(column[0], 69761);
+  assert.equal(column[11], 64818);
+  assert.equal(column[12], 0);
+  assert.equal(column.reduce((a, b) => a + b, 0), 807188);
+  assert.equal(report.schedule[359].interest_saved_cents, 813770);
+  assert.equal(
+    savedByExtraCents(570000, 7, 360, extras, 1, report.interest_cents),
+    69761,
+  );
+});
+
+test('library-cli saved by extra ARM loan', () => {
+  const extras = firstYearExtras();
+  const report = feReport({}, extras);
+  assert.equal(savedByExtraCents(570000, 5.875, 360, extras, 1, report.interest_cents, fe()), 30907);
+  assert.equal(savedByExtraCents(570000, 5.875, 360, extras, 13, report.interest_cents, fe()), 0);
+  assert.equal(report.interest_saved_cents, 357936);
+});
+
+test('library-cli levelArmExtras F2', () => {
+  const arm = fe();
+  const form = buildPrefillMap(360, '2026-10', 100, 250, 1);
+  const extras = levelArmExtras(570000, 5.875, 360, arm, form, 1, new Map());
+  assert.equal(extras.get(1), 100);
+  assert.equal(extras.get(3), 350);
+  assert.equal(extras.get(84), 100);
+  assert.equal(extras.has(85), false);
+  const report = buildReport(570000, 5.875, 360, extras, undefined, arm);
+  assert.equal(report.interest_cents, 107954472);
+  assert.equal(report.monthly_payment_cents, 337177);
+});
+
+test('library-cli levelArmExtras requires ARM', () => {
+  assert.throws(
+    () => levelArmExtras(570000, 7, 360, undefined, new Map(), 1, new Map()),
+    /level extras require an ARM/,
+  );
+});
+
+test('library-cli prevailing and modal payment', () => {
+  const fixed = buildReport(570000, 7, 360, new Map());
+  assert.equal(modalPaymentCents(fixed), fixed.monthly_payment_cents);
+  assert.equal(prevailingExtraCents(fixed), 0);
+  const allExtras = new Map();
+  for (let month = 1; month <= 360; month += 1) allExtras.set(month, 100);
+  const withExtra = buildReport(570000, 7, 360, allExtras);
+  assert.equal(prevailingExtraCents(withExtra), 10000);
 });
