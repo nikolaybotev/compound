@@ -50,7 +50,7 @@ function feLoan(): Loan {
 }
 
 function feValues(overrides: Partial<ArmDraft> = {}): ArmValues {
-  const parsed = parseArm({ ...defaultArm(), ...overrides }, 30, 5875);
+  const parsed = parseArm({ ...defaultArm(), ...overrides }, 360, 5875);
   if (!parsed.ok) throw new Error(parsed.message);
   return parsed.values;
 }
@@ -126,7 +126,9 @@ describe("ARM terms", () => {
     expect(defaultArm()).toEqual({
       enabled: false,
       open: false,
+      fixedUnit: "years",
       fixedYears: "7",
+      initialMonths: "",
       adjustMonths: "12",
       margin: "2.5",
       initialCap: "5",
@@ -159,36 +161,36 @@ describe("ARM terms", () => {
   test("margin and each cap may be zero", () => {
     const parsed = parseArm(
       { ...defaultArm(), margin: "0", initialCap: "0", periodicCap: "0", lifetimeCap: "0" },
-      30,
+      360,
       5875,
     );
     expect(parsed.ok).toBe(true);
   });
 
   test("a floor of 0 is reported on the floor field", () => {
-    const parsed = parseArm({ ...defaultArm(), floor: "0" }, 30, 5875);
+    const parsed = parseArm({ ...defaultArm(), floor: "0" }, 360, 5875);
     expect(parsed).toMatchObject({ ok: false, field: "floor" });
-    const first = parseArm({ ...defaultArm(), initialFloor: "0" }, 30, 5875);
+    const first = parseArm({ ...defaultArm(), initialFloor: "0" }, 360, 5875);
     expect(first).toMatchObject({ ok: false, field: "initialFloor" });
   });
 
   test("a floor above the ceiling is reported on the floor field", () => {
-    const parsed = parseArm({ ...defaultArm(), floor: "11" }, 30, 5875);
+    const parsed = parseArm({ ...defaultArm(), floor: "11" }, 360, 5875);
     expect(parsed).toMatchObject({ ok: false, field: "floor" });
     expect(parsed.ok ? "" : parsed.message).toContain("10.875%");
-    expect(parseArm({ ...defaultArm(), floor: "10.875" }, 30, 5875).ok).toBe(true);
+    expect(parseArm({ ...defaultArm(), floor: "10.875" }, 360, 5875).ok).toBe(true);
   });
 
   test("a rate edit that drops the ceiling under a floor reports the floor", () => {
-    const parsed = parseArm({ ...defaultArm(), lifetimeCap: "1", floor: "7" }, 30, 5875);
+    const parsed = parseArm({ ...defaultArm(), lifetimeCap: "1", floor: "7" }, 360, 5875);
     expect(parsed).toMatchObject({ ok: false, field: "floor" });
-    expect(parseArm({ ...defaultArm(), floor: "7.5" }, 30, 2000)).toMatchObject({ ok: false, field: "floor" });
+    expect(parseArm({ ...defaultArm(), floor: "7.5" }, 360, 2000)).toMatchObject({ ok: false, field: "floor" });
   });
 
   test("the fixed period must be shorter than the term", () => {
-    expect(parseArm(defaultArm(), 7, 5875)).toMatchObject({ ok: false, field: "fixedYears" });
-    expect(parseArm(defaultArm(), 8, 5875).ok).toBe(true);
-    expect(parseArm({ ...defaultArm(), fixedYears: "0" }, 30, 5875)).toMatchObject({
+    expect(parseArm(defaultArm(), 84, 5875)).toMatchObject({ ok: false, field: "fixedYears" });
+    expect(parseArm(defaultArm(), 96, 5875).ok).toBe(true);
+    expect(parseArm({ ...defaultArm(), fixedYears: "0" }, 360, 5875)).toMatchObject({
       ok: false,
       field: "fixedYears",
     });
@@ -207,18 +209,19 @@ describe("ARM terms", () => {
       ["floor", "x"],
       ["initialFloor", ""],
     ] as const) {
-      const parsed = parseArm({ ...defaultArm(), [field]: value }, 30, 5875);
+      const parsed = parseArm({ ...defaultArm(), [field]: value }, 360, 5875);
       expect(parsed, `${field}=${value}`).toMatchObject({ ok: false, field });
     }
   });
 
   test("the structure label", () => {
-    expect(armLabel(7, 12)).toBe("7/1");
-    expect(armLabel(7, 6)).toBe("7/6");
-    expect(armLabel(10, 12)).toBe("10/1");
-    expect(armLabel(7, 1)).toBe("7/1mo");
-    expect(armLabel(7, 1)).not.toBe("7/1");
-    expect(armLabel(5, 3)).toBe("5/3mo");
+    expect(armLabel(84, 12)).toBe("7/1");
+    expect(armLabel(84, 6)).toBe("7/6");
+    expect(armLabel(120, 12)).toBe("10/1");
+    expect(armLabel(84, 1)).toBe("7/1mo");
+    expect(armLabel(84, 1)).not.toBe("7/1");
+    expect(armLabel(60, 3)).toBe("5/3mo");
+    expect(armLabel(18, 12)).toBe("18mo/12mo");
   });
 
   test("percent thousandths print with trailing zeros removed", () => {
@@ -405,7 +408,9 @@ describe("ARM storage", () => {
       [
         "adjustMonths",
         "enabled",
+        "fixedUnit",
         "fixedYears",
+        "initialMonths",
         "floor",
         "index",
         "initialCap",

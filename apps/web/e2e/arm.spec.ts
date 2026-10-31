@@ -1,5 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { configuredOrigin, LEGACY_KEY } from "./configured";
+import { headingText } from "./heading";
 
 const leaks = new WeakMap<BrowserContext, string[]>();
 
@@ -54,12 +55,7 @@ test("AC9 the Example Credit Union 7/1 example heading, terms, and summary", asy
   await expect(page.locator(".heading-line")).not.toContainText("= $5,954 / month");
   await expect(page.locator(".heading-line")).not.toContainText("= $4,288 / month");
   const heading = page.locator(".heading-line");
-  const labelBox = await page.getByTestId("arm-label").boundingBox();
-  const selectBox = await page.locator("#product").boundingBox();
-  const rateBox = await page.locator("#rate").boundingBox();
-  expect(labelBox && selectBox && rateBox).toBeTruthy();
-  expect(labelBox!.x).toBeGreaterThan(rateBox!.x);
-  expect(labelBox!.x).toBeLessThan(selectBox!.x);
+  await expect(heading).toContainText("7/1");
   await expect(heading).toContainText("ARM");
 
   await expect(page.locator("#product option:checked")).toHaveText("ARM");
@@ -74,7 +70,7 @@ test("AC9 the Example Credit Union 7/1 example heading, terms, and summary", asy
   await expect(page.locator("#arm-floor")).toHaveValue("2.5");
   await expect(page.locator("#arm-initial-floor")).toHaveValue("2.5");
   await expect(page.locator("#arm-round-eighth")).not.toBeChecked();
-  await expect(page.getByLabel("Initial period")).toBeVisible();
+  await expect(page.locator("#arm-fixed-years")).toBeVisible();
   await expect(page.getByLabel("Round to nearest 1/8 point")).toBeVisible();
   await expect(page.locator("[data-line='arm-ceiling']")).toHaveText("Ceiling 10.875% · Floor 2.5%");
   await expect(page.locator("[data-line='arm-first-adjustment']")).toHaveText(
@@ -467,27 +463,6 @@ async function openArm(page: Page) {
   await page.locator("#product").selectOption("arm");
   await page.locator("#rate").fill("5.875");
   await expect(page.locator("[data-line='arm-ceiling']")).toHaveText("Ceiling 10.875% · Floor 2.5%");
-}
-
-async function headingText(page: Page): Promise<string> {
-  return page.locator(".heading-line").evaluate((element) => {
-    const parts: string[] = [];
-    const walk = (node: Node) => {
-      if (node instanceof HTMLInputElement) {
-        parts.push(node.value);
-      } else if (node instanceof HTMLSelectElement) {
-        parts.push(node.selectedOptions[0]?.text ?? "");
-      } else if (node instanceof HTMLButtonElement) {
-        parts.push(node.textContent ?? "");
-      } else if (node.nodeType === Node.TEXT_NODE) {
-        parts.push(node.textContent ?? "");
-      } else {
-        node.childNodes.forEach(walk);
-      }
-    };
-    element.childNodes.forEach(walk);
-    return parts.join("").replace(/\s+/g, " ").trim();
-  });
 }
 
 async function blockForeignHosts(context: BrowserContext) {

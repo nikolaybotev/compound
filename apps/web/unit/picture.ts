@@ -60,7 +60,15 @@ function linesFor(draft: {
   const years = draft.years ?? "30";
   const rate = draft.rate ?? "7.375";
   const start = draft.start ?? START;
-  const parsed = parseLoan({ price, down, years, rate, start });
+  const parsed = parseLoan({
+    price,
+    down,
+    termUnit: "years",
+    years,
+    months: "",
+    rate,
+    start,
+  });
   if (!parsed.ok) throw new Error("loan must parse");
   let pictureDraft = draft.picture ?? defaultPicture();
   if (draft.down !== undefined && draft.picture === undefined) {

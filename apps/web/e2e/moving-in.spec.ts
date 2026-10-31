@@ -21,7 +21,8 @@ test("AC5 Moving in on the fresh loan", async ({ page }) => {
     const tags: string[] = [];
     for (const child of main.children) {
       if (child.matches("details")) {
-        tags.push(child.querySelector("summary")?.textContent?.trim() ?? "details");
+        const label = child.querySelector("summary")?.textContent?.trim() ?? "details";
+        tags.push(label);
       } else if (child.matches("section.summary")) {
         tags.push("Loan summary");
       } else if (child.matches(".chart")) {
@@ -39,7 +40,8 @@ test("AC5 Moving in on the fresh loan", async ({ page }) => {
   expect(order.indexOf("Loan summary")).toBeLessThan(order.indexOf("Chart"));
   expect(order.indexOf("Chart")).toBeLessThan(closing);
   expect(movingIndex).toBe(closing + 1);
-  expect(order.indexOf("Schedule")).toBe(movingIndex + 1);
+  expect(order.indexOf("Recast")).toBe(movingIndex + 1);
+  expect(order.indexOf("Schedule")).toBe(movingIndex + 2);
 
   const summary = page.locator("summary", { hasText: "Moving in" });
   await expect(summary).toHaveAttribute("aria-expanded", "false");
