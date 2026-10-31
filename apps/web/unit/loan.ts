@@ -422,7 +422,9 @@ describe("saved loan inputs", () => {
     scenario.draft = {
       price: "712500",
       down: "20",
+      termUnit: "years",
       years: "15",
+      months: "",
       rate: "6.5",
       start: "2024-03",
       fico: "780",
@@ -459,7 +461,9 @@ describe("saved loan inputs", () => {
     expect(loaded.draft).toEqual({
       price: "570000",
       down: "0",
+      termUnit: "years",
       years: "30",
+      months: "",
       rate: "7",
       start: "2026-10",
       fico: "780",
@@ -577,7 +581,7 @@ function loanForLevelExtras(scenario: ReturnType<typeof defaultScenario>): Loan 
   const parsed = parseLoan(scenario.draft);
   if (!parsed.ok) throw new Error("loan must parse");
   const rateThousandths = Math.round(parsed.loan.ratePercent * 1000);
-  const armParsed = parseArm(scenario.arm, parsed.loan.years, rateThousandths);
+  const armParsed = parseArm(scenario.arm, parsed.loan.monthCount, rateThousandths);
   if (!armParsed.ok) throw new Error("arm must parse");
   return {
     ...parsed.loan,

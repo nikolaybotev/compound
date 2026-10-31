@@ -1,6 +1,7 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { configuredOrigin, LEGACY_KEY, SET_KEY } from "./configured";
 import { setStartMonth } from "./start-month";
+import { headingText } from "./heading";
 
 const leaks = new WeakMap<BrowserContext, string[]>();
 
@@ -279,29 +280,6 @@ async function applyMonthly(page: Page, amount: string) {
 
 function extra(page: Page, month: number) {
   return page.locator(`[aria-label="Extra payment for month ${month}"]`);
-}
-
-async function headingText(page: Page): Promise<string> {
-  return page.locator(".heading-line").evaluate((element) => {
-    const parts: string[] = [];
-    const walk = (node: Node) => {
-      if (node instanceof HTMLInputElement) {
-        parts.push(node.value);
-      } else if (node instanceof HTMLSelectElement) {
-        parts.push(node.selectedOptions[0]?.text ?? "");
-      } else if (node instanceof HTMLButtonElement && node.id === "start") {
-        parts.push(node.textContent?.trim() ?? "");
-      } else if (node instanceof HTMLButtonElement) {
-        return;
-      } else if (node.nodeType === Node.TEXT_NODE) {
-        parts.push(node.textContent ?? "");
-      } else {
-        node.childNodes.forEach(walk);
-      }
-    };
-    element.childNodes.forEach(walk);
-    return parts.join("").replace(/\s+/g, " ").trim();
-  });
 }
 
 async function blockForeignHosts(context: BrowserContext) {

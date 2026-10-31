@@ -283,7 +283,9 @@ describe("tax table", () => {
     expect(defaultDraft(now)).toEqual({
       price: "600000",
       down: "5",
+      termUnit: "years",
       years: "30",
+      months: "",
       rate: "7.375",
       start: "2026-10",
       fico: "780",

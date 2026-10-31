@@ -222,7 +222,7 @@ function pmiDropoff(input: TaxTableInput): {
   const noExtra = loanReport(input.loan, new Map(), input.financedCents);
   const scheduled80 = firstAtOrUnder(noExtra, threshold80);
   const scheduled78 = firstAtOrUnder(noExtra, threshold78);
-  const termMonths = input.loan.years * 12;
+  const termMonths = input.loan.monthCount;
   const midpoint = midpointPayment(termMonths);
   let extra80: number | null = null;
   if (input.appliedExtras.size > 0) {

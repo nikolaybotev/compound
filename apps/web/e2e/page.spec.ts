@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { configuredOrigin } from "./configured";
+import { headingText } from "./heading";
 import { setStartMonth } from "./start-month";
 
 const leaks = new WeakMap<BrowserContext, string[]>();
@@ -347,28 +348,6 @@ async function openExample(page: Page) {
 
 async function scrollChartToTop(page: Page) {
   await page.getByTestId("chart").evaluate((element) => element.scrollIntoView());
-}
-
-async function headingText(page: Page): Promise<string> {
-  return page.locator(".heading-line").evaluate((element) => {
-    const parts: string[] = [];
-    const walk = (node: Node) => {
-      if (node instanceof HTMLInputElement) {
-        parts.push(node.value);
-      } else if (node instanceof HTMLSelectElement) {
-        parts.push(node.options[node.selectedIndex]?.text ?? "");
-      } else if (node instanceof HTMLButtonElement && node.id === "start") {
-        parts.push(node.textContent?.trim() ?? "");
-      } else if (node.nodeType === Node.TEXT_NODE) {
-        const text = node.textContent?.replace(/\s+/g, " ") ?? "";
-        if (text.trim()) parts.push(text);
-      } else {
-        node.childNodes.forEach(walk);
-      }
-    };
-    element.childNodes.forEach(walk);
-    return parts.join("").replace(/\s+/g, " ").trim();
-  });
 }
 
 async function indicateMonth(page: Page, month: number) {

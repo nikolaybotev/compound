@@ -19,7 +19,7 @@ function requirement8Loan(index: ArmIndexEntry[] = []): Loan {
     start: "2026-10",
   });
   if (!parsed.ok) throw new Error("loan must parse");
-  const armParsed = parseArm(defaultArm(), 30, 5875);
+  const armParsed = parseArm(defaultArm(), 360, 5875);
   if (!armParsed.ok) throw new Error("arm must parse");
   return {
     ...parsed.loan,

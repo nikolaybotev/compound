@@ -3,8 +3,19 @@ import {
   dollarsToCents,
   formatGroupedCents,
   formatPlainCents,
+  levelArmExtras as libraryLevelArmExtras,
+  modalPaymentCents as libraryModalPaymentCents,
+  prevailingExtraCents as libraryPrevailingExtraCents,
+  recastFixed,
+  savedByExtraCents as librarySavedByExtraCents,
   type Report,
 } from "../../../amortize.js";
+import {
+  paymentDate as calendarPaymentDate,
+  dueDate as calendarDueDate,
+  yearsAndMonths as calendarYearsAndMonths,
+  formatPayoffDate as calendarFormatPayoffDate,
+} from "../../../calendar.js";
 import {
   armFromStorage,
   armToStorage,
@@ -88,18 +99,23 @@ export type StoredSet = {
 export type LoanDraft = {
   price: string;
   down: string;
+  termUnit: "years" | "months";
   years: string;
+  months: string;
   rate: string;
   start: string;
   fico: string;
 };
+
+export type TermUnit = LoanDraft["termUnit"];
 
 export type LoanField = keyof LoanDraft | "loan";
 
 export type Loan = {
   priceCents: number;
   loanCents: number;
-  years: number;
+  monthCount: number;
+  termYears?: number;
   ratePercent: number;
   startMonth: string;
   arm?: LoanArm;
@@ -150,7 +166,8 @@ export const THOUSANDS_MESSAGE =
   "Purchase price must be thousands of dollars greater than zero, with at most five decimal places.";
 const DOWN_MESSAGE =
   "Down payment must be a percent greater than or equal to zero and less than 100, with at most three decimal places.";
-const TERM_MESSAGE = "Term must be a positive whole number of years.";
+const TERM_YEARS_MESSAGE = "Term must be a positive whole number of years.";
+const TERM_MONTHS_MESSAGE = "Term must be a positive whole number of months.";
 const RATE_MESSAGE =
   "Interest must be a percent greater than zero, with at most three decimal places.";
 const START_MESSAGE = "Start month must be a month and a year.";
@@ -165,7 +182,9 @@ export function defaultDraft(now = new Date()): LoanDraft {
   return {
     price: "600000",
     down: "5",
+    termUnit: "years",
     years: "30",
+    months: "",
     rate: "7.375",
     start: currentStartMonth(now),
     fico: "780",
@@ -231,7 +250,9 @@ export function downPaymentCents(priceCents: number, thousandths: number): numbe
 export function parseLoan(draft: LoanDraft): ParseResult {
   const price = draft.price.trim();
   const down = draft.down.trim();
-  const yearsText = draft.years.trim();
+  const yearsText = (draft.years ?? "").trim();
+  const monthsText = (draft.months ?? "").trim();
+  const termUnit = draft.termUnit === "months" ? "months" : "years";
   const rateText = draft.rate.trim();
   const start = draft.start.trim();
 
@@ -253,12 +274,25 @@ export function parseLoan(draft: LoanDraft): ParseResult {
     return { ok: false, field: "down", message: DOWN_MESSAGE };
   }
 
-  if (!/^[1-9]\d*$/.test(yearsText)) {
-    return { ok: false, field: "years", message: TERM_MESSAGE };
-  }
-  const years = Number(yearsText);
-  if (!Number.isSafeInteger(years) || years * 12 > Number.MAX_SAFE_INTEGER) {
-    return { ok: false, field: "years", message: TERM_MESSAGE };
+  let monthCount: number;
+  let termYears: number | undefined;
+  if (termUnit === "months") {
+    if (!/^[1-9]\d*$/.test(monthsText)) {
+      return { ok: false, field: "months", message: TERM_MONTHS_MESSAGE };
+    }
+    monthCount = Number(monthsText);
+    if (!Number.isSafeInteger(monthCount)) {
+      return { ok: false, field: "months", message: TERM_MONTHS_MESSAGE };
+    }
+  } else {
+    if (!/^[1-9]\d*$/.test(yearsText)) {
+      return { ok: false, field: "years", message: TERM_YEARS_MESSAGE };
+    }
+    termYears = Number(yearsText);
+    if (!Number.isSafeInteger(termYears) || termYears * 12 > Number.MAX_SAFE_INTEGER) {
+      return { ok: false, field: "years", message: TERM_YEARS_MESSAGE };
+    }
+    monthCount = termYears * 12;
   }
 
   if (!/^(?:\d+)(?:\.\d{1,3})?$/.test(rateText)) {
@@ -293,7 +327,8 @@ export function parseLoan(draft: LoanDraft): ParseResult {
     loan: {
       priceCents,
       loanCents,
-      years,
+      monthCount,
+      ...(termYears !== undefined ? { termYears } : {}),
       ratePercent,
       startMonth: start,
     },
@@ -331,9 +366,9 @@ export function loanReport(
   return buildReport(
     centsToDollars(financedCents),
     loan.ratePercent,
-    loan.years * 12,
+    loan.monthCount,
     extras,
-    loan.years,
+    loan.termYears,
     armWithStats,
   );
 }
@@ -350,32 +385,29 @@ export function savedByExtraCents(
   fullInterestCents: number,
   financedCents: number = loan.loanCents,
 ): number {
-  const requested = extras.get(month) ?? 0;
-  if (requested <= 0) return 0;
-  const without = new Map(extras);
-  without.delete(month);
-  const counterfactual = loanReport(loan, without, financedCents);
-  return counterfactual.interest_cents - fullInterestCents;
+  return librarySavedByExtraCents(
+    centsToDollars(financedCents),
+    loan.ratePercent,
+    loan.monthCount,
+    extras,
+    month,
+    fullInterestCents,
+    armArgument(loan),
+  );
 }
 
 export function paymentDate(
   startMonth: string,
   paymentNumber: number,
 ): { year: number; month: number } {
-  const startYear = Number(startMonth.slice(0, 4));
-  const startIndex = Number(startMonth.slice(5, 7)) - 1;
-  const index = startYear * 12 + startIndex + paymentNumber;
-  return {
-    year: Math.floor(index / 12),
-    month: (index % 12) + 1,
-  };
+  return calendarPaymentDate(startMonth, paymentNumber);
 }
 
 export function dueDate(
   startMonth: string,
   paymentNumber: number,
 ): { year: number; month: number } {
-  return paymentDate(startMonth, paymentNumber + 1);
+  return calendarDueDate(startMonth, paymentNumber);
 }
 
 export const PAYOFF_DATE_FOOTNOTE =
@@ -385,8 +417,7 @@ export const SCHEDULE_ARREARS_FOOTNOTE =
   "Payments are made in arrears: each month's row is paid on the 1st of the following month, including any extra principal.";
 
 export function formatPayoffDate(startMonth: string, payoffMonth: number): string {
-  const due = dueDate(startMonth, payoffMonth);
-  return `${MONTH_NAMES[due.month - 1]} 1, ${due.year} (${yearsAndMonths(payoffMonth)})`;
+  return calendarFormatPayoffDate(startMonth, payoffMonth);
 }
 
 export type CalendarDate = { year: number; month: number; day: number };
@@ -540,12 +571,7 @@ export function longDate(year: number, month: number): string {
 }
 
 export function yearsAndMonths(months: number): string {
-  const years = Math.floor(months / 12);
-  const rest = months % 12;
-  const parts: string[] = [];
-  if (years > 0) parts.push(`${years} ${years === 1 ? "year" : "years"}`);
-  if (rest > 0 || years === 0) parts.push(`${rest} ${rest === 1 ? "month" : "months"}`);
-  return parts.join(" ");
+  return calendarYearsAndMonths(months);
 }
 
 export function monthsSavedText(months: number): string {
@@ -575,7 +601,10 @@ export type Scenario = {
   prorationStored: boolean;
   arm: ArmDraft;
   armStored: boolean;
+  recastMonth: string;
 };
+
+export { recastFixed };
 
 export function defaultPrefill(): Prefill {
   return {
@@ -701,50 +730,23 @@ export function levelArmExtras(
   kept: Map<number, number>,
 ): Map<number, number> {
   if (!loan.arm?.enabled) throw new Error("levelArmExtras requires an ARM loan");
-  const monthCount = loan.years * 12;
-  const { fixedMonths, adjustMonths } = loan.arm.values;
-  const resets = resetMonths(fixedMonths, adjustMonths, monthCount);
   const prefill = buildPrefillMap(
-    monthCount,
+    loan.monthCount,
     loan.startMonth,
     monthlyDollars,
     yearlyDollars,
     yearlyMonth,
   );
-
-  const result = new Map<number, number>();
-  for (const [month, amount] of kept) {
-    if (month < fromMonth && amount > 0) result.set(month, amount);
-  }
-
-  const fixedPi = loanReport(loan, result, financedCents).monthly_payment_cents;
-  const formStart = Math.max(fromMonth, 1);
-  for (let month = formStart; month <= fixedMonths && month <= monthCount; month += 1) {
-    const amount = prefill.get(month);
-    if (amount !== undefined && amount > 0) result.set(month, amount);
-  }
-
-  for (const reset of resets) {
-    if (reset < fromMonth) continue;
-    for (let month = reset; month <= monthCount; month += 1) result.delete(month);
-
-    const report = loanReport(loan, result, financedCents);
-    if (reset > report.payoff_month) break;
-
-    const periodPayment = report.schedule[reset - 1]?.payment_cents ?? 0;
-    const resetIndex = resets.indexOf(reset);
-    const nextReset = resetIndex + 1 < resets.length ? resets[resetIndex + 1]! : monthCount + 1;
-    const periodEnd = Math.min(nextReset - 1, monthCount);
-
-    for (let month = reset; month <= periodEnd; month += 1) {
-      const formDollars = prefill.get(month) ?? 0;
-      const totalCents = fixedPi + (formDollars > 0 ? dollarsToCents(formDollars) : 0);
-      const extraCents = Math.max(0, totalCents - periodPayment);
-      if (extraCents > 0) result.set(month, centsToDollars(extraCents));
-    }
-  }
-
-  return result;
+  const arm = toBuildReportArm(loan.arm.values, loan.arm.index);
+  return libraryLevelArmExtras(
+    centsToDollars(financedCents),
+    loan.ratePercent,
+    loan.monthCount,
+    arm,
+    prefill,
+    fromMonth,
+    kept,
+  );
 }
 
 export function dropExtrasBeyond(
@@ -784,7 +786,7 @@ export function groupByYear(
   const rows = report.schedule.slice(0, report.payoff_month);
   const resets =
     loan.arm && loan.arm.enabled
-      ? new Set(resetMonths(loan.arm.values.fixedMonths, loan.arm.values.adjustMonths, loan.years * 12))
+      ? new Set(resetMonths(loan.arm.values.fixedMonths, loan.arm.values.adjustMonths, loan.monthCount))
       : null;
   for (const row of rows) {
     const date = paymentDate(startMonth, row.month);
@@ -848,6 +850,7 @@ export function defaultScenario(now = new Date()): Scenario {
     prorationStored: false,
     arm: defaultArm(),
     armStored: false,
+    recastMonth: "",
   };
 }
 
@@ -910,11 +913,11 @@ function scenarioArm(
   const loaded = armFromStorage(value);
   if (!loaded.stored) return { arm: loaded.arm, armStored: false };
   if (!loaded.arm.enabled) return { arm: loaded.arm, armStored: true };
-  const parsed = parseArm(loaded.arm, loan.years, Math.round(loan.ratePercent * 1000));
+  const parsed = parseArm(loaded.arm, loan.monthCount, Math.round(loan.ratePercent * 1000));
   if (!parsed.ok) return { arm: defaultArm(), armStored: false };
   const index = dropIndexBeyond(
     loaded.arm.index,
-    resetMonths(parsed.values.fixedMonths, parsed.values.adjustMonths, loan.years * 12),
+    resetMonths(parsed.values.fixedMonths, parsed.values.adjustMonths, loan.monthCount),
   );
   return { arm: { ...loaded.arm, index }, armStored: true };
 }
@@ -976,7 +979,9 @@ function draftEqual(a: LoanDraft, b: LoanDraft): boolean {
   return (
     a.price === b.price &&
     a.down === b.down &&
+    a.termUnit === b.termUnit &&
     a.years === b.years &&
+    a.months === b.months &&
     a.rate === b.rate &&
     a.start === b.start &&
     a.fico === b.fico
@@ -1010,10 +1015,15 @@ function normalizeStoredFico(text: string): string {
 }
 
 function parseScenarioRecord(record: Record<string, unknown>, now = new Date()): Scenario | null {
+  const termUnitRaw = record.termUnit;
+  const termUnit: TermUnit =
+    termUnitRaw === "months" || termUnitRaw === "years" ? termUnitRaw : "years";
   const draft: LoanDraft = {
     price: typeof record.price === "string" ? record.price : "",
     down: typeof record.down === "string" ? record.down : "",
+    termUnit,
     years: typeof record.years === "string" ? record.years : "",
+    months: typeof record.months === "string" ? record.months : "",
     rate: typeof record.rate === "string" ? record.rate : "",
     start: typeof record.start === "string" ? record.start : "",
     fico: normalizeStoredFico(
@@ -1054,6 +1064,7 @@ function parseScenarioRecord(record: Record<string, unknown>, now = new Date()):
     prorationStored,
     arm,
     armStored,
+    recastMonth: typeof record.recastMonth === "string" ? record.recastMonth : "",
   };
 }
 
@@ -1067,10 +1078,13 @@ function scenarioToStorageObject(scenario: Scenario): Record<string, unknown> {
   return {
     price: scenario.draft.price,
     down: scenario.draft.down,
+    termUnit: scenario.draft.termUnit,
     years: scenario.draft.years,
+    months: scenario.draft.months,
     rate: scenario.draft.rate,
     start: scenario.draft.start,
     fico: scenario.draft.fico,
+    recastMonth: scenario.recastMonth,
     extras: [...scenario.extras.entries()],
     applied: [...scenario.applied.entries()],
     prefill: scenario.prefill,
@@ -1190,13 +1204,20 @@ export function scenarioLabelText(scenario: Scenario, figures: ScenarioFigures):
   const thousands = dollarsToThousandsText(scenario.draft.price);
   const parsed = parseLoan(scenario.draft);
   if (!parsed.ok) return dollars;
-  const years = parsed.loan.years;
-  const term = years === 1 ? "1 year" : `${years} years`;
-  const rateThousandths = Math.round(parsed.loan.ratePercent * 1000);
-  const armParsed = parseArm(scenario.arm, years, rateThousandths);
+  const loan = parsed.loan;
+  const term =
+    loan.termYears !== undefined
+      ? loan.termYears === 1
+        ? "1 year"
+        : `${loan.termYears} years`
+      : loan.monthCount === 1
+        ? "1 month"
+        : `${loan.monthCount} months`;
+  const rateThousandths = Math.round(loan.ratePercent * 1000);
+  const armParsed = parseArm(scenario.arm, loan.monthCount, rateThousandths);
   const product =
     scenario.arm.enabled && armParsed.ok
-      ? armLabel(armParsed.values.fixedMonths / 12, armParsed.values.adjustMonths)
+      ? armLabel(armParsed.values.fixedMonths, armParsed.values.adjustMonths)
       : "fixed";
   return `${dollars} - ${thousands}K | ${scenario.draft.down}% down | ${scenario.draft.rate}% | ${term} | ${product}`;
 }
@@ -1233,45 +1254,11 @@ export function saveStored(storage: FullStorageLike | undefined, set: StoredSet)
 }
 
 export function prevailingExtraCents(report: Report): number {
-  const months =
-    report.arm !== undefined
-      ? Math.min(report.payoff_month, report.arm.fixed_months)
-      : report.payoff_month;
-  const rows = report.schedule.slice(0, months);
-  const counts = new Map<number, number>();
-  for (const row of rows) {
-    const extra = row.extra_cents;
-    if (extra > 0) counts.set(extra, (counts.get(extra) ?? 0) + 1);
-  }
-  for (const [amount, count] of counts) {
-    if (count * 5 >= months * 4) return amount;
-  }
-  return 0;
+  return libraryPrevailingExtraCents(report);
 }
 
 export function modalPaymentCents(report: Report): number {
-  if (report.arm !== undefined) {
-    return report.monthly_payment_cents;
-  }
-  const rows = report.schedule.slice(0, report.payoff_month);
-  const counts = new Map<number, { count: number; firstMonth: number }>();
-  for (const row of rows) {
-    const payment = report.monthly_payment_cents;
-    const entry = counts.get(payment) ?? { count: 0, firstMonth: row.month };
-    entry.count += 1;
-    counts.set(payment, entry);
-  }
-  let bestPayment = 0;
-  let bestCount = 0;
-  let bestFirstMonth = Number.POSITIVE_INFINITY;
-  for (const [payment, { count, firstMonth }] of counts) {
-    if (count > bestCount || (count === bestCount && firstMonth < bestFirstMonth)) {
-      bestCount = count;
-      bestPayment = payment;
-      bestFirstMonth = firstMonth;
-    }
-  }
-  return bestPayment;
+  return libraryModalPaymentCents(report);
 }
 
 export function prevailingTotalCents(
@@ -1299,7 +1286,7 @@ export function scenarioFigures(scenario: Scenario): ScenarioFigures | null {
   const pictureParsed = parsePicture(scenario.picture, scenario.draft.start);
   if (!pictureParsed.ok) return null;
   const rateThousandths = Math.round(parsedLoan.loan.ratePercent * 1000);
-  const armParsed = parseArm(scenario.arm, parsedLoan.loan.years, rateThousandths);
+  const armParsed = parseArm(scenario.arm, parsedLoan.loan.monthCount, rateThousandths);
   const armOn = scenario.arm.enabled && armParsed.ok;
   const reportLoan: Loan = armOn
     ? {

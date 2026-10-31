@@ -3,6 +3,7 @@ import { percentThousandths } from "./picture";
 
 export type ArmField =
   | "fixedYears"
+  | "initialMonths"
   | "adjustMonths"
   | "margin"
   | "initialCap"
@@ -13,10 +14,14 @@ export type ArmField =
 
 export type ArmIndexEntry = [month: number, percent: number];
 
+export type ArmFixedUnit = "years" | "months";
+
 export type ArmDraft = {
   enabled: boolean;
   open: boolean;
+  fixedUnit: ArmFixedUnit;
   fixedYears: string;
+  initialMonths: string;
   adjustMonths: string;
   margin: string;
   initialCap: string;
@@ -55,6 +60,7 @@ export type ArmParseResult =
 
 export const ARM_FIELD_LABELS: Record<ArmField, string> = {
   fixedYears: "Initial period",
+  initialMonths: "Initial period",
   adjustMonths: "Adjusts every",
   margin: "Margin",
   initialCap: "Initial cap",
@@ -68,7 +74,9 @@ export function defaultArm(): ArmDraft {
   return {
     enabled: false,
     open: false,
+    fixedUnit: "years",
     fixedYears: "7",
+    initialMonths: "",
     adjustMonths: "12",
     margin: "2.5",
     initialCap: "5",
@@ -139,10 +147,14 @@ export function currentIndexFieldInvalid(text: string): boolean {
   return trimmed !== "" && percentThousandths(trimmed) === null;
 }
 
-export function armLabel(fixedYears: number, adjustMonths: number): string {
-  if (adjustMonths === 12) return `${fixedYears}/1`;
-  if (adjustMonths === 6) return `${fixedYears}/6`;
-  return `${fixedYears}/${adjustMonths}mo`;
+export function armLabel(fixedMonths: number, adjustMonths: number): string {
+  if (fixedMonths % 12 === 0) {
+    const years = fixedMonths / 12;
+    if (adjustMonths === 12) return `${years}/1`;
+    if (adjustMonths === 6) return `${years}/6`;
+    return `${years}/${adjustMonths}mo`;
+  }
+  return `${fixedMonths}mo/${adjustMonths}mo`;
 }
 
 export function resetMonths(
@@ -198,17 +210,30 @@ function parseWholeField(
   return { ok: true, value };
 }
 
-export function parseArm(
+function parseInitialPeriodMonths(
   draft: ArmDraft,
-  years: number,
-  rateThousandths: number,
-): ArmParseResult {
+): { ok: true; fixedMonths: number } | { ok: false; field: ArmField; message: string } {
+  if (draft.fixedUnit === "months") {
+    const months = parseWholeField(draft.initialMonths, "initialMonths", "months");
+    if (!months.ok) return months;
+    return { ok: true, fixedMonths: months.value };
+  }
   const fixedYears = parseWholeField(draft.fixedYears, "fixedYears", "years");
   if (!fixedYears.ok) return fixedYears;
-  if (fixedYears.value >= years) {
+  return { ok: true, fixedMonths: fixedYears.value * 12 };
+}
+
+export function parseArm(
+  draft: ArmDraft,
+  termMonthCount: number,
+  rateThousandths: number,
+): ArmParseResult {
+  const initial = parseInitialPeriodMonths(draft);
+  if (!initial.ok) return initial;
+  if (initial.fixedMonths >= termMonthCount) {
     return {
       ok: false,
-      field: "fixedYears",
+      field: draft.fixedUnit === "months" ? "initialMonths" : "fixedYears",
       message: "Initial period must be shorter than the term.",
     };
   }
@@ -244,7 +269,7 @@ export function parseArm(
   return {
     ok: true,
     values: {
-      fixedMonths: fixedYears.value * 12,
+      fixedMonths: initial.fixedMonths,
       adjustMonths: adjustMonths.value,
       marginThousandths: margin.thousandths,
       initialCapThousandths: initialCap.thousandths,
@@ -278,6 +303,7 @@ export function toBuildReportArm(values: ArmValues, index: ArmIndexEntry[]): Arm
 
 const TEXT_FIELDS = [
   "fixedYears",
+  "initialMonths",
   "adjustMonths",
   "margin",
   "initialCap",
@@ -312,6 +338,8 @@ export function armFromStorage(value: unknown): { arm: ArmDraft; stored: boolean
   if (typeof record.enabled !== "boolean" || typeof record.open !== "boolean") return fallback;
   if (typeof record.roundEighth !== "boolean") return fallback;
   const draft = defaultArm();
+  const fixedUnit = record.fixedUnit;
+  if (fixedUnit === "years" || fixedUnit === "months") draft.fixedUnit = fixedUnit;
   for (const field of TEXT_FIELDS) {
     const text = record[field];
     if (typeof text !== "string") return fallback;
@@ -337,7 +365,9 @@ export function armToStorage(arm: ArmDraft): ArmDraft {
   return {
     enabled: arm.enabled,
     open: arm.open,
+    fixedUnit: arm.fixedUnit,
     fixedYears: arm.fixedYears,
+    initialMonths: arm.initialMonths,
     adjustMonths: arm.adjustMonths,
     margin: arm.margin,
     initialCap: arm.initialCap,

@@ -60,6 +60,8 @@ import {
   type LoanDraft,
   type Prefill,
   type Scenario,
+  recastFixed,
+  centsToDollars,
   formatPayoffDate,
   formatDueOnFirst,
   armTimelineLines,
@@ -119,7 +121,7 @@ import {
 } from "./tax";
 import { PrevailingBar } from "./prevailing-bar";
 import { Schedule } from "./schedule";
-import { dollarsToCents } from "../../../amortize.js";
+import { dollarsToCents, formatGroupedCents } from "../../../amortize.js";
 
 const MONTHLY_AMOUNT = "Additional amount to monthly payment";
 const YEARLY_AMOUNT = "Additional yearly payment";
@@ -195,6 +197,10 @@ export function App() {
   const [editingValue, setEditingValue] = useState("");
   const [editingIndexMonth, setEditingIndexMonth] = useState<number | null>(null);
   const [editingIndexValue, setEditingIndexValue] = useState("");
+  const [recastOpen, setRecastOpen] = useState(false);
+  const [recastMonth, setRecastMonth] = useState(initial.scenario.recastMonth);
+  const [recastError, setRecastError] = useState<string | null>(null);
+  const [recastInvalid, setRecastInvalid] = useState(false);
   const [knowledgeStack, setKnowledgeStack] = useState<KnowledgeFrame[] | null>(null);
   const knowledgeOpener = useRef<HTMLElement | null>(null);
   const [knowledgeSheet, setKnowledgeSheet] = useState(
@@ -210,6 +216,7 @@ export function App() {
     arm: initial.scenario.arm,
     armStored: initial.scenario.armStored,
     prorationStored: initial.scenario.prorationStored,
+    recastMonth: initial.scenario.recastMonth,
   });
 
   useEffect(() => {
@@ -291,6 +298,9 @@ export function App() {
     setApplyError(null);
     setEditingMonth(null);
     setEditingIndexMonth(null);
+    setRecastMonth(scenario.recastMonth);
+    setRecastError(null);
+    setRecastInvalid(false);
     snapshot.current = {
       draft: scenario.draft,
       extras: scenario.extras,
@@ -301,6 +311,7 @@ export function App() {
       arm: scenario.arm,
       armStored: scenario.armStored,
       prorationStored: scenario.prorationStored,
+      recastMonth: scenario.recastMonth,
     };
   }
 
@@ -333,6 +344,7 @@ export function App() {
       prorationStored: patch.prorationStored ?? snapshot.current.prorationStored,
       arm: patch.arm ?? snapshot.current.arm,
       armStored: patch.armStored ?? snapshot.current.armStored,
+      recastMonth: patch.recastMonth ?? snapshot.current.recastMonth,
     };
     snapshot.current = next;
     const scenarios = [...loanSet.scenarios];
@@ -460,8 +472,8 @@ export function App() {
   );
   const rateThousandths = Math.round(loan.ratePercent * 1000);
   const armParsed = useMemo(
-    () => parseArm(armSaved, loan.years, rateThousandths),
-    [armSaved, loan.years, rateThousandths],
+    () => parseArm(armSaved, loan.monthCount, rateThousandths),
+    [armSaved, loan.monthCount, rateThousandths],
   );
   const armOn = armSaved.enabled && armParsed.ok;
   const teaserShown = useMemo(() => {
@@ -492,6 +504,45 @@ export function App() {
     () => loanReport(reportLoan, extras, lines.financedCents, scheduleAdjustmentStats),
     [reportLoan, extras, lines.financedCents, scheduleAdjustmentStats],
   );
+  const recastDisplay = useMemo(() => {
+    if (armOn) return null;
+    const trimmed = recastMonth.trim();
+    if (trimmed === "") return null;
+    if (!/^[1-9]\d*$/.test(trimmed)) return null;
+    const month = Number(trimmed);
+    if (month < 1 || month >= loan.monthCount) return null;
+    try {
+      const result = recastFixed(
+        centsToDollars(lines.financedCents),
+        loan.ratePercent,
+        loan.monthCount,
+        applied,
+        month,
+      );
+      return result;
+    } catch {
+      return null;
+    }
+  }, [armOn, recastMonth, loan, lines.financedCents, applied]);
+  const recastPaidOff = useMemo(() => {
+    if (armOn) return false;
+    const trimmed = recastMonth.trim();
+    if (trimmed === "" || !/^[1-9]\d*$/.test(trimmed)) return false;
+    const month = Number(trimmed);
+    if (month < 1 || month >= loan.monthCount) return false;
+    try {
+      recastFixed(
+        centsToDollars(lines.financedCents),
+        loan.ratePercent,
+        loan.monthCount,
+        applied,
+        month,
+      );
+      return false;
+    } catch (error) {
+      return error instanceof Error && error.message === "loan is already paid off at the recast month";
+    }
+  }, [armOn, recastMonth, loan, lines.financedCents, applied]);
   const taxTable = useMemo(() => {
     const agi = parseOptionalDollars(pictureSaved.agi);
     const magi = parseOptionalDollars(pictureSaved.magi);
@@ -540,6 +591,55 @@ export function App() {
     };
   });
 
+  function updateRecastMonth(value: string) {
+    setRecastMonth(value);
+    const trimmed = value.trim();
+    if (trimmed === "") {
+      setRecastError(null);
+      setRecastInvalid(false);
+      persist({ recastMonth: "" });
+      return;
+    }
+    if (!/^[1-9]\d*$/.test(trimmed)) {
+      setRecastError(
+        `Recast month must be a payment number from 1 through ${loan.monthCount - 1}.`,
+      );
+      setRecastInvalid(true);
+      return;
+    }
+    const month = Number(trimmed);
+    if (month < 1 || month >= loan.monthCount) {
+      setRecastError(
+        `Recast month must be a payment number from 1 through ${loan.monthCount - 1}.`,
+      );
+      setRecastInvalid(true);
+      return;
+    }
+    try {
+      recastFixed(
+        centsToDollars(lines.financedCents),
+        loan.ratePercent,
+        loan.monthCount,
+        applied,
+        month,
+      );
+      setRecastError(null);
+      setRecastInvalid(false);
+      persist({ recastMonth: trimmed });
+    } catch (error) {
+      if (error instanceof Error && error.message === "loan is already paid off at the recast month") {
+        setRecastError("The loan is already paid off.");
+        setRecastInvalid(false);
+        persist({ recastMonth: trimmed });
+        return;
+      }
+      setRecastError(
+        `Recast month must be a payment number from 1 through ${loan.monthCount - 1}.`,
+      );
+      setRecastInvalid(true);
+    }
+  }
+
   function update(field: keyof LoanDraft, value: string) {
     const next = { ...draft, [field]: value };
     setDraft(next);
@@ -552,7 +652,7 @@ export function App() {
     }
     let nextArm = armSaved;
     if (armSaved.enabled) {
-      const armResult = parseArm(armSaved, parsed.loan.years, Math.round(parsed.loan.ratePercent * 1000));
+      const armResult = parseArm(armSaved, parsed.loan.monthCount, Math.round(parsed.loan.ratePercent * 1000));
       if (!armResult.ok) {
         setError(armResult.message);
         setInvalidField(armResult.field);
@@ -560,12 +660,12 @@ export function App() {
       }
       const index = dropIndexBeyond(
         armSaved.index,
-        resetMonths(armResult.values.fixedMonths, armResult.values.adjustMonths, parsed.loan.years * 12),
+        resetMonths(armResult.values.fixedMonths, armResult.values.adjustMonths, parsed.loan.monthCount),
       );
       if (index !== armSaved.index) nextArm = { ...armSaved, index };
     }
-    const kept = dropExtrasBeyond(extras, parsed.loan.years * 12);
-    const keptApplied = dropExtrasBeyond(applied, parsed.loan.years * 12);
+    const kept = dropExtrasBeyond(extras, parsed.loan.monthCount);
+    const keptApplied = dropExtrasBeyond(applied, parsed.loan.monthCount);
     setValidText({ down: next.down, rate: next.rate, fico: validText.fico });
     setLoan(parsed.loan);
     setExtras(kept);
@@ -664,7 +764,7 @@ export function App() {
       enabled: true,
       open: snapshot.current.armStored ? armSaved.open : true,
     };
-    const result = parseArm(candidate, loan.years, rateThousandths);
+    const result = parseArm(candidate, loan.monthCount, rateThousandths);
     if (!result.ok) {
       select.value = "fixed";
       setError(result.message);
@@ -673,7 +773,7 @@ export function App() {
     }
     const index = dropIndexBeyond(
       candidate.index,
-      resetMonths(result.values.fixedMonths, result.values.adjustMonths, loan.years * 12),
+      resetMonths(result.values.fixedMonths, result.values.adjustMonths, loan.monthCount),
     );
     setError(null);
     setInvalidField(null);
@@ -683,7 +783,7 @@ export function App() {
   function updateArm(field: ArmField, value: string) {
     const next = { ...armDraft, [field]: value };
     setArmDraft(next);
-    const parsed = parseArm(next, loan.years, rateThousandths);
+    const parsed = parseArm(next, loan.monthCount, rateThousandths);
     if (!parsed.ok) {
       setError(parsed.message);
       setInvalidField(parsed.field);
@@ -691,7 +791,7 @@ export function App() {
     }
     const index = dropIndexBeyond(
       armSaved.index,
-      resetMonths(parsed.values.fixedMonths, parsed.values.adjustMonths, loan.years * 12),
+      resetMonths(parsed.values.fixedMonths, parsed.values.adjustMonths, loan.monthCount),
     );
     if (armFieldInvalid(invalidField)) {
       setError(null);
@@ -1033,7 +1133,7 @@ export function App() {
       return;
     }
     setApplyError(null);
-    const monthCount = loan.years * 12;
+    const monthCount = loan.monthCount;
     const useLevel = armOn && prefill.level === true;
     const next = useLevel
       ? levelArmExtras(
@@ -1153,24 +1253,53 @@ export function App() {
           </button>
         ) : null}
         <input
-          id="years"
+          id={draft.termUnit === "months" ? "months" : "years"}
           aria-label="Term"
           inputMode="numeric"
           autoComplete="off"
-          value={draft.years}
-          aria-invalid={invalidField === "years"}
-          style={{ width: `${Math.max(draft.years.length, 1) + 1}ch` }}
-          onInput={(event) => update("years", event.currentTarget.value)}
+          value={draft.termUnit === "months" ? draft.months : draft.years}
+          aria-invalid={
+            invalidField === "years" || invalidField === "months" ? true : undefined
+          }
+          style={{
+            width: `${
+              Math.max(
+                (draft.termUnit === "months" ? draft.months : draft.years).length,
+                1,
+              ) + 1
+            }ch`,
+          }}
+          onInput={(event) =>
+            update(draft.termUnit === "months" ? "months" : "years", event.currentTarget.value)
+          }
         />
-        <span>-year </span>
+        <span>-</span>
+        <select
+          id="term-unit"
+          aria-label="Term unit"
+          class="term-unit"
+          value={draft.termUnit}
+          onChange={(event) => {
+            const unit = event.currentTarget.value === "months" ? "months" : "years";
+            update("termUnit", unit);
+          }}
+        >
+          <option value="years">year</option>
+          <option value="months">month</option>
+        </select>
         {armOn && armParsed.ok ? (
-          <TermButton entry={KNOWLEDGE_ENTRIES.types.id}>
-            <span class="arm-label" data-testid="arm-label">
-              {armLabel(armParsed.values.fixedMonths / 12, armParsed.values.adjustMonths)}
-            </span>
-          </TermButton>
-        ) : null}
-        {armOn ? " " : null}
+          <>
+            {" "}
+            <TermButton entry={KNOWLEDGE_ENTRIES.types.id}>
+              <span class="arm-label" data-testid="arm-label">
+                {armLabel(armParsed.values.fixedMonths, armParsed.values.adjustMonths)}
+              </span>
+            </TermButton>
+            {" "}
+          </>
+        ) : (
+          <span> </span>
+        )}
         <select
           id="product"
           class="product"
@@ -1210,15 +1339,58 @@ export function App() {
       {armOn && armParsed.ok ? (
         <Disclosure className="arm" title="ARM terms" open={armSaved.open} onToggle={setArmOpen}>
           <div class="inputs">
-            <Field
-              id="arm-fixed-years"
-              label={ARM_FIELD_LABELS.fixedYears}
-              term={KNOWLEDGE_ENTRIES.initialPeriod}
-              value={armDraft.fixedYears}
-              suffix="years"
-              invalid={invalidField === "fixedYears"}
-              onInput={(value) => updateArm("fixedYears", value)}
-            />
+            <div class="field">
+              <label for="arm-fixed-unit">Initial period unit</label>
+              <select
+                id="arm-fixed-unit"
+                aria-label="Initial period unit"
+                value={armDraft.fixedUnit}
+                onChange={(event) => {
+                  const fixedUnit = event.currentTarget.value === "months" ? "months" : "years";
+                  const next = { ...armDraft, fixedUnit };
+                  setArmDraft(next);
+                  const parsed = parseArm(next, loan.monthCount, rateThousandths);
+                  if (!parsed.ok) {
+                    setError(parsed.message);
+                    setInvalidField(parsed.field);
+                    return;
+                  }
+                  const index = dropIndexBeyond(
+                    armSaved.index,
+                    resetMonths(parsed.values.fixedMonths, parsed.values.adjustMonths, loan.monthCount),
+                  );
+                  if (armFieldInvalid(invalidField)) {
+                    setError(null);
+                    setInvalidField(null);
+                  }
+                  commitArm({ ...next, enabled: true, open: armSaved.open, index });
+                }}
+              >
+                <option value="years">years</option>
+                <option value="months">months</option>
+              </select>
+            </div>
+            {armDraft.fixedUnit === "months" ? (
+              <Field
+                id="arm-fixed-months"
+                label={ARM_FIELD_LABELS.initialMonths}
+                term={KNOWLEDGE_ENTRIES.initialPeriod}
+                value={armDraft.initialMonths}
+                suffix="months"
+                invalid={invalidField === "initialMonths"}
+                onInput={(value) => updateArm("initialMonths", value)}
+              />
+            ) : (
+              <Field
+                id="arm-fixed-years"
+                label={ARM_FIELD_LABELS.fixedYears}
+                term={KNOWLEDGE_ENTRIES.initialPeriod}
+                value={armDraft.fixedYears}
+                suffix="years"
+                invalid={invalidField === "fixedYears"}
+                onInput={(value) => updateArm("fixedYears", value)}
+              />
+            )}
             <Field
               id="arm-adjust-months"
               label={ARM_FIELD_LABELS.adjustMonths}
@@ -1900,6 +2072,47 @@ export function App() {
           ) : null}
         </div>
       </Disclosure>
+      {!armOn ? (
+        <Disclosure className="recast" title="Recast" open={recastOpen} onToggle={setRecastOpen}>
+          <div class="inputs">
+            <Field
+              id="recast-month"
+              label="Recast month"
+              value={recastMonth}
+              suffix=""
+              invalid={recastInvalid}
+              onInput={(value) => updateRecastMonth(value)}
+            />
+          </div>
+          {recastPaidOff ? (
+            <p class="note">The loan is already paid off.</p>
+          ) : recastDisplay ? (
+            <dl class="recast-figures">
+              <div>
+                <dt>Unpaid principal</dt>
+                <dd class="money">{formatMoney(recastDisplay.remaining_principal_cents)}</dd>
+              </div>
+              <div>
+                <dt>Recast payment</dt>
+                <dd class="money">{formatMoney(recastDisplay.monthly_payment_cents)}</dd>
+              </div>
+              <div>
+                <dt>Remaining months</dt>
+                <dd>{recastDisplay.months}</dd>
+              </div>
+              <div>
+                <dt>Recast interest</dt>
+                <dd class="money">{formatMoney(recastDisplay.interest_cents)}</dd>
+              </div>
+            </dl>
+          ) : null}
+          {recastError && !recastPaidOff ? (
+            <p class="error" role="alert">
+              {recastError}
+            </p>
+          ) : null}
+        </Disclosure>
+      ) : null}
       <Schedule
         years={years}
         openYears={openYears}

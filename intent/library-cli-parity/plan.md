@@ -86,3 +86,5 @@ Files: `apps/web/src/loan.ts`, `apps/web/src/picture.ts`, `apps/web/src/arm.ts`,
 DoD: AC5 and AC6. `node --test`, `pnpm --dir apps/web test`, and `pnpm --dir apps/web test:e2e` exit 0.
 
 ### Build notes (Phase 3)
+
+Page `headingText` e2e helper lives in `apps/web/e2e/heading.ts`. Recast disclosure sits before Schedule; `moving-in.spec.ts` expects `Recast` between Moving in and Schedule. Restored `knowledgeStack` state after recast UI landed. Term heading uses a `-` span plus `#term-unit` options `year` / `month`.

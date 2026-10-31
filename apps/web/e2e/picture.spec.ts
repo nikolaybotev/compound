@@ -1,6 +1,7 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { configuredOrigin, LEGACY_KEY, SET_KEY } from "./configured";
 import { setStartMonth } from "./start-month";
+import { headingText } from "./heading";
 
 const leaks = new WeakMap<BrowserContext, string[]>();
 
@@ -357,28 +358,6 @@ test("AC11 FICO range and PMI ladder", async ({ page }) => {
   await page.locator("#down").fill("6");
   await expect(page.locator("#picture-pmi")).toHaveValue("0.53");
 });
-
-async function headingText(page: Page): Promise<string> {
-  return page.locator(".heading-line").evaluate((element) => {
-    const parts: string[] = [];
-    const walk = (node: Node) => {
-      if (node instanceof HTMLInputElement) {
-        parts.push(node.value);
-      } else if (node instanceof HTMLSelectElement) {
-        parts.push(node.selectedOptions[0]?.text ?? "");
-      } else if (node instanceof HTMLButtonElement && node.id === "start") {
-        parts.push(node.textContent?.trim() ?? "");
-      } else if (node.nodeType === Node.TEXT_NODE) {
-        const text = node.textContent?.replace(/\s+/g, " ") ?? "";
-        if (text.trim()) parts.push(text);
-      } else {
-        node.childNodes.forEach(walk);
-      }
-    };
-    element.childNodes.forEach(walk);
-    return parts.join("").replace(/\s+/g, " ").trim();
-  });
-}
 
 async function openExample(page: Page) {
   await page.goto("/");

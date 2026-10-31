@@ -1,10 +1,12 @@
-import { buildReport, dollarsToCents } from "../../../amortize.js";
+import { buildPictureLines as libraryBuildPictureLines } from "../../../picture.js";
+import { dollarsToCents } from "../../../amortize.js";
 
 type AmortizedLoan = {
   priceCents: number;
   loanCents: number;
   ratePercent: number;
-  years: number;
+  monthCount: number;
+  termYears?: number;
 };
 
 export function percentThousandths(text: string): number | null {
@@ -824,80 +826,35 @@ export function buildPicture(
   if (rateThousandths === null || downThousandths === null) {
     throw new Error("picture loan rate is not a percent");
   }
-  const priceCents = loan.priceCents;
-  const baseCents = loan.loanCents;
-  const downCents = priceCents - baseCents;
-  const financedCents = baseCents;
-  const principalAndInterestCents = buildReport(
-    centsToDollars(financedCents),
-    loan.ratePercent,
-    loan.years * 12,
-    new Map(),
-  ).monthly_payment_cents;
-  const taxCents = percentOfCents(priceCents, values.taxThousandths, 12);
-  const insuranceCents = percentOfCents(priceCents, values.insuranceThousandths, 12);
-  const pmiCents = percentOfCents(financedCents, values.pmiThousandths, 12);
-  const totalMonthlyCents = principalAndInterestCents + taxCents + insuranceCents + pmiCents;
-  const lenderFeesCents = values.lenderFeesCents;
-  const titleCents = titleCentsFromPrice(priceCents, values.titleHundredThousandths);
-  const interestDays = closingInterestDays(startMonth, values.closingDay);
-  const prepaidInterest = prepaidInterestCents(
-    baseCents,
+  const lines = libraryBuildPictureLines({
+    priceCents: loan.priceCents,
+    financedCents: loan.loanCents,
+    ratePercent: loan.ratePercent,
+    monthCount: loan.monthCount,
+    yearsForJson: loan.termYears,
     rateThousandths,
-    interestDays,
-    values.interestBasis,
-  );
-  const homeownersInsuranceCents =
-    values.homeownersInsuranceAnnualCents ??
-    percentOfCents(priceCents, values.insuranceThousandths);
-  const insuranceMonthlyForImpound =
-    values.homeownersInsuranceAnnualCents !== undefined
-      ? halfUpQuotient(values.homeownersInsuranceAnnualCents, 12)
-      : insuranceCents;
-  const taxImpoundCents = taxCents * values.taxImpoundMonths;
-  const insuranceImpoundCents = insuranceMonthlyForImpound * values.insuranceImpoundMonths;
-  const miImpoundCents = pmiCents === 0 ? 0 : pmiCents * values.miImpoundMonths;
-  const prorationCents = values.prorationCents;
-  const closingCents =
-    lenderFeesCents +
-    titleCents +
-    prepaidInterest +
-    homeownersInsuranceCents +
-    taxImpoundCents +
-    insuranceImpoundCents +
-    miImpoundCents +
-    prorationCents;
-  const pointsCents = percentOfCents(baseCents, values.pointsThousandths);
-  const closingAndPointsCents = closingCents + pointsCents;
-  const cashToCloseCents =
-    downCents + closingAndPointsCents - values.sellerCreditCents - values.lenderCreditCents;
-  const dueAtClosingCents = cashToCloseCents - values.earnestCents;
+    taxThousandths: values.taxThousandths,
+    insuranceThousandths: values.insuranceThousandths,
+    pmiThousandths: values.pmiThousandths,
+    titleHundredThousandths: values.titleHundredThousandths,
+    lenderFeesCents: values.lenderFeesCents,
+    closingDay: values.closingDay,
+    startMonth,
+    interestBasis: values.interestBasis,
+    homeownersInsuranceAnnualCents: values.homeownersInsuranceAnnualCents,
+    taxImpoundMonths: values.taxImpoundMonths,
+    insuranceImpoundMonths: values.insuranceImpoundMonths,
+    miImpoundMonths: values.miImpoundMonths,
+    prorationCents: values.prorationCents,
+    pointsThousandths: values.pointsThousandths,
+    sellerCreditCents: values.sellerCreditCents,
+    lenderCreditCents: values.lenderCreditCents,
+    earnestCents: values.earnestCents,
+  });
   return {
-    priceCents,
-    downCents,
-    baseCents,
-    financedCents,
-    principalAndInterestCents,
-    taxCents,
-    insuranceCents,
-    pmiCents,
+    ...lines,
     pmiRateText: pmiRateTextFromThousandths(values.pmiThousandths),
-    totalMonthlyCents,
-    headingDollars: headingDollarsFromCents(totalMonthlyCents),
-    lenderFeesCents,
-    titleCents,
-    prepaidInterestCents: prepaidInterest,
-    prepaidInterestDays: interestDays,
-    homeownersInsuranceCents,
-    taxImpoundCents,
-    insuranceImpoundCents,
-    miImpoundCents,
-    prorationCents,
-    closingCents,
-    pointsCents,
-    closingAndPointsCents,
-    cashToCloseCents,
-    dueAtClosingCents,
+    headingDollars: headingDollarsFromCents(lines.totalMonthlyCents),
   };
 }
 
