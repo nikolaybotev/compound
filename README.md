@@ -112,13 +112,13 @@ The figure assumes equal monthly payments and a first payment one full month out
 
 [`.agents/skills/mortgage-origination-fees/SKILL.md`](.agents/skills/mortgage-origination-fees/SKILL.md) is the front end. It asks for a missing note rate, APR, or loan size. When the term is omitted it passes `--years 30` and says so. It runs `scripts/origination_fees.js`, a symlink to this script, and answers from `--json`. The design is [intent/origination-fees/](intent/origination-fees/intent.md).
 
-The workspace link is local setup and is not a file in this repo: `/Users/nikolay/git/.agents/skills/mortgage-origination-fees` points at `../../github.com/nikolaybotev/compound/.agents/skills/mortgage-origination-fees`.
+The workspace link is local setup and is not a file in this repo.
 
 ## Skill
 
 [`.agents/skills/mortgage-loan-calculator/SKILL.md`](.agents/skills/mortgage-loan-calculator/SKILL.md) is the front end. It runs `scripts/compound_interest_monthly.js`, a symlink to the calculator at the repo root. A summary question (interest saved, both interest totals, the scheduled payment, months saved) runs `--json` alone. A month or savings-so-far question runs `--json --schedule` and reads `schedule`. A fixed-rate servicer recast is two runs: the first with extras through the recast month, the second with `--months` set to the remaining payment count and no extras. See [intent/loan-recast/](intent/loan-recast/spec.md). The skill does not amortize the loan itself.
 
-The workspace link is local setup and is not a file in this repo: `/Users/nikolay/git/.agents/skills/mortgage-loan-calculator` points at `../../github.com/nikolaybotev/compound/.agents/skills/mortgage-loan-calculator`.
+The workspace link is local setup and is not a file in this repo.
 
 ## Test
 
