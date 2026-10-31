@@ -106,3 +106,54 @@ export function dollarsToCents(dollars: number): number;
 export function formatGroupedCents(cents: number): string;
 
 export function formatPlainCents(cents: number): string;
+
+export function levelArmExtras(
+  principalDollars: number,
+  ratePercent: number,
+  monthCount: number,
+  arm: Arm | undefined,
+  formExtrasByMonth: Map<number, number>,
+  fromMonth: number,
+  keptByMonth: Map<number, number>,
+): Map<number, number>;
+
+export type RecastResult = {
+  recast_month: number;
+  remaining_principal_cents: number;
+  months: number;
+  monthly_payment_cents: number;
+  interest_cents: number;
+  payoff_month: number;
+  interest_through_cents: number;
+  lifetime_interest_cents: number;
+};
+
+export function recastFixed(
+  principalDollars: number,
+  ratePercent: number,
+  monthCount: number,
+  extrasByMonth: Map<number, number>,
+  recastMonth: number,
+): RecastResult;
+
+export function savedByExtraCents(
+  principalDollars: number,
+  ratePercent: number,
+  monthCount: number,
+  extrasByMonth: Map<number, number>,
+  month: number,
+  fullInterestCents: number,
+  arm?: Arm,
+): number;
+
+export function savedByExtraByMonth(
+  principalDollars: number,
+  ratePercent: number,
+  monthCount: number,
+  extrasByMonth: Map<number, number>,
+  arm?: Arm,
+): number[];
+
+export function modalPaymentCents(report: Report): number;
+
+export function prevailingExtraCents(report: Report): number;

@@ -813,9 +813,210 @@ function buildReport(principal, ratePercent, monthCount, extrasByMonth, yearsFor
   return report;
 }
 
+function resetMonths(fixedMonths, adjustMonths, monthCount) {
+  const months = [];
+  for (let month = fixedMonths + 1; month <= monthCount; month += adjustMonths) {
+    months.push(month);
+  }
+  return months;
+}
+
+function armForWalk(arm) {
+  if (arm === undefined) return undefined;
+  const { adjustmentStats, ...rest } = arm;
+  return rest;
+}
+
+function levelArmExtras(
+  principalDollars,
+  ratePercent,
+  monthCount,
+  arm,
+  formExtrasByMonth,
+  fromMonth,
+  keptByMonth,
+) {
+  if (arm === undefined || arm === null) {
+    throw new Error('level extras require an ARM');
+  }
+  const walkArm = armForWalk(arm);
+  const { fixedMonths, adjustMonths } = walkArm;
+  const resets = resetMonths(fixedMonths, adjustMonths, monthCount);
+
+  const result = new Map();
+  for (const [month, amount] of keptByMonth) {
+    if (month < fromMonth && amount > 0) result.set(month, amount);
+  }
+
+  const fixedPi = buildReport(
+    principalDollars,
+    ratePercent,
+    monthCount,
+    result,
+    undefined,
+    walkArm,
+  ).monthly_payment_cents;
+
+  const formStart = Math.max(fromMonth, 1);
+  for (let month = formStart; month <= fixedMonths && month <= monthCount; month += 1) {
+    const amount = formExtrasByMonth.get(month);
+    if (amount !== undefined && amount > 0) result.set(month, amount);
+  }
+
+  for (const reset of resets) {
+    if (reset < fromMonth) continue;
+    for (let month = reset; month <= monthCount; month += 1) result.delete(month);
+
+    const report = buildReport(principalDollars, ratePercent, monthCount, result, undefined, walkArm);
+    if (reset > report.payoff_month) break;
+
+    const periodPayment = report.schedule[reset - 1]?.payment_cents ?? 0;
+    if (periodPayment === 0) break;
+
+    const resetIndex = resets.indexOf(reset);
+    const nextReset = resetIndex + 1 < resets.length ? resets[resetIndex + 1] : monthCount + 1;
+    const periodEnd = Math.min(nextReset - 1, monthCount);
+
+    for (let month = reset; month <= periodEnd; month += 1) {
+      const formDollars = formExtrasByMonth.get(month) ?? 0;
+      const totalCents = fixedPi + (formDollars > 0 ? dollarsToCents(formDollars) : 0);
+      const extraCents = Math.max(0, totalCents - periodPayment);
+      if (extraCents > 0) {
+        result.set(month, Number(formatPlainCents(extraCents)));
+      }
+    }
+  }
+
+  return result;
+}
+
+function recastFixed(principalDollars, ratePercent, monthCount, extrasByMonth, recastMonth) {
+  if (!Number.isInteger(recastMonth) || recastMonth < 1 || recastMonth >= monthCount) {
+    throw new Error('recast month must leave a positive remaining term');
+  }
+  const first = buildReport(principalDollars, ratePercent, monthCount, extrasByMonth);
+  const row = first.schedule[recastMonth - 1];
+  if (row.remaining_principal_cents === 0) {
+    throw new Error('loan is already paid off at the recast month');
+  }
+  let interestThroughCents = 0;
+  for (let i = 0; i < recastMonth; i += 1) {
+    interestThroughCents += first.schedule[i].interest_cents;
+  }
+  const remainingPrincipalDollars = Number(formatPlainCents(row.remaining_principal_cents));
+  const remainingMonths = monthCount - recastMonth;
+  const second = buildReport(remainingPrincipalDollars, ratePercent, remainingMonths, new Map());
+  return {
+    recast_month: recastMonth,
+    remaining_principal_cents: row.remaining_principal_cents,
+    months: remainingMonths,
+    monthly_payment_cents: second.monthly_payment_cents,
+    interest_cents: second.interest_cents,
+    payoff_month: second.payoff_month,
+    interest_through_cents: interestThroughCents,
+    lifetime_interest_cents: interestThroughCents + second.interest_cents,
+  };
+}
+
+function savedByExtraCents(
+  principalDollars,
+  ratePercent,
+  monthCount,
+  extrasByMonth,
+  month,
+  fullInterestCents,
+  arm,
+) {
+  const requested = extrasByMonth.get(month) ?? 0;
+  if (requested <= 0) return 0;
+  const without = new Map(extrasByMonth);
+  without.delete(month);
+  const counterfactual = buildReport(
+    principalDollars,
+    ratePercent,
+    monthCount,
+    without,
+    undefined,
+    armForWalk(arm),
+  );
+  return counterfactual.interest_cents - fullInterestCents;
+}
+
+function savedByExtraByMonth(principalDollars, ratePercent, monthCount, extrasByMonth, arm) {
+  const full = buildReport(
+    principalDollars,
+    ratePercent,
+    monthCount,
+    extrasByMonth,
+    undefined,
+    armForWalk(arm),
+  );
+  const fullInterestCents = full.interest_cents;
+  const values = [];
+  for (let month = 1; month <= monthCount; month += 1) {
+    values.push(savedByExtraCents(
+      principalDollars,
+      ratePercent,
+      monthCount,
+      extrasByMonth,
+      month,
+      fullInterestCents,
+      arm,
+    ));
+  }
+  return values;
+}
+
+function prevailingExtraCents(report) {
+  const months = report.arm !== undefined
+    ? Math.min(report.payoff_month, report.arm.fixed_months)
+    : report.payoff_month;
+  const rows = report.schedule.slice(0, months);
+  const counts = new Map();
+  for (const row of rows) {
+    const extra = row.extra_cents;
+    if (extra > 0) counts.set(extra, (counts.get(extra) ?? 0) + 1);
+  }
+  for (const [amount, count] of counts) {
+    if (count * 5 >= months * 4) return amount;
+  }
+  return 0;
+}
+
+function modalPaymentCents(report) {
+  if (report.arm !== undefined) {
+    return report.monthly_payment_cents;
+  }
+  const rows = report.schedule.slice(0, report.payoff_month);
+  const counts = new Map();
+  for (const row of rows) {
+    const payment = report.monthly_payment_cents;
+    const entry = counts.get(payment) ?? { count: 0, firstMonth: row.month };
+    entry.count += 1;
+    counts.set(payment, entry);
+  }
+  let bestPayment = 0;
+  let bestCount = 0;
+  let bestFirstMonth = Number.POSITIVE_INFINITY;
+  for (const [payment, { count, firstMonth }] of counts) {
+    if (count > bestCount || (count === bestCount && firstMonth < bestFirstMonth)) {
+      bestCount = count;
+      bestPayment = payment;
+      bestFirstMonth = firstMonth;
+    }
+  }
+  return bestPayment;
+}
+
 module.exports = {
   buildReport,
   dollarsToCents,
   formatGroupedCents,
   formatPlainCents,
+  levelArmExtras,
+  recastFixed,
+  savedByExtraCents,
+  savedByExtraByMonth,
+  modalPaymentCents,
+  prevailingExtraCents,
 };

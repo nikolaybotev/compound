@@ -42,6 +42,8 @@ DoD: `node --test` exits 0. AC1, and the library numbers in AC3 (`1657241`, `575
 
 ### Build notes (Phase 0)
 
+The amortization AC2 source scan now rejects `require(` calls only, because `levelArmExtras` throws `level extras require an ARM`.
+
 ## Phase 1 — Command-line tool
 
 Files: `compound_interest_monthly.js`, `compound_interest_monthly.test.js`, `README.md`, `AGENTS.md`, `REVIEW.md`.

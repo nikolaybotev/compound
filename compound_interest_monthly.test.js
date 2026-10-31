@@ -432,9 +432,10 @@ test('AC7 skill states the ask rule, the CSV, and which flags to run', () => {
 
 test('amortization AC2 pure walk matches the 30-year fixture and stays free of Node APIs', () => {
   const source = fs.readFileSync(path.join(__dirname, 'amortize.js'), 'utf8');
-  for (const token of ['require', 'import', 'process', 'fs']) {
+  for (const token of ['import', 'process', 'fs']) {
     assert.equal(source.includes(token), false, `amortize.js contains ${token}`);
   }
+  assert.doesNotMatch(source, /\brequire\s*\(/, 'amortize.js must not call require()');
   const { buildReport, formatGroupedCents } = require('./amortize.js');
   const report = buildReport(570000, 7, 360, new Map(), 30);
   assert.equal(report.monthly_payment_cents, 379222);
