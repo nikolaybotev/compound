@@ -35,13 +35,19 @@ jobs:
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: 12.6.0
 
-      - name: Set up Node.js 24
+      - name: Read Node.js version
+        id: node
+        run: |
+          set -euo pipefail
+          version=$(awk -F'"' '/^node = / { print $2; exit }' mise.toml)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ steps.node.outputs.version }}
           cache: pnpm
 
       - name: Install dependencies
@@ -53,11 +59,14 @@ jobs:
         run: |
           set -euo pipefail
           SHORT_SHA="${FEAT_SHA:0:12}"
+          repo="${{ github.repository }}"
+          name="${repo##*/}"
           echo "SHORT_SHA=${SHORT_SHA}" >> "$GITHUB_ENV"
-          VITE_BASE="/compound/feat/${SHORT_SHA}/" \
-          VITE_STORAGE_KEY="compound-amortization-feat-${{ github.event.pull_request.number }}-v1" \
+          echo "PAGES_REPO_NAME=${name}" >> "$GITHUB_ENV"
+          VITE_BASE="/${name}/feat/${SHORT_SHA}/" \
+          VITE_STORAGE_KEY="${name}-amortization-feat-${{ github.event.pull_request.number }}-v1" \
           pnpm --dir apps/web build
-          grep -q "/compound/feat/${SHORT_SHA}/" apps/web/dist/index.html
+          grep -q "/${name}/feat/${SHORT_SHA}/" apps/web/dist/index.html
 
       - name: Check out gh-pages publish script
         uses: actions/checkout@v4
@@ -113,14 +122,21 @@ jobs:
       - name: Set up pnpm
         if: steps.open_pr.outputs.has_open_pr == 'false'
         uses: pnpm/action-setup@v4
-        with:
-          version: 12.6.0
 
-      - name: Set up Node.js 24
+      - name: Read Node.js version
+        if: steps.open_pr.outputs.has_open_pr == 'false'
+        id: node
+        run: |
+          set -euo pipefail
+          version=$(awk -F'"' '/^node = / { print $2; exit }' mise.toml)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
         if: steps.open_pr.outputs.has_open_pr == 'false'
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ steps.node.outputs.version }}
           cache: pnpm
 
       - name: Install dependencies
@@ -134,11 +150,13 @@ jobs:
         run: |
           set -euo pipefail
           SHORT_SHA="${FULL_SHA:0:12}"
+          repo="${{ github.repository }}"
+          name="${repo##*/}"
           echo "SHORT_SHA=${SHORT_SHA}" >> "$GITHUB_ENV"
-          VITE_BASE="/compound/feat/${SHORT_SHA}/" \
-          VITE_STORAGE_KEY="compound-amortization-feat-${SHORT_SHA}-v1" \
+          VITE_BASE="/${name}/feat/${SHORT_SHA}/" \
+          VITE_STORAGE_KEY="${name}-amortization-feat-${SHORT_SHA}-v1" \
           pnpm --dir apps/web build
-          grep -q "/compound/feat/${SHORT_SHA}/" apps/web/dist/index.html
+          grep -q "/${name}/feat/${SHORT_SHA}/" apps/web/dist/index.html
 
       - name: Check out gh-pages publish script
         if: steps.open_pr.outputs.has_open_pr == 'false'

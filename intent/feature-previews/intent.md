@@ -6,11 +6,11 @@
 | Status | Draft |
 | Stage | 1 · Plan |
 | Feeds | [spec.md](spec.md) → [plan.md](plan.md) |
-| Builds on | [../complete-loan-picture/intent.md](../complete-loan-picture/intent.md) (GitHub Pages publisher and `/compound/prototype/`) |
+| Builds on | [../complete-loan-picture/intent.md](../complete-loan-picture/intent.md) (GitHub Pages publisher and prototype/ on the Pages site) |
 
 ## Problem
 
-Pull requests that change the amortization page have no URL on the existing GitHub Pages site. Reviewers must run the app locally or rely on CI. The production publisher on `main` replaces the whole site through `actions/deploy-pages` and the `github-pages` environment, so a feature branch cannot safely upload its own tree without clobbering `/compound/` or `/compound/prototype/`.
+Pull requests that change the amortization page have no URL on the existing GitHub Pages site. Reviewers must run the app locally or rely on CI. The production publisher on `main` replaces the whole site through `actions/deploy-pages` and the `github-pages` environment, so a feature branch cannot safely upload its own tree without clobbering the Pages site or prototype/ on the Pages site.
 
 ## Proposed outcome
 
@@ -36,19 +36,19 @@ None. The decisions are recorded as D1–D12 in [spec.md](spec.md).
 
 ## Original prompt (verbatim)
 
-> Define and implement a feature-preview deploy for nikolaybotev/compound. Follow the skill guide. The repo already has the SDLC chain. This is a new intent folder, intent/feature-previews/, linking to the pages deploy it builds on. Read AGENTS.md, .github/workflows/deploy-pages.yml, and the current Pages setup before writing decisions.
+> Define and implement a feature-preview deploy for this repo. Follow the skill guide. The repo already has the SDLC chain. This is a new intent folder, intent/feature-previews/, linking to the pages deploy it builds on. Read AGENTS.md, .github/workflows/deploy-pages.yml, and the current Pages setup before writing decisions.
 >
 > Branch from latest origin/main. Open one pull request. Do not merge it. Do not force-push main.
 >
 > ## Workflow
-> Feature branches must not deploy to production. Each feature gets its own GitHub Pages URL, independent of the main-branch production deploy. Production stays the current /compound/ page, including the /compound/prototype/ subpath, which stays at least for now. A suggested path was /compound-feat-123 or something suitable.
+> Feature branches must not deploy to production. Each feature gets its own GitHub Pages URL, independent of the main-branch production deploy. Production stays the current Pages site, including the prototype/ subpath, which stays at least for now. A suggested path was a sibling of the Pages site or something suitable.
 >
 > ## Decisions already made
-> - Production deploy stays main-only. Pushing a feature branch must not run the production Pages upload and must not replace /compound/ or /compound/prototype/.
-> - The Pages site is mounted at /compound/. This repo cannot publish /compound-feat-123/. Use /compound/feat/<pull-request-number>/ . Deploy when a same-repo pull request is opened or updated. No deploy for a branch with no pull request. Remove that feat/ directory when the pull request closes. Prototype is not a feature preview and is not removed by that cleanup.
+> - Production deploy stays main-only. Pushing a feature branch must not run the production Pages upload and must not replace the Pages site or prototype/ on the Pages site.
+> - The Pages site is mounted at the repository name. This repo cannot publish a sibling of that path. Use feat/<pull-request-number>/ under the Pages base. Deploy when a same-repo pull request is opened or updated. No deploy for a branch with no pull request. Remove that feat/ directory when the pull request closes. Prototype is not a feature preview and is not removed by that cleanup.
 > - actions/deploy-pages replaces the whole site, and the github-pages environment has been limited to main. Do not point a feature job at that environment or upload a partial artifact over production. Publish only the feature directory, in a way that keeps the existing production files and prototype/. If two feature publishes can erase each other, serialize them. If you cannot do that without risking production, stop and write the blocker into the plan. Do not ship a clobber.
-> - A feature preview is the same origin as production, so localStorage is shared. Bake a separate storage key for preview builds so a preview does not read or write compound-amortization-v1. Production and prototype keep that key.
-> - Vite base for a preview is /compound/feat/<number>/. Production base stays /compound/. A local build with VITE_BASE unset stays ./.
+> - A feature preview is the same origin as production, so localStorage is shared. Bake a separate storage key for preview builds so a preview does not read or write STORAGE_KEY. Production and prototype keep that key.
+> - Vite base for a preview is feat/<number>/ under the Pages base. Production base stays the Pages site. A local build with VITE_BASE unset stays ./.
 > - Same-repo branches only. Do not deploy forks.
 > - No new calculator dependency. Update AGENTS.md with the preview command and the production-vs-preview rule. Update plan.md in the same commit if implementation departs from it.
 >

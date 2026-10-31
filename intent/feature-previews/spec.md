@@ -8,14 +8,14 @@
 
 ## 1. Summary
 
-GitHub Pages for this repo serves an **orphan `gh-pages` branch**: the built site tree plus an empty `.nojekyll` at the root. Production updates replace only the site root (`index.html` and `assets/`). `prototype/` is copied once at seed from the live site and is never republished by a workflow. Feature previews live under `feat/<12-char-commit-sha>/`; open pull requests also keep `feat/<pull-request-number>/index.html` as an HTML redirect to the latest sha. Closing or merging a pull request does **not** remove that pointer. Version **0.6** (complete-loan-picture, `apps/web` `0.6.0`) is the current app release; production `gh-pages` commits are tagged `0.6` when that tag is not already on the remote.
+GitHub Pages for this repo serves an **orphan `gh-pages` branch**: the built site tree plus an empty `.nojekyll` at the root. Production updates replace only the site root (`index.html` and `assets/`). `prototype/` is copied once at seed from the live site and is never republished by a workflow. Feature previews live under `feat/<12-char-commit-sha>/`; open pull requests also keep `feat/<pull-request-number>/index.html` as an HTML redirect to the latest sha. Closing or merging a pull request does **not** remove that pointer. Production `gh-pages` commits are tagged with `PAGES_POINT_VERSION`, taken from `apps/web/package.json` `version`, when that tag is not already on the remote.
 
 ## 2. Goals and non-goals
 
 **Goals**
 
-- G1. Stable PR URL `/compound/feat/<n>/` redirects to the latest `/compound/feat/<12-char-sha>/`.
-- G2. Each feature build is a full Vite output under `feat/<12-char-sha>/` with `VITE_BASE=/compound/feat/<sha>/`.
+- G1. Stable PR URL `feat/<n>/ under the Pages base` redirects to the latest `feat/<12-char-sha>/ under the Pages base`.
+- G2. Each feature build is a full Vite output under `feat/<12-char-sha>/` with `VITE_BASE` set to the Pages base plus `feat/<sha>/`.
 - G3. Production root on `gh-pages` changes only via `publish-gh-pages-production.yml` on `main`; `prototype/` and `feat/` are not rewritten by that job.
 - G4. Correct storage keys for production, prototype, PR previews, and branch-only previews.
 - G5. Documented rollout with backup, seed, Actions deploy from `gh-pages`, branch protection, and rollback.
@@ -38,7 +38,7 @@ GitHub Pages for this repo serves an **orphan `gh-pages` branch**: the built sit
 | `deploy-gh-pages-branch.yml` | On `workflow_dispatch` only (from `main`): check out `gh-pages`, upload whole tree, `actions/deploy-pages`. No build. Workflow file stays on `main` only. |
 | `pages-backup-pre-gh-pages` (orphan) | Full mirror of the live site before cutover (production + `prototype/` + all referenced assets). |
 | `deploy-pages.yml` | **Rollback only** (`workflow_dispatch`): rebuild production + `prototype/` from git and deploy. Does not run on `main` push after cutover. |
-| `publish-gh-pages-production.yml` | On `main` push / dispatch: build production from `main`, commit root only on `gh-pages`, tag `0.6` when absent; **`workflow_dispatch` `deploy-gh-pages-branch.yml`** when the push succeeds. |
+| `publish-gh-pages-production.yml` | On `main` push / dispatch: build production from `main`, commit root only on `gh-pages`, tag `PAGES_POINT_VERSION` when absent; **`workflow_dispatch` `deploy-gh-pages-branch.yml`** when the push succeeds. |
 | `deploy-feature-preview.yml` | PR and non-`main` branch pushes: `feat/<sha>/` and optional PR redirect pointer; dispatch `deploy-gh-pages-branch.yml` when the push succeeds. |
 | `.github/scripts/gh-pages-publish.sh` | Path-scoped commits with fast-forward retry (no force-push). |
 
@@ -52,10 +52,10 @@ Every publish fetches the current `gh-pages` tip, applies **only that job’s pa
 
 ### 4.2 Main production publish
 
-- Builds `apps/web` from `main` with `VITE_BASE=/compound/`.
+- Builds `apps/web` from `main` with `VITE_BASE` set from the repository name.
 - Replaces top-level production files on `gh-pages` (from staging: `index.html`, `assets/`, and any other top-level files from the production dist).
 - Does **not** delete or overwrite `prototype/` or `feat/`.
-- After a successful push, if `PAGES_POINT_VERSION` is `0.6` and tag `0.6` does not exist on the remote, create annotated tag `0.6`. If tag `0.6` already exists, log and exit **0** (do not move the tag, do not fail).
+- After a successful push, if `PAGES_POINT_VERSION` is set and that tag does not exist on the remote, create an annotated tag of that name. If the tag already exists, log and exit **0** (do not move the tag, do not fail).
 
 ### 4.3 Prototype
 
@@ -77,8 +77,8 @@ Until `gh-pages` is seeded and the first `deploy-gh-pages-branch` run completes,
 
 ### 4.5 Feature previews
 
-- **Sha folder:** full build at `feat/<12-char-sha>/` (`index.html` + `assets/`). `VITE_BASE=/compound/feat/<sha>/`.
-- **Pull request:** same build; also write `feat/<pull-request-number>/index.html` redirecting to `/compound/feat/<sha>/` (HTML meta refresh + link; not a symlink). Each new push updates the pointer to the new sha.
+- **Sha folder:** full build at `feat/<12-char-sha>/` (`index.html` + `assets/`). `VITE_BASE` set to the Pages base plus `feat/<sha>/`.
+- **Pull request:** same build; also write `feat/<pull-request-number>/index.html` redirecting to `feat/<sha>/ under the Pages base` (HTML meta refresh + link; not a symlink). Each new push updates the pointer to the new sha.
 - **No open PR:** branch push publishes only `feat/<sha>/` (skipped when an open PR exists for that branch).
 - **PR close/merge:** pointer **remains** at the last published sha; sha folders are never deleted by the workflow.
 - **Forks:** same-repo only.
@@ -87,11 +87,11 @@ Until `gh-pages` is seeded and the first `deploy-gh-pages-branch` run completes,
 
 | Context | Key |
 |---|---|
-| Production and prototype | `compound-amortization-v1` |
-| PR preview build | `compound-amortization-feat-<pull-request-number>-v1` |
-| Branch-only preview (no open PR) | `compound-amortization-feat-<12-char-sha>-v1` |
+| Production and prototype | `STORAGE_KEY` |
+| PR preview build | `{repository name}-amortization-feat-<pull-request-number>-v1` |
+| Branch-only preview (no open PR) | `{repository name}-amortization-feat-<12-char-sha>-v1` |
 
-Set via `VITE_STORAGE_KEY` at build time; default in `loan.ts` remains `compound-amortization-v1`.
+Set via `VITE_STORAGE_KEY` at build time; default in `loan.ts` remains `STORAGE_KEY`.
 
 ### 4.7 Versioning and tags
 
@@ -123,7 +123,7 @@ Block **force-push** and **branch deletion** on `gh-pages`. Only the publish wor
 ## 5. Workflows and files
 
 - `.github/workflows/deploy-gh-pages-branch.yml` — `workflow_dispatch` only; live publisher from `gh-pages`.
-- `.github/workflows/publish-gh-pages-production.yml` — `PAGES_POINT_VERSION: "0.6"`; dispatches deploy after push.
+- `.github/workflows/publish-gh-pages-production.yml` — `PAGES_POINT_VERSION` from `apps/web/package.json` `version`; dispatches deploy after push.
 - `.github/workflows/deploy-feature-preview.yml` — `pull_request` (opened, synchronize, reopened) and `push` (not `main` / `gh-pages`); dispatches deploy after push.
 - `.github/workflows/deploy-pages.yml` — `workflow_dispatch` rollback rebuild.
 - `.github/scripts/gh-pages-publish.sh` — `production`, `feature-sha`, `feature-pr-publish`, `feature-pointer-remove` (manual only), `production-rollback`; sets `GH_PAGES_PUSH_MARKER` on successful push.
@@ -137,8 +137,8 @@ Block **force-push** and **branch deletion** on `gh-pages`. Only the publish wor
 |---|---|
 | AC1 | `deploy-gh-pages-branch.yml` uploads the `gh-pages` tree without building; `deploy-pages.yml` still builds production and `prototype/` when dispatched for rollback. |
 | AC2 | `publish-gh-pages-production.yml` does not build or write `prototype/`. |
-| AC3 | `loan.ts` default `compound-amortization-v1`; preview keys via `VITE_STORAGE_KEY`. |
-| AC4 | PR preview uses `VITE_BASE=/compound/feat/<12-char-sha>/` and PR storage key. |
+| AC3 | `loan.ts` default `STORAGE_KEY`; preview keys via `VITE_STORAGE_KEY`. |
+| AC4 | PR preview uses `VITE_BASE` set to the Pages base plus `feat/<12-char-sha>/` and PR storage key. |
 | AC5 | `node --test` and `pnpm --dir apps/web test` pass. |
 | AC6 | No test workflow on push to `gh-pages`. |
 

@@ -19,7 +19,7 @@ The page still amortizes with the existing calculator. A heading in the form `60
 ## Affected users and systems
 
 - **Users:** The owner, in a browser, comparing a conventional purchase with the Numbers sheet.
-- **Systems:** The amortization page in `apps/web`, which already calls `buildReport` in `amortize.js`. GitHub Pages at `/compound/`, plus a new prototype URL recorded in [spec.md](spec.md). The command-line calculator and the mortgage skill stay as they are.
+- **Systems:** The amortization page in `apps/web`, which already calls `buildReport` in `amortize.js`. GitHub Pages at the Pages site, plus a new prototype URL recorded in [spec.md](spec.md). The command-line calculator and the mortgage skill stay as they are.
 
 ## Constraints and principles
 

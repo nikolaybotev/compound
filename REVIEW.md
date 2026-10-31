@@ -19,3 +19,11 @@ Report at most five nits per review; summarize the rest as a count.
 ## Do not report
 
 Formatting the CI already enforces, generated files the repo ignores, and wording inside the verbatim prompt block of any `intent.md`.
+
+## Writing
+
+Never hardcode this repo's own owner, name, or URL, including the Pages site URL where it can be derived. Prose about the repo says "this repo". Distribution entry points may hardcode the canonical location: a curl|sh one-liner, an installer's default source, or a dependency on another repo. Add an optional override for forks where it is cheap. Do not derive a repo identity from `GITHUB_REPOSITORY` in code that other repos' CI may run. Inside this repo's own workflows, `${{ github.repository }}` is fine. Do not make install instructions depend on an env var the reader must set. References to other repos are fine.
+
+Don't copy the current value of a setting into docs, tests, or workflows. Refer to the setting by its name (env var, secret, or config key). Tests check behavior against the configured value, not a literal.
+
+In the README and other human-facing user or setup docs, drop notes a competent reader already knows, such as "(healthy: exit 0)". `AGENTS.md`, this file, skills, and intents written for agents keep those explicit expectations.

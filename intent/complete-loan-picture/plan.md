@@ -10,7 +10,7 @@ Spec wins. Update this file in the same change whenever implementation departs f
 
 ## Stops
 
-None outstanding. D14 is decided. The feature pull request stays open. The prototype URL is `/compound/prototype/`.
+None outstanding. D14 is decided. The feature pull request stays open. The prototype URL is prototype/ on the Pages site.
 
 ## Departure from one merged pull request per phase
 
@@ -81,20 +81,20 @@ None yet.
 
 Files: `.github/workflows/deploy-pages.yml` on `main` only. Do not land this by merging the feature pull request. Do not add a second workflow that also uploads to Pages.
 
-Checked 2026-10-04: `deploy-pages.yml` uploads the whole `apps/web/dist`. The `github-pages` deployment branch policy is only `main`. Publishing a prototype-only tree would replace `/compound/`. Widening the environment so the feature branch can deploy is rejected.
+Checked 2026-10-04: `deploy-pages.yml` uploads the whole `apps/web/dist`. The `github-pages` deployment branch policy is only `main`. Publishing a prototype-only tree would replace the Pages site. Widening the environment so the feature branch can deploy is rejected.
 
 1. Open a pull request whose only change is `deploy-pages.yml`. The open feature branch already has the page. Set the workflow's `ref` default to that branch. Merge the workflow pull request when its CI is green. That merge is a push to `main`, so the combined job publishes both trees. It must not upload production alone.
 2. The workflow still runs on `push` to `main` and on `workflow_dispatch`. Permissions stay `contents: read`, `pages: write`, and `id-token: write`. Concurrency group stays `pages`, `cancel-in-progress: false`. Environment stays `github-pages`. Input `ref` defaults to the open feature branch. A dispatch may pass another ref. A push uses the default.
-3. Check out `main` and `ref` in two directories. A second `actions/checkout` must not replace the tree the first build just wrote. Vite writes `apps/web/dist` inside each checkout. Install each checkout on its own. Build `main` with `VITE_BASE=/compound/` and `ref` with `VITE_BASE=/compound/prototype/`. Place the outputs at `site/index.html` and `site/prototype/index.html` before the existence check. On `push`, `inputs.ref` is empty, so the prototype build uses the feature-branch default. It does not use `github.sha`. If `ref` cannot be checked out, fail and upload nothing.
-4. Fail the job unless `site/index.html` and `site/prototype/index.html` both exist, the prototype file references `/compound/prototype/`, and the root file does not. Upload `site/` with `actions/upload-pages-artifact` and deploy with `actions/deploy-pages`. This is the only Pages upload while the prototype is up. A later push to `main` runs this same job and rebuilds production and `prototype/` together.
-5. Run AC8 on that combined `deploy-pages.yml` run, the one the merge to `main` starts. There is no second Pages workflow. The two URLs share `compound-amortization-v1` on `the pages site`. Opening the prototype writes that key, so clear it immediately before the production load. Production is then the `main` page: monthly payment `$3,792.22`, and no "Complete monthly payment" figure. The prototype shows the AC3 heading and summary `$3,936.85`.
+3. Check out `main` and `ref` in two directories. A second `actions/checkout` must not replace the tree the first build just wrote. Vite writes `apps/web/dist` inside each checkout. Install each checkout on its own. Build `main` with `VITE_BASE` set from the repository name and `ref` with `VITE_BASE` set to the Pages base plus `prototype/`. Place the outputs at `site/index.html` and `site/prototype/index.html` before the existence check. On `push`, `inputs.ref` is empty, so the prototype build uses the feature-branch default. It does not use `github.sha`. If `ref` cannot be checked out, fail and upload nothing.
+4. Fail the job unless `site/index.html` and `site/prototype/index.html` both exist, the prototype file references prototype/ on the Pages site, and the root file does not. Upload `site/` with `actions/upload-pages-artifact` and deploy with `actions/deploy-pages`. This is the only Pages upload while the prototype is up. A later push to `main` runs this same job and rebuilds production and `prototype/` together.
+5. Run AC8 on that combined `deploy-pages.yml` run, the one the merge to `main` starts. There is no second Pages workflow. The two URLs share `STORAGE_KEY` on `the pages site`. Opening the prototype writes that key, so clear it immediately before the production load. Production is then the `main` page: monthly payment `$3,792.22`, and no "Complete monthly payment" figure. The prototype shows the AC3 heading and summary `$3,936.85`.
 
 DoD: AC8. The feature pull request is still open and unmerged. Stop. Do not merge it.
 
 ### Build notes (Phase 3)
 
-- pnpm is pinned to 12.6.0. The two checkouts live in `main/` and `prototype/`, so `pnpm/action-setup` has no root `package.json` from which to read `packageManager`.
+- pnpm is the `packageManager` in `package.json`. The two checkouts live in `main/` and `prototype/`, so the setup step reads `packageManager` from `main/package.json`.
 - The prototype checkout ref is `inputs.ref || 'complete-loan-picture'`. On a push, `inputs.ref` is empty, so the default is the feature branch and not `github.sha`.
-- The assemble step also requires production `index.html` to contain `/compound/`. The spec's checks stay: both index files exist, the prototype file references `/compound/prototype/`, and the root file does not.
+- The assemble step also requires production `index.html` to contain the Pages site. The spec's checks stay: both index files exist, the prototype file references prototype/ on the Pages site, and the root file does not.
 - The same workflow file is committed on `complete-loan-picture`. Phase 3 still lands on `main` only through the workflow pull request. This copy keeps a later merge of the feature from restoring the production-only upload, which would delete `prototype/`.
-- After the request to merge the feature, a missing prototype ref no longer fails the job before upload. The checkout stays `continue-on-error`. On failure the job copies the `main` tree into `prototype/` and still builds `VITE_BASE=/compound/prototype/`. Production is built from `main` either way. `prototype/` stays in the artifact, so a later push does not delete /compound/prototype/. The storage key stays `compound-amortization-v1`. There is no migration that clears a saved loan.
+- After the request to merge the feature, a missing prototype ref no longer fails the job before upload. The checkout stays `continue-on-error`. On failure the job copies the `main` tree into `prototype/` and still builds `VITE_BASE` set to the Pages base plus `prototype/`. Production is built from `main` either way. `prototype/` stays in the artifact, so a later push does not delete prototype/ on the Pages site. The storage key stays `STORAGE_KEY`. There is no migration that clears a saved loan.

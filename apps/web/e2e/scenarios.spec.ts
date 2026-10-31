@@ -1,7 +1,7 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { configuredOrigin, LEGACY_KEY, SET_KEY } from "./configured";
 import { setStartMonth } from "./start-month";
 
-const origin = "http://127.0.0.1:4173";
 const leaks = new WeakMap<BrowserContext, string[]>();
 
 test.beforeEach(async ({ context }) => {
@@ -182,9 +182,9 @@ test("closed scenario number matches the open menu", async ({ page }) => {
 });
 
 test("AC10 version-1 legacy loads and writes v2 on edit", async ({ page }) => {
-  await page.addInitScript(() => {
+  await page.addInitScript(({ legacyKey, setKey }) => {
     localStorage.setItem(
-      "compound-amortization-v1",
+      legacyKey,
       JSON.stringify({
         version: 1,
         price: "570000",
@@ -194,16 +194,16 @@ test("AC10 version-1 legacy loads and writes v2 on edit", async ({ page }) => {
         start: "2026-10",
       }),
     );
-    localStorage.removeItem("compound-amortization-v2");
-  });
+    localStorage.removeItem(setKey);
+  }, { legacyKey: LEGACY_KEY, setKey: SET_KEY });
   await page.goto("/");
   await expect(page.locator("#price")).toHaveValue("570");
-  const legacyBefore = await page.evaluate(() => localStorage.getItem("compound-amortization-v1"));
+  const legacyBefore = await page.evaluate((legacyKey) => localStorage.getItem(legacyKey), LEGACY_KEY);
   expect(legacyBefore).toContain('"version":1');
   await page.locator("#rate").fill("7.01");
   await page.locator("#rate").blur();
-  const legacyAfter = await page.evaluate(() => localStorage.getItem("compound-amortization-v1"));
-  const setAfter = await page.evaluate(() => localStorage.getItem("compound-amortization-v2"));
+  const legacyAfter = await page.evaluate((legacyKey) => localStorage.getItem(legacyKey), LEGACY_KEY);
+  const setAfter = await page.evaluate((setKey) => localStorage.getItem(setKey), SET_KEY);
   expect(legacyAfter).toContain('"version":1');
   expect(setAfter).toContain('"version":2');
   expect(JSON.parse(setAfter ?? "{}").scenarios[0].price).toBe("570000");
@@ -229,16 +229,16 @@ test("schedule has no Prevailing extra column", async ({ page }) => {
 });
 
 test("AC13 save failure alert and rollback", async ({ page }) => {
-  await page.addInitScript(() => {
+  await page.addInitScript((legacyKey) => {
     const storage = window as Window & { __blockLegacySave?: boolean };
     const original = Storage.prototype.setItem;
     Storage.prototype.setItem = function (key: string, value: string) {
-      if (key === "compound-amortization-v1" && storage.__blockLegacySave) {
+      if (key === legacyKey && storage.__blockLegacySave) {
         throw new Error("blocked");
       }
       return original.call(this, key, value);
     };
-  });
+  }, LEGACY_KEY);
   await page.clock.install({ time: new Date("2026-10-15T12:00:00Z") });
   await page.goto("/");
   await page.locator("#scenario").click();
@@ -305,6 +305,7 @@ async function headingText(page: Page): Promise<string> {
 }
 
 async function blockForeignHosts(context: BrowserContext) {
+  const origin = configuredOrigin();
   const leaked: string[] = [];
   leaks.set(context, leaked);
   await context.route("**/*", (route) => {

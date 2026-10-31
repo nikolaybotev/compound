@@ -1,6 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { configuredOrigin } from "./configured";
 
-const origin = "http://127.0.0.1:4173";
 const leaks = new WeakMap<BrowserContext, string[]>();
 
 const FIRST_ADJUSTMENT_LINE =
@@ -85,6 +85,7 @@ async function openArm(page: Page) {
 }
 
 async function blockForeignHosts(context: BrowserContext) {
+  const origin = configuredOrigin();
   const blocked: string[] = [];
   leaks.set(context, blocked);
   await context.route("**/*", (route) => {

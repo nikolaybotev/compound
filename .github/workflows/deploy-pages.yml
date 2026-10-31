@@ -57,12 +57,20 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 12.6.0
+          package_json_file: main/package.json
 
-      - name: Set up Node.js 24
+      - name: Read Node.js version
+        id: node
+        run: |
+          set -euo pipefail
+          version=$(awk -F'"' '/^node = / { print $2; exit }' main/mise.toml)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: ${{ steps.node.outputs.version }}
           cache: pnpm
           cache-dependency-path: |
             main/pnpm-lock.yaml
@@ -78,28 +86,36 @@ jobs:
 
       - name: Build production
         working-directory: main
-        env:
-          VITE_BASE: /compound/
-        run: pnpm --dir apps/web build
+        run: |
+          set -euo pipefail
+          repo="${{ github.repository }}"
+          name="${repo##*/}"
+          VITE_BASE="/${name}/" pnpm --dir apps/web build
 
       - name: Build prototype
         working-directory: prototype
-        env:
-          VITE_BASE: /compound/prototype/
-        run: pnpm --dir apps/web build
+        run: |
+          set -euo pipefail
+          repo="${{ github.repository }}"
+          name="${repo##*/}"
+          VITE_BASE="/${name}/prototype/" pnpm --dir apps/web build
 
       - name: Assemble site
         run: |
           set -euo pipefail
+          repo="${{ github.repository }}"
+          name="${repo##*/}"
+          base="/${name}/"
+          prototype="/${name}/prototype/"
           mkdir -p site/prototype
           cp -a main/apps/web/dist/. site/
           cp -a prototype/apps/web/dist/. site/prototype/
           test -f site/index.html
           test -f site/prototype/index.html
-          grep -q '/compound/' site/index.html
-          grep -q '/compound/prototype/' site/prototype/index.html
-          if grep -q '/compound/prototype/' site/index.html; then
-            echo "production index references /compound/prototype/" >&2
+          grep -q "$base" site/index.html
+          grep -q "$prototype" site/prototype/index.html
+          if grep -q "$prototype" site/index.html; then
+            echo "production index references ${prototype}" >&2
             exit 1
           fi
 

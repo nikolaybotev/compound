@@ -34,7 +34,7 @@ None. The design choices made while drafting are D1–D14 in [spec.md](spec.md).
 
 ## Original prompt (verbatim)
 
-> Look at @github.com/nikolaybotev/compound/compound_interest_monthly.js .
+> Look at compound_interest_monthly.js in this repo .
 >
 > This is for mortgage interest payments amortization and additional payment savings calculations.
 >

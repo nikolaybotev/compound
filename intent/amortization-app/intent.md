@@ -38,12 +38,12 @@ None. The design choices made while drafting are D1–D19 in [spec.md](spec.md).
 
 ## Original prompt (verbatim)
 
-> Take a look at the @github.com/nikolaybotev/compound/intent/mortgage-skill project's intent plan and spec. The project just got built, let's start on the next project spec and plan using /ai-native-sdlc .
+> Take a look at the intent/mortgage-skill in this repo project's intent plan and spec. The project just got built, let's start on the next project spec and plan using /ai-native-sdlc .
 >
 > I want an app that is similar to and inspired by bankrate's calculator at https://www.bankrate.com/mortgages/amortization-calculator/ , but with key adjustments and distinctive features:
 >
 > 1) SPA that runs entirely locally in browser.
-> 2) Backed by our @github.com/nikolaybotev/compound/compound_interest_monthly.js as the backend
+> 2) Backed by our compound_interest_monthly.js in this repo as the backend
 > 3) Deployed to github similar to how @github.com/nikolaybotev/goldvalue  is deployed.
 > 4) A top-down layout with:
 > a) Inputs (Loan amount, term, Interest, start month) at the top. Maybe better to split Loan amount into Purchase Price and % downpayment, and derive the loan amount.
