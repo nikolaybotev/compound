@@ -70,7 +70,7 @@ That loan (the Example Credit Union 7/1 example in the docs) pays $3,371.77 for 
 
 | Flag | Meaning |
 |---|---|
-| `--fixed-years N` or `--fixed-months N` | Payments at the initial rate (`^[1-9]\d*$`). Exactly one is required, and the fixed period must be shorter than the term. |
+| `--fixed-years N` or `--fixed-months N` | Payments at the initial rate (`^[1-9]\d*$`). Exactly one is required, and the initial period must be shorter than the term. |
 | `--adjust-months N` | Months between resets (`^[1-9]\d*$`). The first reset is payment `F + 1`, then every `N` payments. |
 | `--margin P` | Added to the index at a reset. A percent, `^\d+(?:\.\d{1,3})?$`; `0` is allowed. |
 | `--caps I/P/L` | Initial, periodic, and lifetime caps in points, each `0` or more. The ceiling is `--rate` plus the lifetime cap. |

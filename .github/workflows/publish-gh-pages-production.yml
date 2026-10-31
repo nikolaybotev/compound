@@ -72,7 +72,7 @@ jobs:
       - name: Publish production root to gh-pages
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PAGES_POINT_VERSION: "0.17"
+          PAGES_POINT_VERSION: "0.18"
           GH_PAGES_PUSH_MARKER: ${{ runner.temp }}/gh-pages-pushed
         run: |
           set -euo pipefail

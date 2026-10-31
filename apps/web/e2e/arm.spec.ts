@@ -72,19 +72,20 @@ test("AC9 the Example Credit Union 7/1 example heading, terms, and summary", asy
   await expect(page.locator("#arm-floor")).toHaveValue("2.5");
   await expect(page.locator("#arm-initial-floor")).toHaveValue("2.5");
   await expect(page.locator("#arm-round-eighth")).not.toBeChecked();
-  await expect(page.getByLabel("Fixed period")).toBeVisible();
+  await expect(page.getByLabel("Initial period")).toBeVisible();
   await expect(page.getByLabel("Round to nearest 1/8 point")).toBeVisible();
   await expect(page.locator("[data-line='arm-ceiling']")).toHaveText("Ceiling 10.875% · Floor 2.5%");
   await expect(page.locator("[data-line='arm-first-adjustment']")).toHaveText(
-    "First adjustment November 2033 (payment 85) · -$941.16 to +$1,665.94",
+    "First adjustment November 2033 (payment 85) · -$941.16 to +$1,665.94 · new payment first due December 1, 2033",
   );
 
   const monthly = page.getByRole("region", { name: "Monthly payment" });
   await expect(monthly).toContainText("$4,288.02");
   await expect(monthly.locator(".note")).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Highest rate" })).toContainText("10.875% from November 2033");
+  await expect(page.getByRole("region", { name: "Highest rate" })).not.toContainText("first due");
   await expect(page.getByRole("region", { name: "Highest payment" })).toContainText(
-    "$5,037.71 from November 2033",
+    "$5,037.71 from November 2033 · first due December 1, 2033",
   );
   await expect(page.getByRole("region", { name: "Total interest paid" })).toContainText("$1,103,636.33");
   await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("November 1, 2056");
@@ -93,6 +94,33 @@ test("AC9 the Example Credit Union 7/1 example heading, terms, and summary", asy
   expect(await headingText(page)).toBe(
     "600K | 5% down | 5.875% 30-year fixed | 780+ | starting October 2026",
   );
+});
+
+test("AC4 sheet ARM due notes and adjustment timeline", async ({ page }) => {
+  await openArm(page);
+  await expect(page.locator("[data-line='arm-first-adjustment']")).toContainText(
+    "November 2033 (payment 85)",
+  );
+  await expect(page.locator("[data-line='arm-first-adjustment']")).toContainText(
+    "new payment first due December 1, 2033",
+  );
+  await expect(page.getByRole("region", { name: "Highest payment" })).toContainText("from November 2033");
+  await expect(page.getByRole("region", { name: "Highest payment" })).toContainText(
+    "first due December 1, 2033",
+  );
+  const timeline = page.locator(".arm-timeline");
+  await expect(timeline).toContainText("Change date November 1, 2033");
+  await expect(timeline).toContainText("previous amount");
+  await expect(timeline).toContainText("45 days before the change date");
+  await expect(timeline).toContainText("210 to 240");
+  await expect(timeline).toContainText("60 to 120");
+  await expect(timeline).toContainText("every 12 months");
+  await expect(timeline).toContainText("inference, not a separate rule");
+
+  await page.locator("#arm-adjust-months").fill("1");
+  await expect(page.getByTestId("arm-label")).toHaveText("7/1mo");
+  await expect(timeline).toContainText("25 to 120");
+  await expect(timeline).toContainText("210 to 240");
 });
 
 test("AC9 the structure label follows the interval", async ({ page }) => {
@@ -105,10 +133,10 @@ test("AC9 the structure label follows the interval", async ({ page }) => {
   await page.locator("#arm-fixed-years").fill("10");
   await expect(page.getByTestId("arm-label")).toHaveText("10/1");
   await expect(page.locator("[data-line='arm-first-adjustment']")).toHaveText(
-    "First adjustment November 2036 (payment 121) · -$852.58 to +$1,494.94",
+    "First adjustment November 2036 (payment 121) · -$852.58 to +$1,494.94 · new payment first due December 1, 2036",
   );
   await expect(page.getByRole("region", { name: "Highest payment" })).toContainText(
-    "$4,866.71 from November 2036",
+    "$4,866.71 from November 2036 · first due December 1, 2036",
   );
 });
 
@@ -136,10 +164,10 @@ test("a rate edit under a floor already entered keeps the last valid rate", asyn
   await expect(page.getByRole("region", { name: "Monthly payment" })).toContainText("$4,288.02");
 });
 
-test("a term that is not longer than the fixed period is reported on the fixed period", async ({ page }) => {
+test("a term that is not longer than the initial period is reported on the initial period", async ({ page }) => {
   await openArm(page);
   await page.locator("#years").fill("7");
-  await expect(page.getByRole("alert")).toContainText("Fixed period must be shorter than the term");
+  await expect(page.getByRole("alert")).toContainText("Initial period must be shorter than the term");
   await expect(page.locator("#arm-fixed-years")).toHaveAttribute("aria-invalid", "true");
   await expect(page.getByRole("region", { name: "Payoff date" })).toContainText("November 1, 2056");
   await page.locator("#years").fill("15");
@@ -189,7 +217,7 @@ test("a reload keeps the ARM scenario", async ({ page }) => {
   await expect(page.locator(".heading-line")).not.toContainText("= $4,288 / month");
   await expect(page.locator("summary", { hasText: "ARM terms" })).toHaveAttribute("aria-expanded", "true");
   await expect(page.getByRole("region", { name: "Highest payment" })).toContainText(
-    "$5,037.71 from November 2033",
+    "$5,037.71 from November 2033 · first due December 1, 2033",
   );
 });
 
@@ -329,7 +357,7 @@ test("AC10 an index at the first adjustment recomputes the path", async ({ page 
   await expect(index(page, 85)).toHaveValue("");
   await expect(nov).toContainText("10.875%");
   await expect(page.getByRole("region", { name: "Highest payment" })).toContainText(
-    "$5,037.71 from November 2033",
+    "$5,037.71 from November 2033 · first due December 1, 2033",
   );
   await expect(page.getByRole("region", { name: "Total interest paid" })).toContainText("$1,103,636.33");
 

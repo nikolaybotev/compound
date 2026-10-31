@@ -18,6 +18,9 @@ test("AC2 5.5% ARM November 2026 start with no extra", async ({ page }) => {
   await page.locator("#product").selectOption("arm");
   await expect(page.locator("[data-line='arm-ceiling']")).toHaveText("Ceiling 10.5% · Floor 2.5%");
   await setStartMonth(page, 2026, 11);
+  await expect(page.locator("[data-line='arm-first-adjustment']")).toContainText(
+    "new payment first due January 1, 2034",
+  );
 
   const monthly = page.getByRole("region", { name: "Monthly payment" });
   await expect(monthly).toContainText("$4,152.65");
@@ -32,7 +35,7 @@ test("AC2 5.5% ARM November 2026 start with no extra", async ({ page }) => {
     "1: $4,153 - 600K | 5% down | 5.5% | 30 years | 7/1",
   );
   await expect(page.getByRole("region", { name: "Highest payment" })).toContainText(
-    "$4,869.46 from December 2033",
+    "$4,869.46 from December 2033 · first due January 1, 2034",
   );
 });
 

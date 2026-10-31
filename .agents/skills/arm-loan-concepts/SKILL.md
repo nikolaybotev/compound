@@ -49,9 +49,9 @@ The axes combine. A loan's rate schedule does not decide its payment structure. 
 
 The list is the fully amortizing fixed-then-adjusting loan. Types names other products; they do not add parameters here.
 
-- **start rate** (`start_rate`): the note rate charged through the fixed period; the rate the lifetime ceiling is measured from.
+- **start rate** (`start_rate`): the note rate charged through the initial period; the rate the lifetime ceiling is measured from.
 - **term** (`term_payments`): the number of monthly payments to maturity; an ARM is amortized over the same term as a fixed loan.
-- **initial fixed period** (`fixed_payments`): the payments at the start rate before the first change date.
+- **initial period** (`fixed_payments`): the payments at the start rate before the first change date.
 - **adjustment interval** (`adjust_interval`): the payments between one change date and the next, so each later change is `adjust_interval` payments after the last; a note that adjusts annually has an interval of 12.
 - **index**: the published benchmark the note names; its reading enters the fully indexed rate.
 - **lookback**: the number of days before a change date as of which the index is read (`index_at_lookback`).
@@ -68,7 +68,9 @@ When a person states only one floor, treat it as both the initial floor and the 
 
 This procedure is the fully amortizing case named in Types. It does not compute an interest-only or option payment.
 
-The note sets the **change dates**. The first is the payment after the fixed period, `first_change = fixed_payments + 1`, and each later one is `adjust_interval` payments after the last. A month that is **not a change date** keeps the rate then in effect. An index reading for one month does not change a month that is not a change date; only `index_at_lookback` before a change date enters a rate.
+The note sets the **change dates**. The first is the payment after the initial period, `first_change = fixed_payments + 1`, and each later one is `adjust_interval` payments after the last on each **adjustment period**. A month that is **not a change date** keeps the rate then in effect. An index reading for one month does not change a month that is not a change date; only `index_at_lookback` before a change date enters a rate.
+
+On a **change date** the new rate **accrues**; the **new payment is first due** on the first monthly payment date after the change date (the payment due on the change date itself is still the previous amount). Both adjustment notices are counted back from that first new payment date. The one-time initial notice under 12 CFR 1026.20(d) must be given 210 to 240 days before the first payment at the adjusted level. The payment-change notice under 12 CFR 1026.20(c)(2) must be given at least 60 and no more than 120 days before that payment for a 6-month or 12-month adjustment interval, including 7/6, 5/6, and 7/1. The 25-to-120-day window applies only when adjustments are uniformly scheduled every 60 days or more often, and to certain pre-2015 loans; on the amortization page that is only a 1-month adjustment interval.
 
 On a **change date** the servicer reads the index as of the **lookback**, adds the margin, and that sum is the fully indexed rate: `fully_indexed_rate = index_at_lookback + margin`. A **higher margin** lifts every future fully indexed rate, because the margin is a term of `fully_indexed_rate` at every change date. If the note rounds that sum (uniform notes round to the nearest one-eighth of one percentage point), the value that enters `new_rate` below is the **rounded sum**; the caps, the floors, and the ceiling are **not rounded**. The skill does not give a tie rule.
 
@@ -114,7 +116,7 @@ The table below is **one example** of the parameters and is **not the definition
 
 | Parameter sheet row | Value | Role in the procedure |
 |---|---|---|
-| Initial Fixed Period | 7 Years | `fixed_payments` |
+| Initial period | 7 Years | `fixed_payments` |
 | Adjustment Frequency | Annually | `adjust_interval` (12 for Annually) |
 | Benchmark Index | 1-Year Constant Maturity Treasury (CMT) | `index` |
 | Margin | 2.50% | `margin` |
@@ -131,7 +133,7 @@ The sheet also prints an Upfront Buy-Down Limit of 5.50%, which is a pricing rul
 
 ## How to answer
 
-Answer from this document and quote the step, the relation, or the axis the question is about. Do not compute a payment, an interest figure, a reset rate, or an index value for a person's loan. This skill **does not fetch** an index from any publisher. When the user wants a figure for a fully amortizing loan, say that **mortgage-loan-calculator** is the skill that runs the calculator and asks for the terms, and **does not run the calculator** from here. Do not supply the example's values as the user's terms, including the 45-day lookback, which is quoted only for the example loan or when the user gave it. When asked **which published fixing** of the index a note reads, or how two fixings compare, say the skill does not say which published fixing a note uses and has **no comparison of fixings**. Say the Example Credit Union table is **one invented example** when it is shown. Do not compute a **calendar date** for a change date: the first change is the payment after the fixed period and the note's schedule names the dates. The November 2033 label in Types belongs to the page illustration with a start month of October 2026 and is not a date for another loan.
+Answer from this document and quote the step, the relation, or the axis the question is about. Do not compute a payment, an interest figure, a reset rate, or an index value for a person's loan. This skill **does not fetch** an index from any publisher. When the user wants a figure for a fully amortizing loan, say that **mortgage-loan-calculator** is the skill that runs the calculator and asks for the terms, and **does not run the calculator** from here. Do not supply the example's values as the user's terms, including the 45-day lookback, which is quoted only for the example loan or when the user gave it. When asked **which published fixing** of the index a note reads, or how two fixings compare, say the skill does not say which published fixing a note uses and has **no comparison of fixings**. Say the Example Credit Union table is **one invented example** when it is shown. Do not compute a **calendar date** for a change date: the first change is the payment after the initial period and the note's schedule names the dates. The November 2033 label in Types belongs to the page illustration with a start month of October 2026 and is not a date for another loan.
 
 The procedure is the **fully amortizing** one. **interest-only** and **payment-option** loans, including **negative-amortization**, are explained in Types and are not calculated. Do not invent adjustment steps or a payment for them. **balloon** and **payment-capped** loans are not explained here, and the agent does not invent steps for them. Dollar figures in Types are a **labeled illustration**: the page's general scenario and a **CFPB sample**. Do not present a labeled illustration as the user's loan. If the balance, the rate, or the term is not that illustration, do not scale it and do not compute a new figure.
 

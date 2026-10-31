@@ -372,8 +372,8 @@ test('years is set on an ARM report only when passed', () => {
 
 test('AC5 the library names the term it rejects', () => {
   const cases = [
-    [{ fixedMonths: 360 }, /fixed period/],
-    [{ fixedMonths: 0 }, /fixed period/],
+    [{ fixedMonths: 360 }, /initial period/],
+    [{ fixedMonths: 0 }, /initial period/],
     [{ adjustMonths: 0 }, /adjustment interval/],
     [{ floorThousandths: 11000 }, /lifetime floor.*above the ceiling/],
     [{ initialFloorThousandths: 11000 }, /first adjustment floor.*above the ceiling/],
