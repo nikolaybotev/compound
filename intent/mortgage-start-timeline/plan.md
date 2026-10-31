@@ -88,7 +88,7 @@ DoD: `pnpm --dir apps/web test` and `pnpm --dir apps/web test:e2e` exit 0. `node
 
 ### Build notes (Phase 3)
 
-Added only after the phase lands.
+Shipped the Moving in disclosure after Closing Costs. `graceDays`, `lateChargePercent`, `signingDate`, `lastRent`, and `movingOpen` live on the version-2 picture. Missing keys load `15`, `5`, empty dates, and closed. `closingDisclosureDeadline` counts three business days backward from the day before the signing date. Sundays and 5 U.S.C. 6103(a) holidays are skipped, including the observed Friday when the holiday is a Saturday and the observed Monday when it is a Sunday. Saturday stays a business day. The signing date stays empty until the owner fills it. Prepaid interest on the disclosure is the existing `prepaidInterestCents` and `closingInterestDays`. An interest credit does not relabel schedule rows. The scenario document stays version 2. `amortize.js` is unchanged.
 
 ## Phase 4 — Tax table and PMI drop-off
 

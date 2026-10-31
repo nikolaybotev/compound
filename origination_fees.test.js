@@ -262,6 +262,9 @@ test('the skill asks for the missing facts and reports the script cents', () => 
     'adjustable',
     'interest-only',
     'Do not discount the payments yourself',
+    'odd-days interest',
+    '1st of the second month after the funding month',
+    'closing costs instead',
   ];
   for (const phrase of phrases) {
     assert.ok(skill.includes(phrase), `missing: ${phrase}`);
